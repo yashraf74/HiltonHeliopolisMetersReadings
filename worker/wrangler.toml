@@ -1,1 +1,12 @@
+name = "hilton-heliopolis-meters-api"
+main = "src/index.ts"
+compatibility_date = "2024-09-23"
 
+[[d1_databases]]
+binding = "DB"
+database_name = "hilton-heliopolis-meters-db"
+database_id = "ddfd41e9-dd91-44f7-be2b-3135b3c1e3b8"
+
+[[r2_buckets]]
+binding = "PHOTOS"
+bucket_name = "hilton-heliopolis-meter-photos"
