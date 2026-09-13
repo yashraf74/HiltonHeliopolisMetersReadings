@@ -3,6 +3,9 @@
 // verifies it (PBKDF2-SHA256, 100k iterations). Run the printed statement
 // against D1 with `wrangler d1 execute`.
 import { randomUUID } from "node:crypto";
+import { writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const PBKDF2_ITERATIONS = 100_000;
 
@@ -42,6 +45,12 @@ const esc = (s) => s.replace(/'/g, "''");
 
 const sql = `INSERT INTO users (id, username, password_hash, full_name, role, is_active, created_at) VALUES ('${id}', '${esc(username)}', '${hash}', '${esc(fullName)}', '${role}', 1, '${now}');`;
 
+// Written to a file rather than printed as a --command argument: the hash
+// contains `$`, which a shell would expand inside double quotes and silently
+// corrupt the stored password.
+const outPath = join(tmpdir(), `create-user-${username}.sql`);
+writeFileSync(outPath, sql + "\n");
+
 console.log(sql);
 console.log("\nRun it against the live database with:");
-console.log(`  npx wrangler d1 execute DB --remote --command "${sql.replace(/"/g, '\\"')}"`);
+console.log(`  npx wrangler d1 execute DB --remote --file "${outPath}"`);
