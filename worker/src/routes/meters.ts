@@ -10,10 +10,16 @@ export const meterRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 meterRoutes.use("*", requireAuth);
 
 meterRoutes.get("/", async (c) => {
-  const includeInactive = c.req.query("includeInactive") === "1" && c.get("user").role === "engineer";
+  const isEngineer = c.get("user").role === "engineer";
+  const includeInactive = c.req.query("includeInactive") === "1" && isEngineer;
+  // The meter photo is an engineer-only reference image; technicians never
+  // receive the key, and the photo route refuses them anyway.
+  const columns = isEngineer
+    ? "id, type, location, floor_number, description, is_active, photo_key, created_by, created_at, updated_at"
+    : "id, type, location, floor_number, description, is_active, created_by, created_at, updated_at";
   const query = includeInactive
-    ? "SELECT * FROM meters ORDER BY floor_number, location"
-    : "SELECT * FROM meters WHERE is_active = 1 ORDER BY floor_number, location";
+    ? `SELECT ${columns} FROM meters ORDER BY floor_number, location`
+    : `SELECT ${columns} FROM meters WHERE is_active = 1 ORDER BY floor_number, location`;
   const { results } = await c.env.DB.prepare(query).all();
   return c.json({ meters: results });
 });
@@ -24,6 +30,7 @@ meterRoutes.post("/", requireRole("engineer"), async (c) => {
   const location = typeof body?.location === "string" ? body.location.trim() : "";
   const floorNumber = body?.floorNumber;
   const description = typeof body?.description === "string" ? body.description : null;
+  const photoKey = typeof body?.photoKey === "string" && body.photoKey.startsWith("meters/") ? body.photoKey : null;
 
   if (!METER_TYPES.includes(type)) {
     return c.json({ error: "type must be one of: electricity, water, gas" }, 400);
@@ -35,10 +42,10 @@ meterRoutes.post("/", requireRole("engineer"), async (c) => {
   const now = new Date().toISOString();
 
   await c.env.DB.prepare(
-    `INSERT INTO meters (id, type, location, floor_number, description, is_active, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)`
+    `INSERT INTO meters (id, type, location, floor_number, description, photo_key, is_active, created_by, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
   )
-    .bind(id, type, location, floorNumber, description, c.get("user").id, now, now)
+    .bind(id, type, location, floorNumber, description, photoKey, c.get("user").id, now, now)
     .run();
 
   return c.json({ id }, 201);
@@ -58,6 +65,9 @@ meterRoutes.put("/:id", requireRole("engineer"), async (c) => {
   const location = typeof body?.location === "string" ? body.location.trim() : null;
   const floorNumber = Number.isInteger(body?.floorNumber) ? body.floorNumber : null;
   const description = typeof body?.description === "string" ? body.description : null;
+  // photoKey: string sets, null clears, absent leaves unchanged.
+  const hasPhotoKey = body !== null && Object.prototype.hasOwnProperty.call(body, "photoKey");
+  const photoKey = hasPhotoKey && typeof body.photoKey === "string" && body.photoKey.startsWith("meters/") ? body.photoKey : null;
   const now = new Date().toISOString();
 
   await c.env.DB.prepare(
@@ -66,10 +76,11 @@ meterRoutes.put("/:id", requireRole("engineer"), async (c) => {
        location = COALESCE(?, location),
        floor_number = COALESCE(?, floor_number),
        description = COALESCE(?, description),
+       photo_key = CASE WHEN ? THEN ? ELSE photo_key END,
        updated_at = ?
      WHERE id = ?`
   )
-    .bind(type, location, floorNumber, description, now, id)
+    .bind(type, location, floorNumber, description, hasPhotoKey ? 1 : 0, photoKey, now, id)
     .run();
 
   return c.json({ ok: true });

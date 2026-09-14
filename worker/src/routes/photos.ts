@@ -37,7 +37,11 @@ photoRoutes.post("/", async (c) => {
     return c.json({ error: `Photo exceeds the ${MAX_PHOTO_BYTES / 1024 / 1024} MB limit` }, 413);
   }
 
-  const key = `readings/${crypto.randomUUID()}.${ext}`;
+  const kind = c.req.query("kind") === "meter" ? "meters" : "readings";
+  if (kind === "meters" && c.get("user").role !== "engineer") {
+    return c.json({ error: "Forbidden" }, 403);
+  }
+  const key = `${kind}/${crypto.randomUUID()}.${ext}`;
   await c.env.PHOTOS.put(key, bytes, { httpMetadata: { contentType } });
 
   return c.json({ photoKey: key }, 201);
@@ -46,6 +50,9 @@ photoRoutes.post("/", async (c) => {
 photoRoutes.get("/", async (c) => {
   const key = c.req.query("key");
   if (!key) return c.json({ error: "key query param is required" }, 400);
+  if (key.startsWith("meters/") && c.get("user").role !== "engineer") {
+    return c.json({ error: "Forbidden" }, 403);
+  }
 
   const object = await c.env.PHOTOS.get(key);
   if (!object) return c.json({ error: "Photo not found" }, 404);

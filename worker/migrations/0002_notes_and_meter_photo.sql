@@ -1,0 +1,2 @@
+ALTER TABLE readings ADD COLUMN notes TEXT;
+ALTER TABLE meters ADD COLUMN photo_key TEXT;

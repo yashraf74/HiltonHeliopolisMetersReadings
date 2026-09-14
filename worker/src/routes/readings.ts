@@ -17,6 +17,7 @@ readingRoutes.post("/", async (c) => {
   const value = body?.value;
   const photoKey = body?.photoKey;
   const loggedAt = body?.loggedAt;
+  const notes = typeof body?.notes === "string" && body.notes.trim() ? body.notes.trim().slice(0, 1000) : null;
 
   if (
     typeof id !== "string" ||
@@ -35,11 +36,11 @@ readingRoutes.post("/", async (c) => {
   const now = new Date().toISOString();
 
   await c.env.DB.prepare(
-    `INSERT INTO readings (id, meter_id, value, photo_key, logged_by, logged_by_name, logged_at, synced_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO readings (id, meter_id, value, photo_key, notes, logged_by, logged_by_name, logged_at, synced_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO NOTHING`
   )
-    .bind(id, meterId, value, photoKey, user.id, user.fullName, loggedAt, now, now)
+    .bind(id, meterId, value, photoKey, notes, user.id, user.fullName, loggedAt, now, now)
     .run();
 
   const row = await c.env.DB.prepare("SELECT synced_at FROM readings WHERE id = ?")
@@ -119,7 +120,7 @@ readingRoutes.get("/", requireRole("engineer"), async (c) => {
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const { results } = await c.env.DB.prepare(
-    `SELECT r.id, r.value, r.photo_key, r.logged_by, r.logged_by_name, r.logged_at, r.synced_at,
+    `SELECT r.id, r.value, r.photo_key, r.notes, r.logged_by, r.logged_by_name, r.logged_at, r.synced_at,
             m.id as meter_id, m.type as meter_type, m.location as meter_location,
             m.floor_number as meter_floor, m.description as meter_description
      FROM readings r
@@ -137,4 +138,21 @@ readingRoutes.get("/", requireRole("engineer"), async (c) => {
   const nextCursor = hasMore && last ? encodeCursor(last.logged_at, last.id) : null;
 
   return c.json({ readings: page, nextCursor });
+});
+
+// Hard delete, engineer only. The photo is removed from R2 best-effort.
+readingRoutes.delete("/:id", requireRole("engineer"), async (c) => {
+  const id = c.req.param("id");
+  const row = await c.env.DB.prepare("SELECT photo_key FROM readings WHERE id = ?")
+    .bind(id)
+    .first<{ photo_key: string }>();
+  if (!row) return c.json({ error: "Reading not found" }, 404);
+
+  await c.env.DB.prepare("DELETE FROM readings WHERE id = ?").bind(id).run();
+  try {
+    await c.env.PHOTOS.delete(row.photo_key);
+  } catch (err) {
+    console.error("photo delete failed", row.photo_key, err);
+  }
+  return c.json({ ok: true });
 });
