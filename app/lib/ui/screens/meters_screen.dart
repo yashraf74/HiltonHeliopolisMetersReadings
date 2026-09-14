@@ -155,7 +155,7 @@ class MeterTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      meter.location,
+                      meter.name,
                       style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 15,
@@ -163,7 +163,7 @@ class MeterTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${type.label} · ${S.floorLabel} ${meter.floorNumber}'
+                      '${meter.location} · ${type.label} · ${S.floorLabel} ${meter.floorNumber}'
                       '${meter.description?.isNotEmpty == true ? ' · ${meter.description}' : ''}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,

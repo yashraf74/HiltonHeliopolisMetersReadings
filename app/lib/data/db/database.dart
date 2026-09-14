@@ -9,6 +9,7 @@ part 'database.g.dart';
 /// from technicians).
 class Meters extends Table {
   TextColumn get id => text()();
+  TextColumn get name => text().withDefault(const Constant(''))();
   TextColumn get type => text()();
   TextColumn get location => text()();
   IntColumn get floorNumber => integer()();
@@ -49,7 +50,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'meters_app'));
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -63,6 +64,14 @@ class AppDatabase extends _$AppDatabase {
         // Drops logged_by_name: the name now comes from the session /
         // server so a renamed account is reflected everywhere.
         await m.alterTable(TableMigration(readings));
+      }
+      if (from < 4) {
+        await m.addColumn(meters, meters.name);
+        // Backfilled from location until the next server refresh replaces
+        // it with the real names.
+        await customStatement(
+          "UPDATE meters SET name = location WHERE name = ''",
+        );
       }
     },
   );
@@ -92,7 +101,7 @@ class AppDatabase extends _$AppDatabase {
       ..where((m) => m.isActive.equals(true))
       ..orderBy([
         (m) => OrderingTerm.asc(m.floorNumber),
-        (m) => OrderingTerm.asc(m.location),
+        (m) => OrderingTerm.asc(m.name),
       ]);
     if (type != null) q.where((m) => m.type.equals(type));
     return q.watch();

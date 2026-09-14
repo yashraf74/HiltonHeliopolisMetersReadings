@@ -487,11 +487,11 @@ class _ReadingCardState extends State<_ReadingCard> {
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           leading: MeterTypeBadge(type, compact: true),
           title: Text(
-            row['meter_location'] as String,
+            (row['meter_name'] as String?) ?? row['meter_location'] as String,
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           subtitle: Text(
-            '${row['logged_by_name']} · ${fmt.format(loggedAt)}',
+            '${row['meter_location']} · ${row['logged_by_name']} · ${fmt.format(loggedAt)}',
             style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
           ),
           trailing: Text(
@@ -505,6 +505,7 @@ class _ReadingCardState extends State<_ReadingCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   DetailRow(S.meterType, type.label),
+                  DetailRow(S.meterLocation, row['meter_location'] as String),
                   DetailRow(S.meterFloor, '${row['meter_floor']}'),
                   if ((row['meter_description'] as String?)?.isNotEmpty == true)
                     DetailRow(

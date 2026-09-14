@@ -139,6 +139,7 @@ class ApiClient {
 
   Future<String> createMeter({
     required MeterType type,
+    required String name,
     required String location,
     required int floorNumber,
     String? description,
@@ -150,6 +151,7 @@ class ApiClient {
         headers: _headers(contentType: 'application/json'),
         body: jsonEncode({
           'type': type.name,
+          'name': name,
           'location': location,
           'floorNumber': floorNumber,
           'description': description,
@@ -165,6 +167,7 @@ class ApiClient {
   Future<void> updateMeter(
     String id, {
     MeterType? type,
+    String? name,
     String? location,
     int? floorNumber,
     String? description,
@@ -177,6 +180,7 @@ class ApiClient {
         headers: _headers(contentType: 'application/json'),
         body: jsonEncode({
           'type': ?type?.name,
+          'name': ?name,
           'location': ?location,
           'floorNumber': ?floorNumber,
           'description': ?description,
@@ -329,6 +333,7 @@ class ApiClient {
 
   Meter _meterFromJson(Map<String, dynamic> j) => Meter(
     id: j['id'] as String,
+    name: j['name'] as String? ?? j['location'] as String,
     type: j['type'] as String,
     location: j['location'] as String,
     floorNumber: j['floor_number'] as int,

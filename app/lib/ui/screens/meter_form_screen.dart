@@ -31,6 +31,7 @@ class MeterFormScreen extends StatefulWidget {
 class _MeterFormScreenState extends State<MeterFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late MeterType _type;
+  late final TextEditingController _name;
   late final TextEditingController _location;
   late final TextEditingController _floor;
   late final TextEditingController _description;
@@ -49,6 +50,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     super.initState();
     final m = widget.existing;
     _type = m != null ? MeterType.fromApi(m.type) : MeterType.electricity;
+    _name = TextEditingController(text: m?.name ?? '');
     _location = TextEditingController(text: m?.location ?? '');
     _floor = TextEditingController(text: m?.floorNumber.toString() ?? '');
     _description = TextEditingController(text: m?.description ?? '');
@@ -57,6 +59,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
 
   @override
   void dispose() {
+    _name.dispose();
     _location.dispose();
     _floor.dispose();
     _description.dispose();
@@ -71,6 +74,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     final meters = context.read<MetersController>();
     final api = context.read<ApiClient>();
     final messenger = ScaffoldMessenger.of(context);
+    final name = _name.text.trim();
     final location = _location.text.trim();
     final floor = _floorValue();
     final description = _description.text.trim();
@@ -95,6 +99,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
         ? await meters.updateMeter(
             widget.existing!.id,
             type: _type,
+            name: name,
             location: location,
             floorNumber: floor,
             description: description,
@@ -103,6 +108,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
           )
         : await meters.createMeter(
             type: _type,
+            name: name,
             location: location,
             floorNumber: floor,
             description: description.isEmpty ? null : description,
@@ -265,6 +271,20 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
               ],
             ),
             const SizedBox(height: 20),
+            TextFormField(
+              controller: _name,
+              textInputAction: TextInputAction.next,
+              maxLength: 80,
+              contextMenuBuilder: appContextMenuBuilder,
+              decoration: const InputDecoration(
+                labelText: S.meterName,
+                hintText: S.meterNameHint,
+                counterText: '',
+              ),
+              validator: (v) =>
+                  (v ?? '').trim().isEmpty ? S.fieldRequired : null,
+            ),
+            const SizedBox(height: 14),
             TextFormField(
               controller: _location,
               textInputAction: TextInputAction.next,

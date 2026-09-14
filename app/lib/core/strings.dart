@@ -50,6 +50,10 @@ class S {
   static const gas = 'غاز';
 
   // Meters
+  static const meterName = 'اسم العداد';
+  static const meterNameHint = 'مثال: عداد المطبخ الرئيسي';
+  static const meterNameTaken = 'يوجد عداد بهذا الاسم في نفس الطابق';
+  static const colMeterName = 'اسم العداد';
   static const meterLocation = 'الموقع';
   static const meterFloor = 'الطابق';
   static const meterDescription = 'الوصف';
@@ -86,7 +90,7 @@ class S {
   static const stepType = 'اختر نوع العداد';
   static const stepMeter = 'اختر العداد';
   static const stepDetails = 'الصورة والقراءة';
-  static const searchMeters = 'ابحث بالموقع أو الطابق';
+  static const searchMeters = 'ابحث بالاسم أو الموقع أو الطابق';
   static const noMetersOfType = 'لا توجد عدادات من هذا النوع';
   static const takePhoto = 'التقاط صورة';
   static const pickFromGallery = 'اختيار من المعرض';
@@ -117,7 +121,7 @@ class S {
   static const filters = 'تصفية';
   static const clearFilters = 'مسح التصفية';
   static const applyFilters = 'تطبيق';
-  static const searchReadings = 'ابحث بالموقع أو الوصف أو اسم الفني';
+  static const searchReadings = 'ابحث باسم العداد أو الموقع أو اسم الفني';
   static const filterType = 'نوع العداد';
   static const filterAllTypes = 'كل الأنواع';
   static const filterFloor = 'رقم الطابق';

@@ -117,7 +117,7 @@ class _LocalReadingCard extends StatelessWidget {
                 ),
               ),
               title: Text(
-                meter?.location ?? reading.meterId,
+                meter?.name ?? reading.meterId,
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               subtitle: Text(
@@ -149,6 +149,8 @@ class _LocalReadingCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (type != null) DetailRow(S.meterType, type.label),
+                      if (meter != null)
+                        DetailRow(S.meterLocation, meter.location),
                       if (meter != null)
                         DetailRow(S.meterFloor, '${meter.floorNumber}'),
                       if (meter?.description?.isNotEmpty == true)

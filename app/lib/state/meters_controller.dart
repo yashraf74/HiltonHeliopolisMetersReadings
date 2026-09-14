@@ -60,6 +60,7 @@ class MetersController extends ChangeNotifier {
   /// refreshed from the server afterwards so the list reflects the change.
   Future<String?> createMeter({
     required MeterType type,
+    required String name,
     required String location,
     required int floorNumber,
     String? description,
@@ -67,6 +68,7 @@ class MetersController extends ChangeNotifier {
   }) => _mutate(
     () => _api.createMeter(
       type: type,
+      name: name,
       location: location,
       floorNumber: floorNumber,
       description: description,
@@ -77,6 +79,7 @@ class MetersController extends ChangeNotifier {
   Future<String?> updateMeter(
     String id, {
     required MeterType type,
+    required String name,
     required String location,
     required int floorNumber,
     String? description,
@@ -86,6 +89,7 @@ class MetersController extends ChangeNotifier {
     () => _api.updateMeter(
       id,
       type: type,
+      name: name,
       location: location,
       floorNumber: floorNumber,
       description: description ?? '',
@@ -103,6 +107,7 @@ class MetersController extends ChangeNotifier {
       return null;
     } on ApiException catch (e) {
       if (e.isUnauthorized) _session.markTokenRejected();
+      if (e.statusCode == 409) return S.meterNameTaken;
       return e.message;
     } on NetworkException {
       return S.onlineRequired;

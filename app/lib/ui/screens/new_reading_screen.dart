@@ -256,6 +256,7 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
                   .where(
                     (m) =>
                         q.isEmpty ||
+                        m.name.contains(q) ||
                         m.location.contains(q) ||
                         (m.description ?? '').contains(q) ||
                         m.floorNumber.toString() == _toWesternDigits(q),

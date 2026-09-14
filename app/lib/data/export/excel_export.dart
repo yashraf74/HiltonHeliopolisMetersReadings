@@ -20,6 +20,7 @@ Uint8List buildReadingsWorkbook(List<Map<String, dynamic>> readings) {
   final headerStyle = CellStyle(bold: true);
   final headers = [
     S.colDateTime,
+    S.colMeterName,
     S.colType,
     S.colLocation,
     S.colFloor,
@@ -48,6 +49,7 @@ Uint8List buildReadingsWorkbook(List<Map<String, dynamic>> readings) {
   for (final r in readings) {
     sheet.appendRow([
       TextCellValue(local(r['logged_at'] as String?)),
+      TextCellValue(r['meter_name'] as String? ?? ''),
       TextCellValue(MeterType.fromApi(r['meter_type'] as String).label),
       TextCellValue(r['meter_location'] as String? ?? ''),
       IntCellValue(r['meter_floor'] as int? ?? 0),
@@ -60,7 +62,19 @@ Uint8List buildReadingsWorkbook(List<Map<String, dynamic>> readings) {
     ]);
   }
 
-  final widths = [18.0, 12.0, 26.0, 8.0, 28.0, 14.0, 30.0, 20.0, 18.0, 38.0];
+  final widths = [
+    18.0,
+    22.0,
+    12.0,
+    26.0,
+    8.0,
+    28.0,
+    14.0,
+    30.0,
+    20.0,
+    18.0,
+    38.0,
+  ];
   for (var c = 0; c < widths.length; c++) {
     sheet.setColumnWidth(c, widths[c]);
   }

@@ -17,6 +17,16 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _typeMeta = const VerificationMeta('type');
   @override
   late final GeneratedColumn<String> type = GeneratedColumn<String>(
@@ -99,6 +109,7 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
   @override
   List<GeneratedColumn> get $columns => [
     id,
+    name,
     type,
     location,
     floorNumber,
@@ -123,6 +134,12 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     } else if (isInserting) {
       context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
     }
     if (data.containsKey('type')) {
       context.handle(
@@ -193,6 +210,10 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
         DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
       type: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}type'],
@@ -232,6 +253,7 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
 
 class Meter extends DataClass implements Insertable<Meter> {
   final String id;
+  final String name;
   final String type;
   final String location;
   final int floorNumber;
@@ -241,6 +263,7 @@ class Meter extends DataClass implements Insertable<Meter> {
   final String updatedAt;
   const Meter({
     required this.id,
+    required this.name,
     required this.type,
     required this.location,
     required this.floorNumber,
@@ -253,6 +276,7 @@ class Meter extends DataClass implements Insertable<Meter> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
     map['type'] = Variable<String>(type);
     map['location'] = Variable<String>(location);
     map['floor_number'] = Variable<int>(floorNumber);
@@ -270,6 +294,7 @@ class Meter extends DataClass implements Insertable<Meter> {
   MetersCompanion toCompanion(bool nullToAbsent) {
     return MetersCompanion(
       id: Value(id),
+      name: Value(name),
       type: Value(type),
       location: Value(location),
       floorNumber: Value(floorNumber),
@@ -291,6 +316,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Meter(
       id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
       type: serializer.fromJson<String>(json['type']),
       location: serializer.fromJson<String>(json['location']),
       floorNumber: serializer.fromJson<int>(json['floorNumber']),
@@ -305,6 +331,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
       'type': serializer.toJson<String>(type),
       'location': serializer.toJson<String>(location),
       'floorNumber': serializer.toJson<int>(floorNumber),
@@ -317,6 +344,7 @@ class Meter extends DataClass implements Insertable<Meter> {
 
   Meter copyWith({
     String? id,
+    String? name,
     String? type,
     String? location,
     int? floorNumber,
@@ -326,6 +354,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     String? updatedAt,
   }) => Meter(
     id: id ?? this.id,
+    name: name ?? this.name,
     type: type ?? this.type,
     location: location ?? this.location,
     floorNumber: floorNumber ?? this.floorNumber,
@@ -337,6 +366,7 @@ class Meter extends DataClass implements Insertable<Meter> {
   Meter copyWithCompanion(MetersCompanion data) {
     return Meter(
       id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
       type: data.type.present ? data.type.value : this.type,
       location: data.location.present ? data.location.value : this.location,
       floorNumber: data.floorNumber.present
@@ -355,6 +385,7 @@ class Meter extends DataClass implements Insertable<Meter> {
   String toString() {
     return (StringBuffer('Meter(')
           ..write('id: $id, ')
+          ..write('name: $name, ')
           ..write('type: $type, ')
           ..write('location: $location, ')
           ..write('floorNumber: $floorNumber, ')
@@ -369,6 +400,7 @@ class Meter extends DataClass implements Insertable<Meter> {
   @override
   int get hashCode => Object.hash(
     id,
+    name,
     type,
     location,
     floorNumber,
@@ -382,6 +414,7 @@ class Meter extends DataClass implements Insertable<Meter> {
       identical(this, other) ||
       (other is Meter &&
           other.id == this.id &&
+          other.name == this.name &&
           other.type == this.type &&
           other.location == this.location &&
           other.floorNumber == this.floorNumber &&
@@ -393,6 +426,7 @@ class Meter extends DataClass implements Insertable<Meter> {
 
 class MetersCompanion extends UpdateCompanion<Meter> {
   final Value<String> id;
+  final Value<String> name;
   final Value<String> type;
   final Value<String> location;
   final Value<int> floorNumber;
@@ -403,6 +437,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
   final Value<int> rowid;
   const MetersCompanion({
     this.id = const Value.absent(),
+    this.name = const Value.absent(),
     this.type = const Value.absent(),
     this.location = const Value.absent(),
     this.floorNumber = const Value.absent(),
@@ -414,6 +449,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
   });
   MetersCompanion.insert({
     required String id,
+    this.name = const Value.absent(),
     required String type,
     required String location,
     required int floorNumber,
@@ -429,6 +465,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
        updatedAt = Value(updatedAt);
   static Insertable<Meter> custom({
     Expression<String>? id,
+    Expression<String>? name,
     Expression<String>? type,
     Expression<String>? location,
     Expression<int>? floorNumber,
@@ -440,6 +477,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
+      if (name != null) 'name': name,
       if (type != null) 'type': type,
       if (location != null) 'location': location,
       if (floorNumber != null) 'floor_number': floorNumber,
@@ -453,6 +491,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
 
   MetersCompanion copyWith({
     Value<String>? id,
+    Value<String>? name,
     Value<String>? type,
     Value<String>? location,
     Value<int>? floorNumber,
@@ -464,6 +503,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
   }) {
     return MetersCompanion(
       id: id ?? this.id,
+      name: name ?? this.name,
       type: type ?? this.type,
       location: location ?? this.location,
       floorNumber: floorNumber ?? this.floorNumber,
@@ -480,6 +520,9 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     final map = <String, Expression>{};
     if (id.present) {
       map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
     }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
@@ -512,6 +555,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
   String toString() {
     return (StringBuffer('MetersCompanion(')
           ..write('id: $id, ')
+          ..write('name: $name, ')
           ..write('type: $type, ')
           ..write('location: $location, ')
           ..write('floorNumber: $floorNumber, ')
@@ -1250,6 +1294,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 
 typedef $$MetersTableCreateCompanionBuilder = MetersCompanion Function({
   required String id,
+  Value<String> name,
   required String type,
   required String location,
   required int floorNumber,
@@ -1261,6 +1306,7 @@ typedef $$MetersTableCreateCompanionBuilder = MetersCompanion Function({
 });
 typedef $$MetersTableUpdateCompanionBuilder = MetersCompanion Function({
   Value<String> id,
+  Value<String> name,
   Value<String> type,
   Value<String> location,
   Value<int> floorNumber,
@@ -1282,6 +1328,11 @@ class $$MetersTableFilterComposer
   });
   ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1335,6 +1386,11 @@ class $$MetersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get type => $composableBuilder(
     column: $table.type,
     builder: (column) => ColumnOrderings(column),
@@ -1382,6 +1438,9 @@ class $$MetersTableAnnotationComposer
   });
   GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
 
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
@@ -1438,6 +1497,7 @@ class $$MetersTableTableManager
           updateCompanionCallback:
               ({
                 Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<String> location = const Value.absent(),
                 Value<int> floorNumber = const Value.absent(),
@@ -1448,6 +1508,7 @@ class $$MetersTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => MetersCompanion(
                 id: id,
+                name: name,
                 type: type,
                 location: location,
                 floorNumber: floorNumber,
@@ -1460,6 +1521,7 @@ class $$MetersTableTableManager
           createCompanionCallback:
               ({
                 required String id,
+                Value<String> name = const Value.absent(),
                 required String type,
                 required String location,
                 required int floorNumber,
@@ -1470,6 +1532,7 @@ class $$MetersTableTableManager
                 Value<int> rowid = const Value.absent(),
               }) => MetersCompanion.insert(
                 id: id,
+                name: name,
                 type: type,
                 location: location,
                 floorNumber: floorNumber,

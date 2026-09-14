@@ -17,6 +17,7 @@ void main() {
           'logged_at': '2026-09-13T10:00:00.000Z',
           'synced_at': '2026-09-13T10:01:00.000Z',
           'meter_id': 'm1',
+          'meter_name': 'عداد المسبح',
           'meter_type': 'water',
           'meter_location': 'المطبخ',
           'meter_floor': 2,
@@ -28,8 +29,9 @@ void main() {
       expect(excel.sheets.keys, ['القراءات']);
       final sheet = excel.sheets['القراءات']!;
       expect(sheet.maxRows, 2);
-      expect(sheet.rows[1][2]?.value.toString(), 'المطبخ');
-      expect(sheet.rows[1][5]?.value, isA<DoubleCellValue>());
+      expect(sheet.rows[1][1]?.value.toString(), 'عداد المسبح');
+      expect(sheet.rows[1][3]?.value.toString(), 'المطبخ');
+      expect(sheet.rows[1][6]?.value, isA<DoubleCellValue>());
     },
   );
 
