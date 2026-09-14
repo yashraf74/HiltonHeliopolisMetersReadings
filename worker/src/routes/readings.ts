@@ -36,11 +36,11 @@ readingRoutes.post("/", async (c) => {
   const now = new Date().toISOString();
 
   await c.env.DB.prepare(
-    `INSERT INTO readings (id, meter_id, value, photo_key, notes, logged_by, logged_by_name, logged_at, synced_at, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO readings (id, meter_id, value, photo_key, notes, logged_by, logged_at, synced_at, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(id) DO NOTHING`
   )
-    .bind(id, meterId, value, photoKey, notes, user.id, user.fullName, loggedAt, now, now)
+    .bind(id, meterId, value, photoKey, notes, user.id, loggedAt, now, now)
     .run();
 
   const row = await c.env.DB.prepare("SELECT synced_at FROM readings WHERE id = ?")
@@ -95,7 +95,7 @@ readingRoutes.get("/", requireRole("engineer"), async (c) => {
     params.push(Number(floor));
   }
   if (technician) {
-    conditions.push("r.logged_by_name LIKE ?");
+    conditions.push("u.full_name LIKE ?");
     params.push(`%${technician}%`);
   }
   if (dateFrom) {
@@ -107,7 +107,7 @@ readingRoutes.get("/", requireRole("engineer"), async (c) => {
     params.push(dateTo);
   }
   if (search) {
-    conditions.push("(m.location LIKE ? OR m.description LIKE ? OR r.logged_by_name LIKE ?)");
+    conditions.push("(m.location LIKE ? OR m.description LIKE ? OR u.full_name LIKE ?)");
     params.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
   if (cursor) {
@@ -120,11 +120,13 @@ readingRoutes.get("/", requireRole("engineer"), async (c) => {
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
   const { results } = await c.env.DB.prepare(
-    `SELECT r.id, r.value, r.photo_key, r.notes, r.logged_by, r.logged_by_name, r.logged_at, r.synced_at,
+    `SELECT r.id, r.value, r.photo_key, r.notes, r.logged_by, r.logged_at, r.synced_at,
+            u.full_name as logged_by_name, u.username as logged_by_username,
             m.id as meter_id, m.type as meter_type, m.location as meter_location,
             m.floor_number as meter_floor, m.description as meter_description
      FROM readings r
      JOIN meters m ON m.id = r.meter_id
+     JOIN users u ON u.id = r.logged_by
      ${where}
      ORDER BY r.logged_at DESC, r.id DESC
      LIMIT ?`
