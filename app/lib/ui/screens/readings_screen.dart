@@ -485,7 +485,13 @@ class _ReadingCardState extends State<_ReadingCard> {
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          leading: MeterTypeBadge(type, compact: true),
+          leading: PhotoThumb(
+            type: type,
+            image: NetworkImage(
+              api.photoUri(row['photo_key'] as String).toString(),
+              headers: api.authHeaders,
+            ),
+          ),
           title: Text(
             (row['meter_name'] as String?) ?? row['meter_location'] as String,
             style: const TextStyle(fontWeight: FontWeight.w700),

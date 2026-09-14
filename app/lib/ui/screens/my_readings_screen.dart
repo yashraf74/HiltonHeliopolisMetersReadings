@@ -100,22 +100,19 @@ class _LocalReadingCard extends StatelessWidget {
                 horizontal: 14,
                 vertical: 4,
               ),
-              leading: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: photoWidget(
-                    placeholder: Container(
-                      color: scheme.surfaceContainerHighest,
-                      child: Icon(
-                        type?.icon ?? Icons.image_outlined,
-                        color: type?.color ?? scheme.outline,
-                      ),
+              leading: type == null
+                  ? const SizedBox(width: 44, height: 44)
+                  : PhotoThumb(
+                      type: type,
+                      image: photo != null
+                          ? FileImage(photo)
+                          : reading.photoKey != null
+                          ? NetworkImage(
+                              api.photoUri(reading.photoKey!).toString(),
+                              headers: api.authHeaders,
+                            )
+                          : null,
                     ),
-                  ),
-                ),
-              ),
               title: Text(
                 meter?.name ?? reading.meterId,
                 style: const TextStyle(fontWeight: FontWeight.w700),

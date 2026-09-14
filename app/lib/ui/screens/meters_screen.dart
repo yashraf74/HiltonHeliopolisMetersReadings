@@ -100,7 +100,6 @@ class _MetersScreenState extends State<MetersScreen> {
                               const SizedBox(height: 10),
                           itemBuilder: (context, i) => MeterTile(
                             meter: meters[i],
-                            showPhoto: true,
                             onTap: () => MeterFormScreen.open(
                               context,
                               existing: meters[i],
@@ -117,26 +116,20 @@ class _MetersScreenState extends State<MetersScreen> {
   }
 }
 
-/// Shared meter row. [showPhoto] renders the engineer's reference photo in
-/// place of the type badge; it is false everywhere except the meters tab so
-/// the reading flow and readings lists never show it.
+/// Shared meter row: the reference photo (with the type icon in the
+/// corner) when the meter has one, otherwise the plain type badge.
 class MeterTile extends StatelessWidget {
-  const MeterTile({
-    super.key,
-    required this.meter,
-    this.onTap,
-    this.showPhoto = false,
-  });
+  const MeterTile({super.key, required this.meter, this.onTap});
 
   final Meter meter;
   final VoidCallback? onTap;
-  final bool showPhoto;
 
   @override
   Widget build(BuildContext context) {
     final type = MeterType.fromApi(meter.type);
     final scheme = Theme.of(context).colorScheme;
-    final photoKey = showPhoto ? meter.photoKey : null;
+    final api = context.read<ApiClient>();
+    final photoKey = meter.photoKey;
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -145,10 +138,16 @@ class MeterTile extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              if (photoKey != null)
-                _MeterThumb(photoKey: photoKey, type: type)
-              else
-                MeterTypeBadge(type),
+              PhotoThumb(
+                type: type,
+                size: 52,
+                image: photoKey == null
+                    ? null
+                    : NetworkImage(
+                        api.photoUri(photoKey).toString(),
+                        headers: api.authHeaders,
+                      ),
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -179,50 +178,6 @@ class MeterTile extends StatelessWidget {
                 Icon(Icons.chevron_left_rounded, color: scheme.outline),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MeterThumb extends StatelessWidget {
-  const _MeterThumb({required this.photoKey, required this.type});
-
-  final String photoKey;
-  final MeterType type;
-
-  @override
-  Widget build(BuildContext context) {
-    final api = context.read<ApiClient>();
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: SizedBox(
-        width: 56,
-        height: 56,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.network(
-              api.photoUri(photoKey).toString(),
-              headers: api.authHeaders,
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => MeterTypeBadge(type),
-            ),
-            PositionedDirectional(
-              bottom: 0,
-              end: 0,
-              child: Container(
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  color: type.color,
-                  borderRadius: const BorderRadiusDirectional.only(
-                    topStart: Radius.circular(8),
-                  ),
-                ),
-                child: Icon(type.icon, size: 12, color: Colors.white),
-              ),
-            ),
-          ],
         ),
       ),
     );

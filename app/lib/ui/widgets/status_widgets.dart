@@ -251,3 +251,56 @@ class NotesBlock extends StatelessWidget {
     );
   }
 }
+
+/// Square thumbnail: the photo with the meter-type icon pinned to the
+/// lower corner. Falls back to the plain type badge when there is no image
+/// or it fails to load.
+class PhotoThumb extends StatelessWidget {
+  const PhotoThumb({super.key, required this.type, this.image, this.size = 44});
+
+  final MeterType type;
+  final ImageProvider? image;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final fallback = SizedBox(
+      width: size,
+      height: size,
+      child: MeterTypeBadge(type, compact: size < 44),
+    );
+    if (image == null) return fallback;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Image(
+              image: image!,
+              fit: BoxFit.cover,
+              gaplessPlayback: true,
+              errorBuilder: (_, _, _) => fallback,
+            ),
+            PositionedDirectional(
+              bottom: 0,
+              end: 0,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: BoxDecoration(
+                  color: type.color,
+                  borderRadius: const BorderRadiusDirectional.only(
+                    topStart: Radius.circular(8),
+                  ),
+                ),
+                child: Icon(type.icon, size: size * 0.3, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
