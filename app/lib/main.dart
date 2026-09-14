@@ -11,6 +11,7 @@ import 'data/db/database.dart';
 import 'state/connectivity_controller.dart';
 import 'state/meters_controller.dart';
 import 'state/session_controller.dart';
+import 'state/sync_controller.dart';
 import 'ui/home_shell.dart';
 import 'ui/login_screen.dart';
 
@@ -22,10 +23,26 @@ Future<void> main() async {
   final session = SessionController(storage: const FlutterSecureStorage());
   final api = ApiClient(tokenProvider: () => session.token);
   final meters = MetersController(db: db, api: api, session: session);
+  final connectivity = ConnectivityController();
+  final sync = SyncController(
+    db: db,
+    api: api,
+    session: session,
+    connectivity: connectivity,
+  );
 
   await session.restore();
 
-  runApp(MetersApp(db: db, session: session, api: api, meters: meters));
+  runApp(
+    MetersApp(
+      db: db,
+      session: session,
+      api: api,
+      meters: meters,
+      connectivity: connectivity,
+      sync: sync,
+    ),
+  );
 }
 
 class MetersApp extends StatelessWidget {
@@ -35,12 +52,16 @@ class MetersApp extends StatelessWidget {
     required this.session,
     required this.api,
     required this.meters,
+    required this.connectivity,
+    required this.sync,
   });
 
   final AppDatabase db;
   final SessionController session;
   final ApiClient api;
   final MetersController meters;
+  final ConnectivityController connectivity;
+  final SyncController sync;
 
   @override
   Widget build(BuildContext context) {

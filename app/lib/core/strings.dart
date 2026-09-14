@@ -82,6 +82,77 @@ class S {
   static const loggedBy = 'سجّلها';
   static const loggedAt = 'التاريخ';
 
+  // New reading flow
+  static const stepType = 'اختر نوع العداد';
+  static const stepMeter = 'اختر العداد';
+  static const stepDetails = 'الصورة والقراءة';
+  static const searchMeters = 'ابحث بالموقع أو الطابق';
+  static const noMetersOfType = 'لا توجد عدادات من هذا النوع';
+  static const takePhoto = 'التقاط صورة';
+  static const pickFromGallery = 'اختيار من المعرض';
+  static const retakePhoto = 'تغيير الصورة';
+  static const photoRequired = 'صورة العداد مطلوبة';
+  static const valueRequired = 'أدخل قراءة العداد';
+  static const valueInvalid = 'أدخل رقمًا صحيحًا';
+  static const valueHint = 'مثال: 12345.6';
+  static const saveReading = 'حفظ القراءة';
+  static const readingSaved = 'تم حفظ القراءة على الجهاز';
+  static const readingSavedOnline = 'تم حفظ القراءة وستتم مزامنتها الآن';
+  static const newReadingAgain = 'تسجيل قراءة أخرى';
+  static const back = 'رجوع';
+  static const next = 'التالي';
+  static const loggedByYou = 'أنت';
+  static const willBeLoggedAs = 'سيتم تسجيل القراءة باسم';
+  static const photoUnavailable = 'تعذر فتح الكاميرا أو المعرض';
+
+  // Sync
+  static const syncNow = 'مزامنة الآن';
+  static const syncAllDone = 'كل القراءات متزامنة';
+  static const syncStarted = 'بدأت المزامنة';
+  static const syncNeedsInternet = 'المزامنة تحتاج اتصالاً بالإنترنت';
+  static const retrySync = 'إعادة المزامنة';
+  static const lastErrorLabel = 'سبب الفشل';
+
+  // Engineer readings list
+  static const filters = 'تصفية';
+  static const clearFilters = 'مسح التصفية';
+  static const applyFilters = 'تطبيق';
+  static const searchReadings = 'ابحث بالموقع أو الوصف أو اسم الفني';
+  static const filterType = 'نوع العداد';
+  static const filterAllTypes = 'كل الأنواع';
+  static const filterFloor = 'رقم الطابق';
+  static const filterTechnician = 'اسم الفني';
+  static const filterDateRange = 'الفترة الزمنية';
+  static const filterDateFrom = 'من';
+  static const filterDateTo = 'إلى';
+  static const pickDates = 'اختيار الفترة';
+  static const readingsCount = 'عدد القراءات';
+  static const noReadingsMatch = 'لا توجد قراءات مطابقة';
+  static const readingsNeedInternet = 'عرض القراءات يتطلب اتصالاً بالإنترنت';
+  static const loadFailed = 'تعذر تحميل القراءات';
+  static const readingId = 'معرف القراءة';
+  static const syncedAtLabel = 'وقت المزامنة';
+  static const photo = 'الصورة';
+  static const photoLoadFailed = 'تعذر تحميل الصورة';
+
+  // Export
+  static const exportExcel = 'تصدير إلى Excel';
+  static const exporting = 'جارٍ التصدير…';
+  static const exportDone = 'تم حفظ الملف';
+  static const exportCancelled = 'تم إلغاء التصدير';
+  static const exportFailed = 'تعذر تصدير الملف';
+  static const exportNothing = 'لا توجد قراءات لتصديرها';
+  static const colDateTime = 'التاريخ والوقت';
+  static const colType = 'نوع العداد';
+  static const colLocation = 'الموقع';
+  static const colFloor = 'الطابق';
+  static const colDescription = 'الوصف';
+  static const colValue = 'القراءة';
+  static const colLoggedBy = 'سجّلها';
+  static const colSyncedAt = 'وقت المزامنة';
+  static const colReadingId = 'معرف القراءة';
+  static const sheetName = 'القراءات';
+
   // Generic
   static const retry = 'إعادة المحاولة';
   static const cancel = 'إلغاء';

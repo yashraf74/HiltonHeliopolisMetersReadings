@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>يستخدم التطبيق الكاميرا لتصوير قراءة العداد كإثبات.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>يستخدم التطبيق مكتبة الصور لاختيار صورة قراءة العداد.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
