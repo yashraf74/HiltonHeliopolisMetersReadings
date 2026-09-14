@@ -9,6 +9,8 @@ const EXT_BY_CONTENT_TYPE: Record<string, string> = {
   "image/webp": "webp",
 };
 
+const MAX_PHOTO_BYTES = 3 * 1024 * 1024;
+
 export const photoRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
 photoRoutes.use("*", requireAuth);
@@ -23,8 +25,20 @@ photoRoutes.post("/", async (c) => {
   }
   if (!c.req.raw.body) return c.json({ error: "Missing photo body" }, 400);
 
+  const declared = Number(c.req.header("Content-Length") ?? "0");
+  if (declared > MAX_PHOTO_BYTES) {
+    return c.json({ error: `Photo exceeds the ${MAX_PHOTO_BYTES / 1024 / 1024} MB limit` }, 413);
+  }
+  // Buffer rather than stream so the limit holds even without a
+  // Content-Length header; 3 MB is well within a Worker's memory budget.
+  const bytes = await c.req.raw.arrayBuffer();
+  if (bytes.byteLength === 0) return c.json({ error: "Missing photo body" }, 400);
+  if (bytes.byteLength > MAX_PHOTO_BYTES) {
+    return c.json({ error: `Photo exceeds the ${MAX_PHOTO_BYTES / 1024 / 1024} MB limit` }, 413);
+  }
+
   const key = `readings/${crypto.randomUUID()}.${ext}`;
-  await c.env.PHOTOS.put(key, c.req.raw.body, { httpMetadata: { contentType } });
+  await c.env.PHOTOS.put(key, bytes, { httpMetadata: { contentType } });
 
   return c.json({ photoKey: key }, 201);
 });

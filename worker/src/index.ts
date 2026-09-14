@@ -6,6 +6,7 @@ import { authRoutes } from "./routes/auth";
 import { meterRoutes } from "./routes/meters";
 import { readingRoutes } from "./routes/readings";
 import { photoRoutes } from "./routes/photos";
+import { userRoutes } from "./routes/users";
 
 const app = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
@@ -17,6 +18,7 @@ app.route("/api/auth", authRoutes);
 app.route("/api/meters", meterRoutes);
 app.route("/api/readings", readingRoutes);
 app.route("/api/photos", photoRoutes);
+app.route("/api/users", userRoutes);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));
 

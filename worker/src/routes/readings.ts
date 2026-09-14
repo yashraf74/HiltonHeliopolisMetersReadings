@@ -49,6 +49,28 @@ readingRoutes.post("/", async (c) => {
   return c.json({ id, syncedAt: row?.synced_at ?? now });
 });
 
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 200;
+
+// Cursor = base64url("<logged_at>|<id>") of the last row of the previous
+// page. Keyset pagination stays correct as new readings arrive, unlike
+// OFFSET which would shift every page.
+function encodeCursor(loggedAt: string, id: string): string {
+  return btoa(`${loggedAt}|${id}`).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function decodeCursor(cursor: string): { loggedAt: string; id: string } | null {
+  try {
+    const padded = cursor.replace(/-/g, "+").replace(/_/g, "/");
+    const raw = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
+    const sep = raw.lastIndexOf("|");
+    if (sep <= 0) return null;
+    return { loggedAt: raw.slice(0, sep), id: raw.slice(sep + 1) };
+  } catch {
+    return null;
+  }
+}
+
 readingRoutes.get("/", requireRole("engineer"), async (c) => {
   const type = c.req.query("type");
   const floor = c.req.query("floor");
@@ -56,6 +78,9 @@ readingRoutes.get("/", requireRole("engineer"), async (c) => {
   const dateFrom = c.req.query("dateFrom");
   const dateTo = c.req.query("dateTo");
   const search = c.req.query("search");
+  const cursor = c.req.query("cursor");
+  const limitParam = Number(c.req.query("limit") ?? DEFAULT_PAGE_SIZE);
+  const limit = Number.isInteger(limitParam) ? Math.min(Math.max(limitParam, 1), MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
 
   const conditions: string[] = [];
   const params: unknown[] = [];
@@ -84,6 +109,12 @@ readingRoutes.get("/", requireRole("engineer"), async (c) => {
     conditions.push("(m.location LIKE ? OR m.description LIKE ? OR r.logged_by_name LIKE ?)");
     params.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
+  if (cursor) {
+    const decoded = decodeCursor(cursor);
+    if (!decoded) return c.json({ error: "Invalid cursor" }, 400);
+    conditions.push("(r.logged_at < ? OR (r.logged_at = ? AND r.id < ?))");
+    params.push(decoded.loggedAt, decoded.loggedAt, decoded.id);
+  }
 
   const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
@@ -94,11 +125,16 @@ readingRoutes.get("/", requireRole("engineer"), async (c) => {
      FROM readings r
      JOIN meters m ON m.id = r.meter_id
      ${where}
-     ORDER BY r.logged_at DESC
-     LIMIT 1000`
+     ORDER BY r.logged_at DESC, r.id DESC
+     LIMIT ?`
   )
-    .bind(...params)
-    .all();
+    .bind(...params, limit + 1)
+    .all<{ id: string; logged_at: string }>();
 
-  return c.json({ readings: results });
+  const hasMore = results.length > limit;
+  const page = hasMore ? results.slice(0, limit) : results;
+  const last = page[page.length - 1];
+  const nextCursor = hasMore && last ? encodeCursor(last.logged_at, last.id) : null;
+
+  return c.json({ readings: page, nextCursor });
 });
