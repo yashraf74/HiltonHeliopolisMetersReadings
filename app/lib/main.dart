@@ -71,9 +71,10 @@ class MetersApp extends StatelessWidget {
         Provider<ApiClient>.value(value: api),
         ChangeNotifierProvider<SessionController>.value(value: session),
         ChangeNotifierProvider<MetersController>.value(value: meters),
-        ChangeNotifierProvider<ConnectivityController>(
-          create: (_) => ConnectivityController(),
+        ChangeNotifierProvider<ConnectivityController>.value(
+          value: connectivity,
         ),
+        ChangeNotifierProvider<SyncController>.value(value: sync),
       ],
       child: MaterialApp(
         title: S.appNameShort,

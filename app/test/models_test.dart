@@ -3,7 +3,12 @@ import 'package:meters_app/data/models.dart';
 
 void main() {
   test('AuthUser round-trips through JSON', () {
-    const user = AuthUser(id: 'u1', username: 'tech', fullName: 'فني', role: UserRole.technician);
+    const user = AuthUser(
+      id: 'u1',
+      username: 'tech',
+      fullName: 'فني',
+      role: UserRole.technician,
+    );
     final restored = AuthUser.fromJson(user.toJson());
     expect(restored.id, 'u1');
     expect(restored.role, UserRole.technician);
