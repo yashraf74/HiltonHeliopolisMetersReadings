@@ -28,6 +28,13 @@ class NetworkException implements Exception {
   String toString() => S.networkError;
 }
 
+class ReadingsPage {
+  const ReadingsPage({required this.rows, required this.nextCursor});
+
+  final List<Map<String, dynamic>> rows;
+  final String? nextCursor;
+}
+
 class LoginResult {
   const LoginResult({required this.token, required this.user});
 
@@ -42,13 +49,19 @@ class ApiClient {
     required String Function() tokenProvider,
     http.Client? httpClient,
     String baseUrl = AppConfig.apiBaseUrl,
+    void Function(bool reachable)? onReachability,
   }) : _tokenProvider = tokenProvider,
        _http = httpClient ?? http.Client(),
-       _baseUrl = baseUrl;
+       _baseUrl = baseUrl,
+       _onReachability = onReachability;
 
   final String Function() _tokenProvider;
   final http.Client _http;
   final String _baseUrl;
+
+  /// Reports ground-truth connectivity: true after any completed request,
+  /// false when the server could not be reached at all.
+  final void Function(bool reachable)? _onReachability;
 
   Uri _uri(String path, [Map<String, String>? query]) =>
       Uri.parse('$_baseUrl/api$path').replace(queryParameters: query);
@@ -63,15 +76,22 @@ class ApiClient {
     try {
       response = await request.timeout(AppConfig.requestTimeout);
     } on SocketException {
+      _onReachability?.call(false);
       throw NetworkException();
     } on HttpException {
+      _onReachability?.call(false);
       throw NetworkException();
     } on http.ClientException {
+      _onReachability?.call(false);
       throw NetworkException();
     } on Exception catch (e) {
-      if (e.toString().contains('TimeoutException')) throw NetworkException();
+      if (e.toString().contains('TimeoutException')) {
+        _onReachability?.call(false);
+        throw NetworkException();
+      }
       rethrow;
     }
+    _onReachability?.call(true);
 
     Map<String, dynamic> body = const {};
     if (response.body.isNotEmpty) {
@@ -207,16 +227,89 @@ class ApiClient {
     return body['syncedAt'] as String;
   }
 
-  Future<List<Map<String, dynamic>>> fetchReadings(
-    Map<String, String> filters,
-  ) async {
+  static const readingsPageSize = 50;
+
+  Future<ReadingsPage> fetchReadings(
+    Map<String, String> filters, {
+    String? cursor,
+    int limit = readingsPageSize,
+  }) async {
     final body = await _json(
       _http.get(
-        _uri('/readings', filters.isEmpty ? null : filters),
+        _uri('/readings', {...filters, 'limit': '$limit', 'cursor': ?cursor}),
         headers: _headers(),
       ),
     );
-    return (body['readings'] as List<dynamic>).cast<Map<String, dynamic>>();
+    return ReadingsPage(
+      rows: (body['readings'] as List<dynamic>).cast<Map<String, dynamic>>(),
+      nextCursor: body['nextCursor'] as String?,
+    );
+  }
+
+  /// Walks every page for an export. [maxRows] is a safety cap.
+  Future<List<Map<String, dynamic>>> fetchAllReadings(
+    Map<String, String> filters, {
+    int maxRows = 20000,
+  }) async {
+    final all = <Map<String, dynamic>>[];
+    String? cursor;
+    do {
+      final page = await fetchReadings(filters, cursor: cursor, limit: 200);
+      all.addAll(page.rows);
+      cursor = page.nextCursor;
+    } while (cursor != null && all.length < maxRows);
+    return all;
+  }
+
+  // ---- users (engineer) ---------------------------------------------------
+
+  Future<List<AppUser>> fetchUsers() async {
+    final body = await _json(_http.get(_uri('/users'), headers: _headers()));
+    return (body['users'] as List<dynamic>)
+        .map((u) => AppUser.fromJson(u as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<String> createUser({
+    required String username,
+    required String password,
+    required String fullName,
+    required UserRole role,
+  }) async {
+    final body = await _json(
+      _http.post(
+        _uri('/users'),
+        headers: _headers(contentType: 'application/json'),
+        body: jsonEncode({
+          'username': username,
+          'password': password,
+          'fullName': fullName,
+          'role': role.name,
+        }),
+      ),
+    );
+    return body['id'] as String;
+  }
+
+  Future<void> updateUser(
+    String id, {
+    String? fullName,
+    UserRole? role,
+    bool? isActive,
+    String? password,
+  }) async {
+    await _json(
+      _http.put(
+        _uri('/users/$id'),
+        headers: _headers(contentType: 'application/json'),
+        body: jsonEncode({
+          'fullName': ?fullName,
+          'role': ?role?.name,
+          'isActive': ?isActive,
+          'password': ?password,
+        }),
+      ),
+    );
   }
 
   Meter _meterFromJson(Map<String, dynamic> j) => Meter(

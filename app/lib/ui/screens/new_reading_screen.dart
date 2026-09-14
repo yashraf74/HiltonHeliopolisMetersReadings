@@ -22,6 +22,8 @@ import 'meters_screen.dart';
 /// Three-step flow: meter type → meter → photo + value. The reading is
 /// written to the local database the moment "save" is tapped, whatever the
 /// connectivity, and the sync engine takes it from there.
+const maxPhotoBytes = 3 * 1024 * 1024;
+
 class NewReadingScreen extends StatefulWidget {
   const NewReadingScreen({super.key});
 
@@ -67,7 +69,16 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
         preferredCameraDevice: CameraDevice.rear,
       );
       if (picked == null) return;
-      setState(() => _photo = File(picked.path));
+      final file = File(picked.path);
+      // Mirrors the server's 3 MB cap; the picker's downscaling normally
+      // lands far below this, so hitting it means something unusual.
+      if (await file.length() > maxPhotoBytes) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text(S.photoTooLarge)));
+        return;
+      }
+      setState(() => _photo = file);
     } on PlatformException {
       if (!mounted) return;
       ScaffoldMessenger.of(context)

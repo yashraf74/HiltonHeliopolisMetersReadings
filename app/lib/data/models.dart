@@ -96,3 +96,27 @@ class AuthUser {
     'role': role.name,
   };
 }
+
+class AppUser {
+  const AppUser({
+    required this.id,
+    required this.username,
+    required this.fullName,
+    required this.role,
+    required this.isActive,
+  });
+
+  final String id;
+  final String username;
+  final String fullName;
+  final UserRole role;
+  final bool isActive;
+
+  factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
+    id: json['id'] as String,
+    username: json['username'] as String,
+    fullName: json['fullName'] as String,
+    role: UserRole.fromApi(json['role'] as String),
+    isActive: json['isActive'] as bool,
+  );
+}

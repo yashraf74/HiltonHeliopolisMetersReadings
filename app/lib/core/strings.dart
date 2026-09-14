@@ -153,6 +153,38 @@ class S {
   static const colReadingId = 'معرف القراءة';
   static const sheetName = 'القراءات';
 
+  // Users (engineer)
+  static const navUsers = 'المستخدمون';
+  static const addUser = 'إضافة مستخدم';
+  static const editUser = 'تعديل المستخدم';
+  static const usernameRules =
+      'اسم المستخدم: 3 إلى 32 حرفًا، أحرف إنجليزية صغيرة وأرقام و _ و . فقط';
+  static const passwordRules = 'كلمة المرور: 6 أحرف على الأقل';
+  static const usernameTaken = 'اسم المستخدم مستخدم بالفعل';
+  static const userSaved = 'تم حفظ المستخدم';
+  static const role = 'الدور';
+  static const fullName = 'الاسم الكامل';
+  static const activeUsers = 'الحسابات النشطة';
+  static const inactiveUsers = 'الحسابات الموقوفة';
+  static const active = 'نشط';
+  static const inactive = 'موقوف';
+  static const accountActive = 'الحساب نشط';
+  static const accountActiveHint = 'الحساب الموقوف لا يستطيع تسجيل الدخول';
+  static const newPassword = 'كلمة مرور جديدة';
+  static const resetPasswordHint =
+      'اتركه فارغًا للإبقاء على كلمة المرور الحالية';
+  static const usersNeedInternet = 'إدارة المستخدمين تتطلب اتصالاً بالإنترنت';
+  static const noUsers = 'لا يوجد مستخدمون';
+  static const you = 'أنت';
+  static const cannotEditSelf = 'لا يمكنك إيقاف حسابك أو تغيير دورك';
+
+  // Misc additions
+  static const photoTooLarge = 'حجم الصورة يتجاوز الحد الأقصى (3 ميجابايت)';
+  static const syncFailedCheckConnection =
+      'تعذرت المزامنة، تحقق من الاتصال بالإنترنت';
+  static const loadingMore = 'جارٍ تحميل المزيد…';
+  static const exportingPages = 'جارٍ تجميع كل القراءات…';
+
   // Generic
   static const retry = 'إعادة المحاولة';
   static const cancel = 'إلغاء';

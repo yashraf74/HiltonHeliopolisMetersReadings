@@ -12,6 +12,7 @@ import 'screens/meters_screen.dart';
 import 'screens/my_readings_screen.dart';
 import 'screens/new_reading_screen.dart';
 import 'screens/readings_screen.dart';
+import 'screens/users_screen.dart';
 import 'widgets/status_widgets.dart';
 
 class _Tab {
@@ -37,17 +38,34 @@ class HomeShell extends StatefulWidget {
   State<HomeShell> createState() => _HomeShellState();
 }
 
-class _HomeShellState extends State<HomeShell> {
+class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _index = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Warm the meter cache on entry; a failure just keeps the cached list.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<MetersController>().refresh();
       context.read<SyncController>().sync();
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // Coming back to the foreground is the moment connectivity most often
+  // changed without us hearing about it; re-check and drain the queue.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    context.read<ConnectivityController>().recheck();
+    context.read<SyncController>().sync();
+    context.read<MetersController>().refresh();
   }
 
   List<_Tab> _tabsFor(AuthUser user) => [
@@ -67,8 +85,14 @@ class _HomeShellState extends State<HomeShell> {
         label: S.navReadings,
         icon: Icons.list_alt_rounded,
         body: ReadingsScreen(),
-      )
-    else
+      ),
+    if (user.isEngineer)
+      const _Tab(
+        label: S.navUsers,
+        icon: Icons.group_outlined,
+        body: UsersScreen(),
+      ),
+    if (!user.isEngineer)
       const _Tab(
         label: S.navMyReadings,
         icon: Icons.history_rounded,
@@ -115,22 +139,26 @@ class _HomeShellState extends State<HomeShell> {
                   borderRadius: BorderRadius.circular(20),
                   onTap: () async {
                     final messenger = ScaffoldMessenger.of(context);
-                    if (!isOnline) {
-                      messenger.showSnackBar(
-                        const SnackBar(content: Text(S.syncNeedsInternet)),
-                      );
-                      return;
-                    }
+                    final sync = context.read<SyncController>();
                     if (pending == 0) {
                       messenger.showSnackBar(
                         const SnackBar(content: Text(S.syncAllDone)),
                       );
                       return;
                     }
+                    // Always try: the offline flag can be stale, and a real
+                    // request is the only reliable test.
                     messenger.showSnackBar(
                       const SnackBar(content: Text(S.syncStarted)),
                     );
-                    await context.read<SyncController>().sync();
+                    final synced = await sync.sync();
+                    if (synced == 0 && !sync.isRunning) {
+                      messenger.showSnackBar(
+                        const SnackBar(
+                          content: Text(S.syncFailedCheckConnection),
+                        ),
+                      );
+                    }
                   },
                   child: Padding(
                     padding: const EdgeInsets.symmetric(

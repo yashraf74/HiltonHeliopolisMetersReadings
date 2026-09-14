@@ -94,45 +94,98 @@ class ReadingsScreen extends StatefulWidget {
 class _ReadingsScreenState extends State<ReadingsScreen> {
   ReadingFilters _filters = const ReadingFilters();
   final _search = TextEditingController();
+  final _scroll = ScrollController();
   List<Map<String, dynamic>> _rows = const [];
+  String? _nextCursor;
   bool _loading = true;
+  bool _loadingMore = false;
   String? _error;
   bool _exporting = false;
 
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   @override
   void dispose() {
+    _scroll.dispose();
     _search.dispose();
     super.dispose();
   }
 
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final nearBottom =
+        _scroll.position.pixels >= _scroll.position.maxScrollExtent - 400;
+    if (nearBottom) _loadMore();
+  }
+
+  void _handleError(Object e) {
+    if (e is NetworkException) {
+      _error = S.readingsNeedInternet;
+    } else if (e is ApiException) {
+      if (e.isUnauthorized) {
+        context.read<SessionController>().markTokenRejected();
+      }
+      _error = '${S.loadFailed}: ${e.message}';
+    } else {
+      _error = S.loadFailed;
+    }
+  }
+
+  /// First page for the current filters (also used by pull-to-refresh).
   Future<void> _load() async {
     setState(() {
       _loading = true;
       _error = null;
+      _nextCursor = null;
     });
     try {
-      final rows = await context.read<ApiClient>().fetchReadings(
+      final page = await context.read<ApiClient>().fetchReadings(
         _filters.toQuery(),
       );
       if (!mounted) return;
-      setState(() => _rows = rows);
-    } on NetworkException {
+      setState(() {
+        _rows = page.rows;
+        _nextCursor = page.nextCursor;
+      });
+    } catch (e) {
       if (!mounted) return;
-      setState(() => _error = S.readingsNeedInternet);
-    } on ApiException catch (e) {
-      if (!mounted) return;
-      if (e.isUnauthorized) {
-        context.read<SessionController>().markTokenRejected();
-      }
-      setState(() => _error = '${S.loadFailed}: ${e.message}');
+      setState(() => _handleError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final cursor = _nextCursor;
+    if (cursor == null || _loadingMore || _loading) return;
+    setState(() => _loadingMore = true);
+    try {
+      final page = await context.read<ApiClient>().fetchReadings(
+        _filters.toQuery(),
+        cursor: cursor,
+      );
+      if (!mounted) return;
+      setState(() {
+        _rows = [..._rows, ...page.rows];
+        _nextCursor = page.nextCursor;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      final messenger = ScaffoldMessenger.of(context);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            e is NetworkException ? S.readingsNeedInternet : S.loadFailed,
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -148,6 +201,8 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     _load();
   }
 
+  /// Exports every reading matching the current filters, not just the pages
+  /// loaded so far.
   Future<void> _export() async {
     if (_rows.isEmpty) {
       ScaffoldMessenger.of(context)
@@ -156,10 +211,14 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     }
     setState(() => _exporting = true);
     final messenger = ScaffoldMessenger.of(context);
+    final api = context.read<ApiClient>();
     try {
-      final bytes = buildReadingsWorkbook(_rows);
+      final all = _nextCursor == null
+          ? _rows
+          : await api.fetchAllReadings(_filters.toQuery());
+      final bytes = buildReadingsWorkbook(all);
       final stamp = DateFormat('yyyy-MM-dd_HHmm').format(DateTime.now());
-      final path = await FilePicker.saveFile(
+      final saved = await FilePicker.saveFile(
         dialogTitle: S.exportExcel,
         fileName: 'meter-readings-$stamp.xlsx',
         mimeType:
@@ -170,8 +229,12 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
       );
       messenger.showSnackBar(
         SnackBar(
-          content: Text(path == null ? S.exportCancelled : S.exportDone),
+          content: Text(saved == null ? S.exportCancelled : S.exportDone),
         ),
+      );
+    } on NetworkException {
+      messenger.showSnackBar(
+        const SnackBar(content: Text(S.readingsNeedInternet)),
       );
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('${S.exportFailed}: $e')));
@@ -248,7 +311,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
             child: Row(
               children: [
                 Text(
-                  '${S.readingsCount}: ${_rows.length}',
+                  '${S.readingsCount}: ${_rows.length}${_nextCursor != null ? '+' : ''}',
                   style: TextStyle(
                     color: scheme.onSurfaceVariant,
                     fontSize: 12.5,
@@ -298,11 +361,38 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
                     ],
                   )
                 : ListView.separated(
+                    controller: _scroll,
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    itemCount: _rows.length,
+                    itemCount: _rows.length + (_nextCursor != null ? 1 : 0),
                     separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (context, i) => _ReadingCard(row: _rows[i]),
+                    itemBuilder: (context, i) {
+                      if (i == _rows.length) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Text(
+                                S.loadingMore,
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      return _ReadingCard(row: _rows[i]);
+                    },
                   ),
           ),
         ),

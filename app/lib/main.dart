@@ -21,9 +21,13 @@ Future<void> main() async {
 
   final db = AppDatabase();
   final session = SessionController(storage: const FlutterSecureStorage());
-  final api = ApiClient(tokenProvider: () => session.token);
-  final meters = MetersController(db: db, api: api, session: session);
   final connectivity = ConnectivityController();
+  final api = ApiClient(
+    tokenProvider: () => session.token,
+    onReachability: (up) =>
+        up ? connectivity.markOnline() : connectivity.markOffline(),
+  );
+  final meters = MetersController(db: db, api: api, session: session);
   final sync = SyncController(
     db: db,
     api: api,
