@@ -185,6 +185,25 @@ class S {
   static const loadingMore = 'جارٍ تحميل المزيد…';
   static const exportingPages = 'جارٍ تجميع كل القراءات…';
 
+  // Polish round
+  static const notes = 'ملاحظات';
+  static const notesOptionalHint = 'اختياري: أي ملاحظة عن العداد أو القراءة';
+  static const deleteReading = 'حذف القراءة';
+  static const deleteReadingConfirm =
+      'سيتم حذف القراءة وصورتها نهائيًا من الخادم. هل تريد المتابعة؟';
+  static const readingDeleted = 'تم حذف القراءة';
+  static const deleteNeedsInternet = 'الحذف يتطلب اتصالاً بالإنترنت';
+  static const belowGround = 'طابق تحت الأرض';
+  static const belowGroundHint = 'مثال: طابق -1 للجراج أو الغلايات';
+  static const meterPhoto = 'صورة العداد (مرجع للمهندس فقط)';
+  static const meterPhotoHint =
+      'تظهر في قائمة العدادات فقط ولا تُستخدم في القراءات';
+  static const addMeterPhoto = 'إضافة صورة';
+  static const changePhoto = 'تغيير الصورة';
+  static const removePhoto = 'إزالة الصورة';
+  static const filterAll = 'الكل';
+  static const noMetersForFilter = 'لا توجد عدادات من هذا النوع';
+
   // Generic
   static const retry = 'إعادة المحاولة';
   static const cancel = 'إلغاء';

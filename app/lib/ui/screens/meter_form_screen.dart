@@ -1,13 +1,19 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/strings.dart';
+import '../../data/api/api_client.dart';
 import '../../data/db/database.dart';
 import '../../data/models.dart';
 import '../../state/meters_controller.dart';
+import '../widgets/photo_picker.dart';
+import '../widgets/status_widgets.dart';
 
 /// Add a new meter, or edit / retire an existing one when [existing] is set.
+/// The optional reference photo is uploaded on save (engineer-only).
 class MeterFormScreen extends StatefulWidget {
   const MeterFormScreen({super.key, this.existing});
 
@@ -28,7 +34,14 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
   late final TextEditingController _location;
   late final TextEditingController _floor;
   late final TextEditingController _description;
+  late bool _belowGround;
   bool _busy = false;
+
+  // Photo state: an existing server key, a newly picked file, or a request
+  // to clear. `_newPhoto` wins over `_photoKey`; `_removePhoto` clears both.
+  String? _photoKey;
+  File? _newPhoto;
+  bool _removePhoto = false;
 
   bool get _isEdit => widget.existing != null;
 
@@ -38,8 +51,12 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     final m = widget.existing;
     _type = m != null ? MeterType.fromApi(m.type) : MeterType.electricity;
     _location = TextEditingController(text: m?.location ?? '');
-    _floor = TextEditingController(text: m?.floorNumber.toString() ?? '');
+    _floor = TextEditingController(
+      text: m != null ? m.floorNumber.abs().toString() : '',
+    );
+    _belowGround = (m?.floorNumber ?? 0) < 0;
     _description = TextEditingController(text: m?.description ?? '');
+    _photoKey = m?.photoKey;
   }
 
   @override
@@ -50,32 +67,57 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     super.dispose();
   }
 
+  int _floorValue() {
+    final n = int.parse(_floor.text.trim());
+    return _belowGround ? -n : n;
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _busy = true);
     final meters = context.read<MetersController>();
+    final api = context.read<ApiClient>();
+    final messenger = ScaffoldMessenger.of(context);
     final location = _location.text.trim();
-    final floor = int.parse(_floor.text.trim());
+    final floor = _floorValue();
     final description = _description.text.trim();
 
-    final error = _isEdit
+    String? error;
+    String? uploadedKey;
+    try {
+      if (_newPhoto != null) {
+        uploadedKey = await api.uploadPhoto(
+          await _newPhoto!.readAsBytes(),
+          contentType: contentTypeForPath(_newPhoto!.path),
+          forMeter: true,
+        );
+      }
+    } on NetworkException {
+      error = S.onlineRequired;
+    } on ApiException catch (e) {
+      error = e.message;
+    }
+
+    error ??= _isEdit
         ? await meters.updateMeter(
             widget.existing!.id,
             type: _type,
             location: location,
             floorNumber: floor,
             description: description,
+            photoKey: uploadedKey,
+            clearPhoto: _removePhoto && uploadedKey == null,
           )
         : await meters.createMeter(
             type: _type,
             location: location,
             floorNumber: floor,
             description: description.isEmpty ? null : description,
+            photoKey: uploadedKey,
           );
     if (!mounted) return;
     setState(() => _busy = false);
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(error ?? S.meterSaved)));
+    messenger.showSnackBar(SnackBar(content: Text(error ?? S.meterSaved)));
     if (error == null) Navigator.of(context).pop();
   }
 
@@ -113,8 +155,79 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     if (error == null) Navigator.of(context).pop();
   }
 
+  Widget _buildPhotoSection(BuildContext context) {
+    final api = context.read<ApiClient>();
+    final scheme = Theme.of(context).colorScheme;
+    final showExisting =
+        _photoKey != null && !_removePhoto && _newPhoto == null;
+    final hasAny = showExisting || _newPhoto != null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(S.meterPhoto, style: const TextStyle(fontWeight: FontWeight.w700)),
+        const SizedBox(height: 2),
+        Text(
+          S.meterPhotoHint,
+          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
+        ),
+        const SizedBox(height: 8),
+        if (hasAny) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: AspectRatio(
+              aspectRatio: 4 / 3,
+              child: _newPhoto != null
+                  ? Image.file(_newPhoto!, fit: BoxFit.cover)
+                  : Image.network(
+                      api.photoUri(_photoKey!).toString(),
+                      headers: api.authHeaders,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) => Container(
+                        color: scheme.surfaceContainerHighest,
+                        alignment: Alignment.center,
+                        child: Text(
+                          S.photoLoadFailed,
+                          style: TextStyle(color: scheme.onSurfaceVariant),
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          PhotoSourceButtons(
+            compact: true,
+            onPicked: (f) => setState(() => _newPhoto = f),
+          ),
+          TextButton.icon(
+            onPressed: _busy
+                ? null
+                : () => setState(() {
+                    _newPhoto = null;
+                    _removePhoto = true;
+                  }),
+            icon: Icon(
+              Icons.hide_image_outlined,
+              size: 18,
+              color: scheme.error,
+            ),
+            label: Text(S.removePhoto, style: TextStyle(color: scheme.error)),
+          ),
+        ] else
+          PhotoSourceButtons(
+            compact: true,
+            onPicked: (f) => setState(() {
+              _newPhoto = f;
+              _removePhoto = false;
+            }),
+          ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEdit ? S.editMeter : S.addMeter),
@@ -122,10 +235,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
           if (_isEdit)
             IconButton(
               tooltip: S.retireMeter,
-              icon: Icon(
-                Icons.delete_outline_rounded,
-                color: Theme.of(context).colorScheme.error,
-              ),
+              icon: Icon(Icons.delete_outline_rounded, color: scheme.error),
               onPressed: _busy ? null : _retire,
             ),
         ],
@@ -165,6 +275,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
             TextFormField(
               controller: _location,
               textInputAction: TextInputAction.next,
+              contextMenuBuilder: appContextMenuBuilder,
               decoration: const InputDecoration(
                 labelText: S.meterLocation,
                 hintText: S.meterLocationHint,
@@ -176,26 +287,53 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
             TextFormField(
               controller: _floor,
               textInputAction: TextInputAction.next,
-              keyboardType: const TextInputType.numberWithOptions(signed: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[-0-9]')),
-              ],
-              decoration: const InputDecoration(labelText: S.meterFloor),
+              // Plain number pad: iOS has no signed pad, so the sign comes
+              // from the switch below instead of a full keyboard.
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              contextMenuBuilder: appContextMenuBuilder,
+              decoration: InputDecoration(
+                labelText: S.meterFloor,
+                prefixText: _belowGround ? '- ' : null,
+                prefixStyle: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                ),
+              ),
               validator: (v) {
                 if ((v ?? '').trim().isEmpty) return S.fieldRequired;
                 return int.tryParse(v!.trim()) == null ? S.floorInvalid : null;
               },
             ),
-            const SizedBox(height: 14),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text(
+                S.belowGround,
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(
+                S.belowGroundHint,
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
+                  fontSize: 12.5,
+                ),
+              ),
+              value: _belowGround,
+              onChanged: _busy ? null : (v) => setState(() => _belowGround = v),
+            ),
+            const SizedBox(height: 6),
             TextFormField(
               controller: _description,
               maxLines: 3,
+              contextMenuBuilder: appContextMenuBuilder,
               decoration: const InputDecoration(
                 labelText: S.meterDescription,
                 hintText: S.meterDescriptionHint,
                 alignLabelWithHint: true,
               ),
             ),
+            const SizedBox(height: 20),
+            _buildPhotoSection(context),
             const SizedBox(height: 28),
             FilledButton(
               onPressed: _busy ? null : _save,

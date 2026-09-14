@@ -42,5 +42,6 @@ void main() {
     expect(q.containsKey('type'), isFalse);
     expect(const ReadingFilters().isEmpty, isTrue);
     expect(f.activeCount, 2);
+    expect(const ReadingFilters(floor: -1).toQuery()['floor'], '-1');
   });
 }

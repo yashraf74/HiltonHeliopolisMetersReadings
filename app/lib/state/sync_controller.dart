@@ -124,6 +124,7 @@ class SyncController extends ChangeNotifier {
           value: reading.value,
           photoKey: photoKey,
           loggedAt: reading.loggedAt,
+          notes: reading.notes,
         );
         await _db.updateReadingSync(
           reading.id,

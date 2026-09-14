@@ -166,3 +166,88 @@ class EmptyState extends StatelessWidget {
     );
   }
 }
+
+/// Uses Flutter's own selection toolbar instead of the iOS system context
+/// menu, which in debug builds can trip a framework assertion ("Attempted
+/// to show while another instance was still visible") when the menu is
+/// re-shown during a rebuild. Pass as `contextMenuBuilder` on text fields.
+Widget appContextMenuBuilder(BuildContext context, EditableTextState state) =>
+    AdaptiveTextSelectionToolbar.editableText(editableTextState: state);
+
+/// One label/value line in an expanded reading or meter card.
+class DetailRow extends StatelessWidget {
+  const DetailRow(this.label, this.value, {super.key, this.mono = false});
+
+  final String label;
+  final String value;
+  final bool mono;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 110,
+            child: Text(
+              label,
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              textDirection: mono ? TextDirection.ltr : null,
+              style: TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                fontFamily: mono ? 'monospace' : null,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A notes block that renders nothing at all when there are no notes.
+class NotesBlock extends StatelessWidget {
+  const NotesBlock(this.notes, {super.key});
+
+  final String? notes;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = notes?.trim() ?? '';
+    if (text.isEmpty) return const SizedBox.shrink();
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: scheme.secondaryContainer.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            S.notes,
+            style: TextStyle(
+              color: scheme.onSurfaceVariant,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(text, style: const TextStyle(fontSize: 14)),
+        ],
+      ),
+    );
+  }
+}

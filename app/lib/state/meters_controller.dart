@@ -63,12 +63,14 @@ class MetersController extends ChangeNotifier {
     required String location,
     required int floorNumber,
     String? description,
+    String? photoKey,
   }) => _mutate(
     () => _api.createMeter(
       type: type,
       location: location,
       floorNumber: floorNumber,
       description: description,
+      photoKey: photoKey,
     ),
   );
 
@@ -78,6 +80,8 @@ class MetersController extends ChangeNotifier {
     required String location,
     required int floorNumber,
     String? description,
+    String? photoKey,
+    bool clearPhoto = false,
   }) => _mutate(
     () => _api.updateMeter(
       id,
@@ -85,6 +89,8 @@ class MetersController extends ChangeNotifier {
       location: location,
       floorNumber: floorNumber,
       description: description ?? '',
+      photoKey: photoKey,
+      clearPhoto: clearPhoto,
     ),
   );
 

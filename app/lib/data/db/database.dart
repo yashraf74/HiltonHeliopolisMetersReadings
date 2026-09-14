@@ -5,12 +5,15 @@ part 'database.g.dart';
 
 /// Local cache of the server's meters so the technician can pick a meter
 /// with no connectivity. Refreshed from the API whenever it is reachable.
+/// `photoKey` is only ever populated for engineers (the API withholds it
+/// from technicians).
 class Meters extends Table {
   TextColumn get id => text()();
   TextColumn get type => text()();
   TextColumn get location => text()();
   IntColumn get floorNumber => integer()();
   TextColumn get description => text().nullable()();
+  TextColumn get photoKey => text().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   TextColumn get updatedAt => text()();
 
@@ -26,6 +29,7 @@ class Readings extends Table {
   TextColumn get id => text()();
   TextColumn get meterId => text()();
   RealColumn get value => real()();
+  TextColumn get notes => text().nullable()();
   TextColumn get photoKey => text().nullable()();
   TextColumn get localPhotoPath => text().nullable()();
   TextColumn get loggedBy => text()();
@@ -46,7 +50,18 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'meters_app'));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration => MigrationStrategy(
+    onCreate: (m) => m.createAll(),
+    onUpgrade: (m, from, to) async {
+      if (from < 2) {
+        await m.addColumn(meters, meters.photoKey);
+        await m.addColumn(readings, readings.notes);
+      }
+    },
+  );
 
   // ---- meters -------------------------------------------------------------
 
@@ -86,6 +101,9 @@ class AppDatabase extends _$AppDatabase {
 
   Future<void> insertReading(ReadingsCompanion reading) =>
       into(readings).insert(reading);
+
+  Future<void> deleteReading(String id) =>
+      (delete(readings)..where((r) => r.id.equals(id))).go();
 
   Stream<List<Reading>> watchReadingsBy(String userId) =>
       (select(readings)

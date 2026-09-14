@@ -25,6 +25,7 @@ Uint8List buildReadingsWorkbook(List<Map<String, dynamic>> readings) {
     S.colFloor,
     S.colDescription,
     S.colValue,
+    S.notes,
     S.colLoggedBy,
     S.colSyncedAt,
     S.colReadingId,
@@ -52,13 +53,14 @@ Uint8List buildReadingsWorkbook(List<Map<String, dynamic>> readings) {
       IntCellValue(r['meter_floor'] as int? ?? 0),
       TextCellValue(r['meter_description'] as String? ?? ''),
       DoubleCellValue((r['value'] as num).toDouble()),
+      TextCellValue(r['notes'] as String? ?? ''),
       TextCellValue(r['logged_by_name'] as String? ?? ''),
       TextCellValue(local(r['synced_at'] as String?)),
       TextCellValue(r['id'] as String),
     ]);
   }
 
-  final widths = [18.0, 12.0, 26.0, 8.0, 28.0, 14.0, 20.0, 18.0, 38.0];
+  final widths = [18.0, 12.0, 26.0, 8.0, 28.0, 14.0, 30.0, 20.0, 18.0, 38.0];
   for (var c = 0; c < widths.length; c++) {
     sheet.setColumnWidth(c, widths[c]);
   }

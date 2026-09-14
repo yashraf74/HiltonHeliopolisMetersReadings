@@ -2,8 +2,6 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -16,14 +14,14 @@ import '../../data/models.dart';
 import '../../state/connectivity_controller.dart';
 import '../../state/session_controller.dart';
 import '../../state/sync_controller.dart';
+import '../widgets/photo_picker.dart';
 import '../widgets/status_widgets.dart';
 import 'meters_screen.dart';
 
-/// Three-step flow: meter type → meter → photo + value. The reading is
-/// written to the local database the moment "save" is tapped, whatever the
-/// connectivity, and the sync engine takes it from there.
-const maxPhotoBytes = 3 * 1024 * 1024;
-
+/// Three-step flow: meter type → meter → photo + value (+ optional notes).
+/// The reading is written to the local database the moment "save" is
+/// tapped, whatever the connectivity, and the sync engine takes it from
+/// there.
 class NewReadingScreen extends StatefulWidget {
   const NewReadingScreen({super.key});
 
@@ -37,6 +35,7 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
   Meter? _meter;
   File? _photo;
   final _value = TextEditingController();
+  final _notes = TextEditingController();
   final _search = TextEditingController();
   String? _valueError;
   bool _saving = false;
@@ -44,6 +43,7 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
   @override
   void dispose() {
     _value.dispose();
+    _notes.dispose();
     _search.dispose();
     super.dispose();
   }
@@ -55,35 +55,10 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
       _meter = null;
       _photo = null;
       _value.clear();
+      _notes.clear();
       _search.clear();
       _valueError = null;
     });
-  }
-
-  Future<void> _pickPhoto(ImageSource source) async {
-    try {
-      final picked = await ImagePicker().pickImage(
-        source: source,
-        imageQuality: 70,
-        maxWidth: 1600,
-        preferredCameraDevice: CameraDevice.rear,
-      );
-      if (picked == null) return;
-      final file = File(picked.path);
-      // Mirrors the server's 3 MB cap; the picker's downscaling normally
-      // lands far below this, so hitting it means something unusual.
-      if (await file.length() > maxPhotoBytes) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text(S.photoTooLarge)));
-        return;
-      }
-      setState(() => _photo = file);
-    } on PlatformException {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.photoUnavailable)));
-    }
   }
 
   Future<void> _save() async {
@@ -124,12 +99,14 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
         ? '.jpg'
         : p.extension(_photo!.path);
     final stored = await _photo!.copy(p.join(dir.path, '$id$ext'));
+    final notes = _notes.text.trim();
 
     await db.insertReading(
       ReadingsCompanion.insert(
         id: id,
         meterId: _meter!.id,
         value: value,
+        notes: Value(notes.isEmpty ? null : notes),
         localPhotoPath: Value(stored.path),
         loggedBy: user.id,
         loggedByName: user.fullName,
@@ -248,6 +225,7 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
           child: TextField(
             controller: _search,
             onChanged: (_) => setState(() {}),
+            contextMenuBuilder: appContextMenuBuilder,
             decoration: InputDecoration(
               hintText: S.searchMeters,
               prefixIcon: const Icon(Icons.search_rounded),
@@ -321,51 +299,19 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _pickPhoto(ImageSource.camera),
-                  icon: const Icon(Icons.photo_camera_outlined),
-                  label: const Text(S.retakePhoto),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _pickPhoto(ImageSource.gallery),
-                  icon: const Icon(Icons.photo_library_outlined),
-                  label: const Text(S.pickFromGallery),
-                ),
-              ),
-            ],
+          PhotoSourceButtons(
+            compact: true,
+            onPicked: (f) => setState(() => _photo = f),
           ),
         ] else
-          Row(
-            children: [
-              Expanded(
-                child: _PhotoButton(
-                  icon: Icons.photo_camera_rounded,
-                  label: S.takePhoto,
-                  onTap: () => _pickPhoto(ImageSource.camera),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _PhotoButton(
-                  icon: Icons.photo_library_rounded,
-                  label: S.pickFromGallery,
-                  onTap: () => _pickPhoto(ImageSource.gallery),
-                ),
-              ),
-            ],
-          ),
+          PhotoSourceButtons(onPicked: (f) => setState(() => _photo = f)),
         const SizedBox(height: 22),
         TextField(
           controller: _value,
           keyboardType: const TextInputType.numberWithOptions(decimal: true),
           textDirection: TextDirection.ltr,
           textAlign: TextAlign.center,
+          contextMenuBuilder: appContextMenuBuilder,
           style: const TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.w800,
@@ -378,6 +324,21 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
             hintText: S.valueHint,
             errorText: _valueError,
             prefixIcon: Icon(_type!.icon, color: _type!.color),
+          ),
+        ),
+        const SizedBox(height: 14),
+        TextField(
+          controller: _notes,
+          maxLines: 3,
+          minLines: 2,
+          maxLength: 1000,
+          contextMenuBuilder: appContextMenuBuilder,
+          textInputAction: TextInputAction.newline,
+          decoration: const InputDecoration(
+            labelText: S.notes,
+            hintText: S.notesOptionalHint,
+            alignLabelWithHint: true,
+            counterText: '',
           ),
         ),
         const SizedBox(height: 12),
@@ -459,47 +420,6 @@ class _StepHeader extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _PhotoButton extends StatelessWidget {
-  const _PhotoButton({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Material(
-      color: scheme.primaryContainer.withValues(alpha: 0.5),
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 26),
-          child: Column(
-            children: [
-              Icon(icon, size: 34, color: scheme.primary),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: scheme.onPrimaryContainer,
-                ),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }

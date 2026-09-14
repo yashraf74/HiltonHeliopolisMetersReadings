@@ -1,10 +1,12 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:provider/provider.dart';
 
 import '../../core/strings.dart';
 import '../../data/api/api_client.dart';
+import '../../data/db/database.dart';
 import '../../data/export/excel_export.dart';
 import '../../data/models.dart';
 import '../../state/session_controller.dart';
@@ -391,7 +393,11 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
                           ),
                         );
                       }
-                      return _ReadingCard(row: _rows[i]);
+                      return _ReadingCard(
+                        row: _rows[i],
+                        onDeleted: () =>
+                            setState(() => _rows = [..._rows]..removeAt(i)),
+                      );
                     },
                   ),
           ),
@@ -401,13 +407,68 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
   }
 }
 
-class _ReadingCard extends StatelessWidget {
-  const _ReadingCard({required this.row});
+class _ReadingCard extends StatefulWidget {
+  const _ReadingCard({required this.row, required this.onDeleted});
 
   final Map<String, dynamic> row;
+  final VoidCallback onDeleted;
+
+  @override
+  State<_ReadingCard> createState() => _ReadingCardState();
+}
+
+class _ReadingCardState extends State<_ReadingCard> {
+  bool _deleting = false;
+
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(S.deleteReading),
+        content: const Text(S.deleteReadingConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(S.cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              minimumSize: const Size(0, 44),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(S.deleteReading),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _deleting = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final id = widget.row['id'] as String;
+    try {
+      await context.read<ApiClient>().deleteReading(id);
+      // If the engineer logged it on this device, drop the local copy too.
+      if (mounted) await context.read<AppDatabase>().deleteReading(id);
+      messenger.showSnackBar(const SnackBar(content: Text(S.readingDeleted)));
+      widget.onDeleted();
+    } on NetworkException {
+      messenger.showSnackBar(
+        const SnackBar(content: Text(S.deleteNeedsInternet)),
+      );
+    } on ApiException catch (e) {
+      if (e.isUnauthorized && mounted) {
+        context.read<SessionController>().markTokenRejected();
+      }
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _deleting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final row = widget.row;
     final type = MeterType.fromApi(row['meter_type'] as String);
     final scheme = Theme.of(context).colorScheme;
     final loggedAt = DateTime.parse(row['logged_at'] as String).toLocal();
@@ -443,18 +504,19 @@ class _ReadingCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _Detail(S.meterType, type.label),
-                  _Detail(S.meterFloor, '${row['meter_floor']}'),
+                  DetailRow(S.meterType, type.label),
+                  DetailRow(S.meterFloor, '${row['meter_floor']}'),
                   if ((row['meter_description'] as String?)?.isNotEmpty == true)
-                    _Detail(
+                    DetailRow(
                       S.meterDescription,
                       row['meter_description'] as String,
                     ),
-                  _Detail(S.loggedBy, row['logged_by_name'] as String),
-                  _Detail(S.loggedAt, fmt.format(loggedAt)),
+                  DetailRow(S.loggedBy, row['logged_by_name'] as String),
+                  DetailRow(S.loggedAt, fmt.format(loggedAt)),
                   if (syncedAt != null)
-                    _Detail(S.syncedAtLabel, fmt.format(syncedAt)),
-                  _Detail(S.readingId, row['id'] as String, mono: true),
+                    DetailRow(S.syncedAtLabel, fmt.format(syncedAt)),
+                  DetailRow(S.readingId, row['id'] as String, mono: true),
+                  NotesBlock(row['notes'] as String?),
                   const SizedBox(height: 12),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(12),
@@ -484,50 +546,31 @@ class _ReadingCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.tonalIcon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: scheme.errorContainer,
+                        foregroundColor: scheme.onErrorContainer,
+                        minimumSize: const Size.fromHeight(44),
+                      ),
+                      onPressed: _deleting ? null : _delete,
+                      icon: _deleting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.delete_outline_rounded),
+                      label: const Text(S.deleteReading),
+                    ),
+                  ),
                 ],
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _Detail extends StatelessWidget {
-  const _Detail(this.label, this.value, {this.mono = false});
-
-  final String label;
-  final String value;
-  final bool mono;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 110,
-            child: Text(
-              label,
-              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              textDirection: mono ? TextDirection.ltr : null,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-                fontFamily: mono ? 'monospace' : null,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -545,8 +588,9 @@ class _FilterSheet extends StatefulWidget {
 class _FilterSheetState extends State<_FilterSheet> {
   late ReadingFilters _f = widget.initial;
   late final _floor = TextEditingController(
-    text: widget.initial.floor?.toString() ?? '',
+    text: widget.initial.floor?.abs().toString() ?? '',
   );
+  late bool _belowGround = (widget.initial.floor ?? 0) < 0;
   late final _tech = TextEditingController(text: widget.initial.technician);
 
   @override
@@ -627,12 +671,12 @@ class _FilterSheetState extends State<_FilterSheet> {
               Expanded(
                 child: TextField(
                   controller: _floor,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    signed: true,
-                  ),
-                  decoration: const InputDecoration(
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
                     labelText: S.filterFloor,
                     isDense: true,
+                    prefixText: _belowGround ? '- ' : null,
                   ),
                 ),
               ),
@@ -650,6 +694,15 @@ class _FilterSheetState extends State<_FilterSheet> {
             ],
           ),
           const SizedBox(height: 16),
+          const SizedBox(height: 8),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: FilterChip(
+              label: const Text(S.belowGround),
+              selected: _belowGround,
+              onSelected: (v) => setState(() => _belowGround = v),
+            ),
+          ),
           Text(
             S.filterDateRange,
             style: const TextStyle(fontWeight: FontWeight.w700),
@@ -697,7 +750,8 @@ class _FilterSheetState extends State<_FilterSheet> {
                         type: _f.type,
                         floor: floorText.isEmpty
                             ? null
-                            : int.tryParse(floorText),
+                            : (_belowGround ? -1 : 1) *
+                                  (int.tryParse(floorText) ?? 0),
                         technician: _tech.text.trim(),
                         from: _f.from,
                         to: _f.to,

@@ -142,6 +142,7 @@ class ApiClient {
     required String location,
     required int floorNumber,
     String? description,
+    String? photoKey,
   }) async {
     final body = await _json(
       _http.post(
@@ -152,18 +153,23 @@ class ApiClient {
           'location': location,
           'floorNumber': floorNumber,
           'description': description,
+          'photoKey': ?photoKey,
         }),
       ),
     );
     return body['id'] as String;
   }
 
+  /// [photoKey]: pass a key to set, `null` with [clearPhoto] to remove,
+  /// omit both to leave the photo unchanged.
   Future<void> updateMeter(
     String id, {
     MeterType? type,
     String? location,
     int? floorNumber,
     String? description,
+    String? photoKey,
+    bool clearPhoto = false,
   }) async {
     await _json(
       _http.put(
@@ -174,6 +180,7 @@ class ApiClient {
           'location': ?location,
           'floorNumber': ?floorNumber,
           'description': ?description,
+          if (photoKey != null || clearPhoto) 'photoKey': photoKey,
         }),
       ),
     );
@@ -185,13 +192,15 @@ class ApiClient {
 
   // ---- photos & readings --------------------------------------------------
 
+  /// [forMeter] stores under meters/ (engineer-only reference photos).
   Future<String> uploadPhoto(
     List<int> bytes, {
     String contentType = 'image/jpeg',
+    bool forMeter = false,
   }) async {
     final body = await _json(
       _http.post(
-        _uri('/photos'),
+        _uri('/photos', forMeter ? {'kind': 'meter'} : null),
         headers: _headers(contentType: contentType),
         body: bytes,
       ),
@@ -210,6 +219,7 @@ class ApiClient {
     required double value,
     required String photoKey,
     required String loggedAt,
+    String? notes,
   }) async {
     final body = await _json(
       _http.post(
@@ -221,10 +231,15 @@ class ApiClient {
           'value': value,
           'photoKey': photoKey,
           'loggedAt': loggedAt,
+          'notes': ?notes,
         }),
       ),
     );
     return body['syncedAt'] as String;
+  }
+
+  Future<void> deleteReading(String id) async {
+    await _json(_http.delete(_uri('/readings/$id'), headers: _headers()));
   }
 
   static const readingsPageSize = 50;
@@ -318,6 +333,7 @@ class ApiClient {
     location: j['location'] as String,
     floorNumber: j['floor_number'] as int,
     description: j['description'] as String?,
+    photoKey: j['photo_key'] as String?,
     isActive: (j['is_active'] as int) == 1,
     updatedAt: j['updated_at'] as String,
   );
