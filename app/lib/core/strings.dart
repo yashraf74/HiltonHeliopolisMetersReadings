@@ -14,8 +14,10 @@ class S {
   static const logout = 'تسجيل الخروج';
   static const loginRequired = 'أدخل اسم المستخدم وكلمة المرور';
   static const loginFailed = 'اسم المستخدم أو كلمة المرور غير صحيحة';
-  static const loginOffline = 'لا يوجد اتصال بالإنترنت. تسجيل الدخول يتطلب اتصالاً في المرة الأولى.';
-  static const sessionExpired = 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى';
+  static const loginOffline =
+      'لا يوجد اتصال بالإنترنت. تسجيل الدخول يتطلب اتصالاً في المرة الأولى.';
+  static const sessionExpired =
+      'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى';
   static const serverError = 'حدث خطأ في الخادم، حاول مرة أخرى';
   static const networkError = 'تعذر الاتصال بالخادم';
 
@@ -35,7 +37,8 @@ class S {
   // Connectivity / sync
   static const online = 'متصل';
   static const offline = 'غير متصل';
-  static const offlineBanner = 'أنت غير متصل بالإنترنت. سيتم حفظ القراءات على الجهاز ومزامنتها لاحقًا.';
+  static const offlineBanner =
+      'أنت غير متصل بالإنترنت. سيتم حفظ القراءات على الجهاز ومزامنتها لاحقًا.';
   static const syncPending = 'بانتظار المزامنة';
   static const syncSyncing = 'جارٍ المزامنة';
   static const syncSynced = 'تمت المزامنة';
@@ -52,10 +55,26 @@ class S {
   static const meterDescription = 'الوصف';
   static const floorLabel = 'الطابق';
   static const noMeters = 'لا توجد عدادات بعد';
-  static const noMetersHint = 'يقوم المهندس بإضافة العدادات من شاشة العدادات';
+  static const noMetersHint = 'اضغط زر الإضافة لتسجيل أول عداد';
+  static const noMetersHintTechnician = 'لم يضف المهندس أي عدادات بعد';
+  static const addMeter = 'إضافة عداد';
+  static const editMeter = 'تعديل العداد';
+  static const meterType = 'نوع العداد';
+  static const meterLocationHint = 'مثال: المطبخ الرئيسي';
+  static const meterDescriptionHint =
+      'اختياري: الرقم التسلسلي، الموديل، ملاحظات';
+  static const meterSaved = 'تم حفظ العداد';
+  static const retireMeter = 'إيقاف العداد';
+  static const retireMeterConfirm =
+      'سيتم إخفاء العداد من قائمة الفنيين مع الاحتفاظ بقراءاته السابقة. هل تريد المتابعة؟';
+  static const meterRetired = 'تم إيقاف العداد';
+  static const fieldRequired = 'هذا الحقل مطلوب';
+  static const floorInvalid = 'أدخل رقم طابق صحيح';
+  static const onlineRequired = 'هذا الإجراء يتطلب اتصالاً بالإنترنت';
   static const refreshMeters = 'تحديث العدادات';
   static const metersRefreshed = 'تم تحديث قائمة العدادات';
-  static const metersRefreshFailed = 'تعذر تحديث العدادات، سيتم استخدام النسخة المحفوظة';
+  static const metersRefreshFailed =
+      'تعذر تحديث العدادات، سيتم استخدام النسخة المحفوظة';
 
   // Readings
   static const noReadings = 'لا توجد قراءات بعد';
@@ -68,5 +87,6 @@ class S {
   static const cancel = 'إلغاء';
   static const save = 'حفظ';
   static const placeholderTitle = 'قيد التنفيذ';
-  static const placeholderBody = 'هذه الشاشة ستكون جاهزة في المرحلة القادمة من التطوير.';
+  static const placeholderBody =
+      'هذه الشاشة ستكون جاهزة في المرحلة القادمة من التطوير.';
 }

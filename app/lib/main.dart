@@ -50,7 +50,9 @@ class MetersApp extends StatelessWidget {
         Provider<ApiClient>.value(value: api),
         ChangeNotifierProvider<SessionController>.value(value: session),
         ChangeNotifierProvider<MetersController>.value(value: meters),
-        ChangeNotifierProvider<ConnectivityController>(create: (_) => ConnectivityController()),
+        ChangeNotifierProvider<ConnectivityController>(
+          create: (_) => ConnectivityController(),
+        ),
       ],
       child: MaterialApp(
         title: S.appNameShort,
@@ -65,7 +67,9 @@ class MetersApp extends StatelessWidget {
         ],
         home: Consumer<SessionController>(
           builder: (context, session, _) => switch (session.status) {
-            SessionStatus.restoring => const Scaffold(body: Center(child: CircularProgressIndicator())),
+            SessionStatus.restoring => const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
             SessionStatus.signedOut => const LoginScreen(),
             SessionStatus.signedIn => const HomeShell(),
           },

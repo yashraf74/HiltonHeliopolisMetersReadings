@@ -13,7 +13,12 @@ import 'screens/placeholder_screen.dart';
 import 'widgets/status_widgets.dart';
 
 class _Tab {
-  const _Tab({required this.label, required this.icon, required this.body, this.enabled = true});
+  const _Tab({
+    required this.label,
+    required this.icon,
+    required this.body,
+    this.enabled = true,
+  });
 
   final String label;
   final IconData icon;
@@ -43,28 +48,36 @@ class _HomeShellState extends State<HomeShell> {
   }
 
   List<_Tab> _tabsFor(AuthUser user) => [
-        const _Tab(
-          label: S.navNewReading,
-          icon: Icons.add_circle_outline_rounded,
-          body: PlaceholderScreen(icon: Icons.add_a_photo_outlined),
-        ),
-        if (user.isEngineer)
-          const _Tab(label: S.navMeters, icon: Icons.speed_rounded, body: MetersScreen()),
-        if (user.isEngineer)
-          const _Tab(
-            label: S.navReadings,
-            icon: Icons.list_alt_rounded,
-            body: PlaceholderScreen(icon: Icons.list_alt_rounded),
-          )
-        else
-          const _Tab(label: S.navMyReadings, icon: Icons.history_rounded, body: MyReadingsScreen()),
-        const _Tab(
-          label: S.navDashboard,
-          icon: Icons.dashboard_outlined,
-          body: SizedBox.shrink(),
-          enabled: false,
-        ),
-      ];
+    const _Tab(
+      label: S.navNewReading,
+      icon: Icons.add_circle_outline_rounded,
+      body: PlaceholderScreen(icon: Icons.add_a_photo_outlined),
+    ),
+    if (user.isEngineer)
+      const _Tab(
+        label: S.navMeters,
+        icon: Icons.speed_rounded,
+        body: MetersScreen(),
+      ),
+    if (user.isEngineer)
+      const _Tab(
+        label: S.navReadings,
+        icon: Icons.list_alt_rounded,
+        body: PlaceholderScreen(icon: Icons.list_alt_rounded),
+      )
+    else
+      const _Tab(
+        label: S.navMyReadings,
+        icon: Icons.history_rounded,
+        body: MyReadingsScreen(),
+      ),
+    const _Tab(
+      label: S.navDashboard,
+      icon: Icons.dashboard_outlined,
+      body: SizedBox.shrink(),
+      enabled: false,
+    ),
+  ];
 
   void _onSelect(List<_Tab> tabs, int i) {
     if (!tabs[i].enabled) {
@@ -99,21 +112,34 @@ class _HomeShellState extends State<HomeShell> {
                     if (pending > 0)
                       Container(
                         margin: const EdgeInsetsDirectional.only(end: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: SyncStatus.pending.color.withValues(alpha: 0.14),
+                          color: SyncStatus.pending.color.withValues(
+                            alpha: 0.14,
+                          ),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
                           '$pending ${S.syncPending}',
-                          style: TextStyle(color: SyncStatus.pending.color, fontSize: 12, fontWeight: FontWeight.w700),
+                          style: TextStyle(
+                            color: SyncStatus.pending.color,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     Tooltip(
                       message: isOnline ? S.online : S.offline,
                       child: Icon(
-                        isOnline ? Icons.cloud_done_outlined : Icons.cloud_off_rounded,
-                        color: isOnline ? SyncStatus.synced.color : scheme.outline,
+                        isOnline
+                            ? Icons.cloud_done_outlined
+                            : Icons.cloud_off_rounded,
+                        color: isOnline
+                            ? SyncStatus.synced.color
+                            : scheme.outline,
                       ),
                     ),
                   ],
@@ -133,8 +159,20 @@ class _HomeShellState extends State<HomeShell> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(user.fullName, style: TextStyle(fontWeight: FontWeight.w700, color: scheme.onSurface)),
-                    Text(user.role.label, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                    Text(
+                      user.fullName,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                    Text(
+                      user.role.label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ),

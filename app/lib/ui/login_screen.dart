@@ -73,13 +73,18 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: AppColors.accent,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Icon(Icons.speed_rounded, color: Colors.white, size: 40),
+                      child: const Icon(
+                        Icons.speed_rounded,
+                        color: Colors.white,
+                        size: 40,
+                      ),
                     ),
                     const SizedBox(height: 20),
                     Text(
                       S.appName,
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 6),
                     Text(
@@ -110,7 +115,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         labelText: S.password,
                         prefixIcon: const Icon(Icons.lock_outline_rounded),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscure ? Icons.visibility_rounded : Icons.visibility_off_rounded),
+                          icon: Icon(
+                            _obscure
+                                ? Icons.visibility_rounded
+                                : Icons.visibility_off_rounded,
+                          ),
                           onPressed: () => setState(() => _obscure = !_obscure),
                         ),
                       ),
@@ -120,7 +129,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       Text(
                         _error!,
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: scheme.error, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                          color: scheme.error,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                     const SizedBox(height: 24),
@@ -130,7 +142,10 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? const SizedBox(
                               width: 22,
                               height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
                             )
                           : const Text(S.loginButton),
                     ),
@@ -139,9 +154,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.wifi_off_rounded, size: 18, color: scheme.onSurfaceVariant),
+                          Icon(
+                            Icons.wifi_off_rounded,
+                            size: 18,
+                            color: scheme.onSurfaceVariant,
+                          ),
                           const SizedBox(width: 6),
-                          Text(S.offline, style: TextStyle(color: scheme.onSurfaceVariant)),
+                          Text(
+                            S.offline,
+                            style: TextStyle(color: scheme.onSurfaceVariant),
+                          ),
                         ],
                       ),
                     ],

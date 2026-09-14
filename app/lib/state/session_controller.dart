@@ -14,7 +14,8 @@ enum SessionStatus { restoring, signedOut, signedIn }
 /// signed in and can log readings; the token is only ever validated by the
 /// server when a request is actually made.
 class SessionController extends ChangeNotifier {
-  SessionController({required FlutterSecureStorage storage}) : _storage = storage;
+  SessionController({required FlutterSecureStorage storage})
+    : _storage = storage;
 
   static const _tokenKey = 'auth_token';
   static const _userKey = 'auth_user';
@@ -52,7 +53,11 @@ class SessionController extends ChangeNotifier {
   }
 
   /// Returns null on success, otherwise an Arabic error message to display.
-  Future<String?> signIn(ApiClient api, String username, String password) async {
+  Future<String?> signIn(
+    ApiClient api,
+    String username,
+    String password,
+  ) async {
     try {
       final result = await api.login(username.trim(), password);
       _token = result.token;

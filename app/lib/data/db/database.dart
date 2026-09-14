@@ -43,7 +43,7 @@ class Readings extends Table {
 @DriftDatabase(tables: [Meters, Readings])
 class AppDatabase extends _$AppDatabase {
   AppDatabase([QueryExecutor? executor])
-      : super(executor ?? driftDatabase(name: 'meters_app'));
+    : super(executor ?? driftDatabase(name: 'meters_app'));
 
   @override
   int get schemaVersion => 1;
@@ -58,10 +58,12 @@ class AppDatabase extends _$AppDatabase {
       await batch((b) => b.insertAllOnConflictUpdate(meters, fromServer));
       final ids = fromServer.map((m) => m.id).toList();
       if (ids.isEmpty) {
-        await update(meters).write(const MetersCompanion(isActive: Value(false)));
-      } else {
-        await (update(meters)..where((m) => m.id.isNotIn(ids)))
+        await update(meters)
             .write(const MetersCompanion(isActive: Value(false)));
+      } else {
+        await (update(meters)..where((m) => m.id.isNotIn(ids))).write(
+          const MetersCompanion(isActive: Value(false)),
+        );
       }
     });
   }
@@ -69,7 +71,10 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<Meter>> watchActiveMeters({String? type}) {
     final q = select(meters)
       ..where((m) => m.isActive.equals(true))
-      ..orderBy([(m) => OrderingTerm.asc(m.floorNumber), (m) => OrderingTerm.asc(m.location)]);
+      ..orderBy([
+        (m) => OrderingTerm.asc(m.floorNumber),
+        (m) => OrderingTerm.asc(m.location),
+      ]);
     if (type != null) q.where((m) => m.type.equals(type));
     return q.watch();
   }
@@ -82,15 +87,17 @@ class AppDatabase extends _$AppDatabase {
   Future<void> insertReading(ReadingsCompanion reading) =>
       into(readings).insert(reading);
 
-  Stream<List<Reading>> watchReadingsBy(String userId) => (select(readings)
-        ..where((r) => r.loggedBy.equals(userId))
-        ..orderBy([(r) => OrderingTerm.desc(r.loggedAt)]))
-      .watch();
+  Stream<List<Reading>> watchReadingsBy(String userId) =>
+      (select(readings)
+            ..where((r) => r.loggedBy.equals(userId))
+            ..orderBy([(r) => OrderingTerm.desc(r.loggedAt)]))
+          .watch();
 
-  Future<List<Reading>> unsyncedReadings() => (select(readings)
-        ..where((r) => r.syncStatus.isNotValue('synced'))
-        ..orderBy([(r) => OrderingTerm.asc(r.loggedAt)]))
-      .get();
+  Future<List<Reading>> unsyncedReadings() =>
+      (select(readings)
+            ..where((r) => r.syncStatus.isNotValue('synced'))
+            ..orderBy([(r) => OrderingTerm.asc(r.loggedAt)]))
+          .get();
 
   Stream<int> watchPendingCount() {
     final count = readings.id.count();
@@ -107,12 +114,13 @@ class AppDatabase extends _$AppDatabase {
     String? syncedAt,
     String? lastError,
     int? retryCount,
-  }) =>
-      (update(readings)..where((r) => r.id.equals(id))).write(ReadingsCompanion(
-        syncStatus: Value(status),
-        photoKey: photoKey != null ? Value(photoKey) : const Value.absent(),
-        syncedAt: syncedAt != null ? Value(syncedAt) : const Value.absent(),
-        lastError: Value(lastError),
-        retryCount: retryCount != null ? Value(retryCount) : const Value.absent(),
-      ));
+  }) => (update(readings)..where((r) => r.id.equals(id))).write(
+    ReadingsCompanion(
+      syncStatus: Value(status),
+      photoKey: photoKey != null ? Value(photoKey) : const Value.absent(),
+      syncedAt: syncedAt != null ? Value(syncedAt) : const Value.absent(),
+      lastError: Value(lastError),
+      retryCount: retryCount != null ? Value(retryCount) : const Value.absent(),
+    ),
+  );
 }

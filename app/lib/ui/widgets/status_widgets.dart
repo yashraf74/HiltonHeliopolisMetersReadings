@@ -40,7 +40,12 @@ class StatusBanners extends StatelessWidget {
 }
 
 class _Banner extends StatelessWidget {
-  const _Banner({required this.icon, required this.color, required this.text, this.action});
+  const _Banner({
+    required this.icon,
+    required this.color,
+    required this.text,
+    this.action,
+  });
 
   final IconData icon;
   final Color color;
@@ -57,7 +62,15 @@ class _Banner extends StatelessWidget {
           children: [
             Icon(icon, color: color, size: 20),
             const SizedBox(width: 10),
-            Expanded(child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
             ?action,
           ],
         ),
@@ -81,7 +94,11 @@ class SyncStatusChip extends StatelessWidget {
       ),
       child: Text(
         status.label,
-        style: TextStyle(color: status.color, fontSize: 12, fontWeight: FontWeight.w700),
+        style: TextStyle(
+          color: status.color,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }
@@ -108,7 +125,12 @@ class MeterTypeBadge extends StatelessWidget {
 }
 
 class EmptyState extends StatelessWidget {
-  const EmptyState({super.key, required this.icon, required this.title, this.body});
+  const EmptyState({
+    super.key,
+    required this.icon,
+    required this.title,
+    this.body,
+  });
 
   final IconData icon;
   final String title;
@@ -125,10 +147,18 @@ class EmptyState extends StatelessWidget {
           children: [
             Icon(icon, size: 56, color: scheme.outline),
             const SizedBox(height: 14),
-            Text(title, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
             if (body != null) ...[
               const SizedBox(height: 6),
-              Text(body!, textAlign: TextAlign.center, style: TextStyle(color: scheme.onSurfaceVariant)),
+              Text(
+                body!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: scheme.onSurfaceVariant),
+              ),
             ],
           ],
         ),

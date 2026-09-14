@@ -1,7 +1,9 @@
 import 'package:flutter/foundation.dart';
 
+import '../core/strings.dart';
 import '../data/api/api_client.dart';
 import '../data/db/database.dart';
+import '../data/models.dart';
 import 'session_controller.dart';
 
 /// Keeps the local meter cache in step with the server. Reads always come
@@ -12,9 +14,9 @@ class MetersController extends ChangeNotifier {
     required AppDatabase db,
     required ApiClient api,
     required SessionController session,
-  })  : _db = db,
-        _api = api,
-        _session = session;
+  }) : _db = db,
+       _api = api,
+       _session = session;
 
   final AppDatabase _db;
   final ApiClient _api;
@@ -35,7 +37,9 @@ class MetersController extends ChangeNotifier {
     notifyListeners();
     try {
       final includeInactive = _session.user?.isEngineer ?? false;
-      final fromServer = await _api.fetchMeters(includeInactive: includeInactive);
+      final fromServer = await _api.fetchMeters(
+        includeInactive: includeInactive,
+      );
       await _db.replaceMeters(fromServer);
       _lastRefresh = DateTime.now();
       return true;
@@ -47,6 +51,55 @@ class MetersController extends ChangeNotifier {
     } finally {
       _refreshing = false;
       notifyListeners();
+    }
+  }
+
+  // ---- engineer actions (online only) --------------------------------------
+
+  /// Returns null on success or an Arabic error message. The cache is
+  /// refreshed from the server afterwards so the list reflects the change.
+  Future<String?> createMeter({
+    required MeterType type,
+    required String location,
+    required int floorNumber,
+    String? description,
+  }) => _mutate(
+    () => _api.createMeter(
+      type: type,
+      location: location,
+      floorNumber: floorNumber,
+      description: description,
+    ),
+  );
+
+  Future<String?> updateMeter(
+    String id, {
+    required MeterType type,
+    required String location,
+    required int floorNumber,
+    String? description,
+  }) => _mutate(
+    () => _api.updateMeter(
+      id,
+      type: type,
+      location: location,
+      floorNumber: floorNumber,
+      description: description ?? '',
+    ),
+  );
+
+  Future<String?> retireMeter(String id) => _mutate(() => _api.retireMeter(id));
+
+  Future<String?> _mutate(Future<void> Function() action) async {
+    try {
+      await action();
+      await refresh();
+      return null;
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) _session.markTokenRejected();
+      return e.message;
+    } on NetworkException {
+      return S.onlineRequired;
     }
   }
 }

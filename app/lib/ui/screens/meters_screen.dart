@@ -6,8 +6,9 @@ import '../../data/db/database.dart';
 import '../../data/models.dart';
 import '../../state/meters_controller.dart';
 import '../widgets/status_widgets.dart';
+import 'meter_form_screen.dart';
 
-/// Lists the locally cached meters. Add/edit/retire arrive in phase 4.
+/// Engineer's meter list from the local cache, with add / edit / retire.
 class MetersScreen extends StatelessWidget {
   const MetersScreen({super.key});
 
@@ -26,23 +27,38 @@ class MetersScreen extends StatelessWidget {
       stream: db.watchActiveMeters(),
       builder: (context, snapshot) {
         final meters = snapshot.data ?? const <Meter>[];
-        return RefreshIndicator(
-          onRefresh: () => _refresh(context),
-          child: meters.isEmpty
-              ? ListView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  children: const [
-                    SizedBox(height: 120),
-                    EmptyState(icon: Icons.speed_rounded, title: S.noMeters, body: S.noMetersHint),
-                  ],
-                )
-              : ListView.separated(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  itemCount: meters.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
-                  itemBuilder: (context, i) => MeterTile(meter: meters[i]),
-                ),
+        return Scaffold(
+          floatingActionButton: FloatingActionButton.extended(
+            onPressed: () => MeterFormScreen.open(context),
+            icon: const Icon(Icons.add_rounded),
+            label: const Text(S.addMeter),
+          ),
+          body: RefreshIndicator(
+            onRefresh: () => _refresh(context),
+            child: meters.isEmpty
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      SizedBox(height: 120),
+                      EmptyState(
+                        icon: Icons.speed_rounded,
+                        title: S.noMeters,
+                        body: S.noMetersHint,
+                      ),
+                    ],
+                  )
+                : ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+                    itemCount: meters.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, i) => MeterTile(
+                      meter: meters[i],
+                      onTap: () =>
+                          MeterFormScreen.open(context, existing: meters[i]),
+                    ),
+                  ),
+          ),
         );
       },
     );
@@ -73,19 +89,29 @@ class MeterTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(meter.location, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                    Text(
+                      meter.location,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                      ),
+                    ),
                     const SizedBox(height: 2),
                     Text(
                       '${type.label} · ${S.floorLabel} ${meter.floorNumber}'
                       '${meter.description?.isNotEmpty == true ? ' · ${meter.description}' : ''}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13),
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
               ),
-              if (onTap != null) Icon(Icons.chevron_left_rounded, color: scheme.outline),
+              if (onTap != null)
+                Icon(Icons.chevron_left_rounded, color: scheme.outline),
             ],
           ),
         ),

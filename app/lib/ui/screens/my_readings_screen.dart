@@ -25,7 +25,10 @@ class MyReadingsScreen extends StatelessWidget {
       builder: (context, snapshot) {
         final readings = snapshot.data ?? const <Reading>[];
         if (readings.isEmpty) {
-          return const EmptyState(icon: Icons.history_rounded, title: S.noReadings);
+          return const EmptyState(
+            icon: Icons.history_rounded,
+            title: S.noReadings,
+          );
         }
         return ListView.separated(
           padding: const EdgeInsets.all(16),
@@ -37,7 +40,9 @@ class MyReadingsScreen extends StatelessWidget {
               future: db.meterById(r.meterId),
               builder: (context, meterSnap) {
                 final meter = meterSnap.data;
-                final type = meter != null ? MeterType.fromApi(meter.type) : null;
+                final type = meter != null
+                    ? MeterType.fromApi(meter.type)
+                    : null;
                 return Card(
                   child: Padding(
                     padding: const EdgeInsets.all(14),
@@ -51,11 +56,20 @@ class MyReadingsScreen extends StatelessWidget {
                             children: [
                               Text(
                                 meter?.location ?? r.meterId,
-                                style: const TextStyle(fontWeight: FontWeight.w700),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                               Text(
-                                dateFormat.format(DateTime.parse(r.loggedAt).toLocal()),
-                                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
+                                dateFormat.format(
+                                  DateTime.parse(r.loggedAt).toLocal(),
+                                ),
+                                style: TextStyle(
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
                               ),
                             ],
                           ),
@@ -65,7 +79,10 @@ class MyReadingsScreen extends StatelessWidget {
                           children: [
                             Text(
                               NumberFormat.decimalPattern('en').format(r.value),
-                              style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 18,
+                              ),
                             ),
                             const SizedBox(height: 4),
                             SyncStatusChip(SyncStatus.fromDb(r.syncStatus)),

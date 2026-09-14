@@ -68,7 +68,11 @@ ThemeData buildAppTheme() {
       backgroundColor: Colors.white,
       indicatorColor: scheme.primaryContainer,
       labelTextStyle: WidgetStateProperty.all(
-        const TextStyle(fontFamily: 'Cairo', fontSize: 12, fontWeight: FontWeight.w600),
+        const TextStyle(
+          fontFamily: 'Cairo',
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     ),
     snackBarTheme: const SnackBarThemeData(

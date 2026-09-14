@@ -42,9 +42,9 @@ class ApiClient {
     required String Function() tokenProvider,
     http.Client? httpClient,
     String baseUrl = AppConfig.apiBaseUrl,
-  })  : _tokenProvider = tokenProvider,
-        _http = httpClient ?? http.Client(),
-        _baseUrl = baseUrl;
+  }) : _tokenProvider = tokenProvider,
+       _http = httpClient ?? http.Client(),
+       _baseUrl = baseUrl;
 
   final String Function() _tokenProvider;
   final http.Client _http;
@@ -54,9 +54,9 @@ class ApiClient {
       Uri.parse('$_baseUrl/api$path').replace(queryParameters: query);
 
   Map<String, String> _headers({bool auth = true, String? contentType}) => {
-        'Content-Type': ?contentType,
-        if (auth) 'Authorization': 'Bearer ${_tokenProvider()}',
-      };
+    'Content-Type': ?contentType,
+    if (auth) 'Authorization': 'Bearer ${_tokenProvider()}',
+  };
 
   Future<Map<String, dynamic>> _json(Future<http.Response> request) async {
     final http.Response response;
@@ -91,11 +91,13 @@ class ApiClient {
   // ---- auth ---------------------------------------------------------------
 
   Future<LoginResult> login(String username, String password) async {
-    final body = await _json(_http.post(
-      _uri('/auth/login'),
-      headers: _headers(auth: false, contentType: 'application/json'),
-      body: jsonEncode({'username': username, 'password': password}),
-    ));
+    final body = await _json(
+      _http.post(
+        _uri('/auth/login'),
+        headers: _headers(auth: false, contentType: 'application/json'),
+        body: jsonEncode({'username': username, 'password': password}),
+      ),
+    );
     return LoginResult(
       token: body['token'] as String,
       user: AuthUser.fromJson(body['user'] as Map<String, dynamic>),
@@ -105,10 +107,12 @@ class ApiClient {
   // ---- meters -------------------------------------------------------------
 
   Future<List<Meter>> fetchMeters({bool includeInactive = false}) async {
-    final body = await _json(_http.get(
-      _uri('/meters', includeInactive ? {'includeInactive': '1'} : null),
-      headers: _headers(),
-    ));
+    final body = await _json(
+      _http.get(
+        _uri('/meters', includeInactive ? {'includeInactive': '1'} : null),
+        headers: _headers(),
+      ),
+    );
     final rows = body['meters'] as List<dynamic>;
     return rows.map((r) => _meterFromJson(r as Map<String, dynamic>)).toList();
   }
@@ -119,16 +123,18 @@ class ApiClient {
     required int floorNumber,
     String? description,
   }) async {
-    final body = await _json(_http.post(
-      _uri('/meters'),
-      headers: _headers(contentType: 'application/json'),
-      body: jsonEncode({
-        'type': type.name,
-        'location': location,
-        'floorNumber': floorNumber,
-        'description': description,
-      }),
-    ));
+    final body = await _json(
+      _http.post(
+        _uri('/meters'),
+        headers: _headers(contentType: 'application/json'),
+        body: jsonEncode({
+          'type': type.name,
+          'location': location,
+          'floorNumber': floorNumber,
+          'description': description,
+        }),
+      ),
+    );
     return body['id'] as String;
   }
 
@@ -139,16 +145,18 @@ class ApiClient {
     int? floorNumber,
     String? description,
   }) async {
-    await _json(_http.put(
-      _uri('/meters/$id'),
-      headers: _headers(contentType: 'application/json'),
-      body: jsonEncode({
-        'type': ?type?.name,
-        'location': ?location,
-        'floorNumber': ?floorNumber,
-        'description': ?description,
-      }),
-    ));
+    await _json(
+      _http.put(
+        _uri('/meters/$id'),
+        headers: _headers(contentType: 'application/json'),
+        body: jsonEncode({
+          'type': ?type?.name,
+          'location': ?location,
+          'floorNumber': ?floorNumber,
+          'description': ?description,
+        }),
+      ),
+    );
   }
 
   Future<void> retireMeter(String id) async {
@@ -157,12 +165,17 @@ class ApiClient {
 
   // ---- photos & readings --------------------------------------------------
 
-  Future<String> uploadPhoto(List<int> bytes, {String contentType = 'image/jpeg'}) async {
-    final body = await _json(_http.post(
-      _uri('/photos'),
-      headers: _headers(contentType: contentType),
-      body: bytes,
-    ));
+  Future<String> uploadPhoto(
+    List<int> bytes, {
+    String contentType = 'image/jpeg',
+  }) async {
+    final body = await _json(
+      _http.post(
+        _uri('/photos'),
+        headers: _headers(contentType: contentType),
+        body: bytes,
+      ),
+    );
     return body['photoKey'] as String;
   }
 
@@ -178,35 +191,41 @@ class ApiClient {
     required String photoKey,
     required String loggedAt,
   }) async {
-    final body = await _json(_http.post(
-      _uri('/readings'),
-      headers: _headers(contentType: 'application/json'),
-      body: jsonEncode({
-        'id': id,
-        'meterId': meterId,
-        'value': value,
-        'photoKey': photoKey,
-        'loggedAt': loggedAt,
-      }),
-    ));
+    final body = await _json(
+      _http.post(
+        _uri('/readings'),
+        headers: _headers(contentType: 'application/json'),
+        body: jsonEncode({
+          'id': id,
+          'meterId': meterId,
+          'value': value,
+          'photoKey': photoKey,
+          'loggedAt': loggedAt,
+        }),
+      ),
+    );
     return body['syncedAt'] as String;
   }
 
-  Future<List<Map<String, dynamic>>> fetchReadings(Map<String, String> filters) async {
-    final body = await _json(_http.get(
-      _uri('/readings', filters.isEmpty ? null : filters),
-      headers: _headers(),
-    ));
+  Future<List<Map<String, dynamic>>> fetchReadings(
+    Map<String, String> filters,
+  ) async {
+    final body = await _json(
+      _http.get(
+        _uri('/readings', filters.isEmpty ? null : filters),
+        headers: _headers(),
+      ),
+    );
     return (body['readings'] as List<dynamic>).cast<Map<String, dynamic>>();
   }
 
   Meter _meterFromJson(Map<String, dynamic> j) => Meter(
-        id: j['id'] as String,
-        type: j['type'] as String,
-        location: j['location'] as String,
-        floorNumber: j['floor_number'] as int,
-        description: j['description'] as String?,
-        isActive: (j['is_active'] as int) == 1,
-        updatedAt: j['updated_at'] as String,
-      );
+    id: j['id'] as String,
+    type: j['type'] as String,
+    location: j['location'] as String,
+    floorNumber: j['floor_number'] as int,
+    description: j['description'] as String?,
+    isActive: (j['is_active'] as int) == 1,
+    updatedAt: j['updated_at'] as String,
+  );
 }

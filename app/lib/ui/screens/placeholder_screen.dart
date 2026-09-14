@@ -11,6 +11,10 @@ class PlaceholderScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return EmptyState(icon: icon, title: S.placeholderTitle, body: S.placeholderBody);
+    return EmptyState(
+      icon: icon,
+      title: S.placeholderTitle,
+      body: S.placeholderBody,
+    );
   }
 }
