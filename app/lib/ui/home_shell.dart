@@ -98,12 +98,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         icon: Icons.history_rounded,
         body: MyReadingsScreen(),
       ),
-    const _Tab(
-      label: S.navDashboard,
-      icon: Icons.dashboard_outlined,
-      body: SizedBox.shrink(),
-      enabled: false,
-    ),
+    if (user.isEngineer)
+      const _Tab(
+        label: S.navDashboard,
+        icon: Icons.dashboard_outlined,
+        body: SizedBox.shrink(),
+        enabled: false,
+      ),
   ];
 
   void _onSelect(List<_Tab> tabs, int i) {

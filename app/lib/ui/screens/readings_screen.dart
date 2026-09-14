@@ -588,9 +588,8 @@ class _FilterSheet extends StatefulWidget {
 class _FilterSheetState extends State<_FilterSheet> {
   late ReadingFilters _f = widget.initial;
   late final _floor = TextEditingController(
-    text: widget.initial.floor?.abs().toString() ?? '',
+    text: widget.initial.floor?.toString() ?? '',
   );
-  late bool _belowGround = (widget.initial.floor ?? 0) < 0;
   late final _tech = TextEditingController(text: widget.initial.technician);
 
   @override
@@ -671,12 +670,15 @@ class _FilterSheetState extends State<_FilterSheet> {
               Expanded(
                 child: TextField(
                   controller: _floor,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: InputDecoration(
+                  keyboardType: const TextInputType.numberWithOptions(
+                    signed: true,
+                  ),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[-0-9]')),
+                  ],
+                  decoration: const InputDecoration(
                     labelText: S.filterFloor,
                     isDense: true,
-                    prefixText: _belowGround ? '- ' : null,
                   ),
                 ),
               ),
@@ -694,15 +696,6 @@ class _FilterSheetState extends State<_FilterSheet> {
             ],
           ),
           const SizedBox(height: 16),
-          const SizedBox(height: 8),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: FilterChip(
-              label: const Text(S.belowGround),
-              selected: _belowGround,
-              onSelected: (v) => setState(() => _belowGround = v),
-            ),
-          ),
           Text(
             S.filterDateRange,
             style: const TextStyle(fontWeight: FontWeight.w700),
@@ -750,8 +743,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                         type: _f.type,
                         floor: floorText.isEmpty
                             ? null
-                            : (_belowGround ? -1 : 1) *
-                                  (int.tryParse(floorText) ?? 0),
+                            : int.tryParse(floorText),
                         technician: _tech.text.trim(),
                         from: _f.from,
                         to: _f.to,

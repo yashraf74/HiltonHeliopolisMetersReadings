@@ -5,8 +5,10 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:provider/provider.dart';
 
 import '../../core/strings.dart';
+import '../../data/api/api_client.dart';
 import '../../data/db/database.dart';
 import '../../data/models.dart';
+import '../../data/photo_store.dart';
 import '../../state/session_controller.dart';
 import '../../state/sync_controller.dart';
 import '../widgets/status_widgets.dart';
@@ -48,15 +50,18 @@ class _LocalReadingCard extends StatelessWidget {
 
   final Reading reading;
 
+  Future<(Meter?, File?)> _load(AppDatabase db) async => (
+    await db.meterById(reading.meterId),
+    await PhotoStore.resolve(reading.localPhotoPath),
+  );
+
   @override
   Widget build(BuildContext context) {
     final db = context.read<AppDatabase>();
+    final api = context.read<ApiClient>();
+    final userName = context.read<SessionController>().user?.fullName ?? '';
     final scheme = Theme.of(context).colorScheme;
     final status = SyncStatus.fromDb(reading.syncStatus);
-    final photo = reading.localPhotoPath != null
-        ? File(reading.localPhotoPath!)
-        : null;
-    final hasPhoto = photo != null && photo.existsSync();
     final fmt = DateFormat('d/M/yyyy · HH:mm', 'ar');
     final loggedAt = DateTime.parse(reading.loggedAt).toLocal();
     final syncedAt = reading.syncedAt != null
@@ -64,11 +69,28 @@ class _LocalReadingCard extends StatelessWidget {
         : null;
     final value = NumberFormat.decimalPattern('en').format(reading.value);
 
-    return FutureBuilder<Meter?>(
-      future: db.meterById(reading.meterId),
-      builder: (context, meterSnap) {
-        final meter = meterSnap.data;
+    return FutureBuilder<(Meter?, File?)>(
+      future: _load(db),
+      builder: (context, snap) {
+        final meter = snap.data?.$1;
+        final photo = snap.data?.$2;
         final type = meter != null ? MeterType.fromApi(meter.type) : null;
+
+        // Local file first; once synced, the server copy is the fallback
+        // (e.g. after an iOS reinstall moved the app container).
+        Widget photoWidget({required Widget placeholder}) {
+          if (photo != null) return Image.file(photo, fit: BoxFit.cover);
+          if (reading.photoKey != null) {
+            return Image.network(
+              api.photoUri(reading.photoKey!).toString(),
+              headers: api.authHeaders,
+              fit: BoxFit.cover,
+              errorBuilder: (_, _, _) => placeholder,
+            );
+          }
+          return placeholder;
+        }
+
         return Card(
           clipBehavior: Clip.antiAlias,
           child: Theme(
@@ -83,15 +105,15 @@ class _LocalReadingCard extends StatelessWidget {
                 child: SizedBox(
                   width: 44,
                   height: 44,
-                  child: hasPhoto
-                      ? Image.file(photo, fit: BoxFit.cover)
-                      : Container(
-                          color: scheme.surfaceContainerHighest,
-                          child: Icon(
-                            type?.icon ?? Icons.image_outlined,
-                            color: type?.color ?? scheme.outline,
-                          ),
-                        ),
+                  child: photoWidget(
+                    placeholder: Container(
+                      color: scheme.surfaceContainerHighest,
+                      child: Icon(
+                        type?.icon ?? Icons.image_outlined,
+                        color: type?.color ?? scheme.outline,
+                      ),
+                    ),
+                  ),
                 ),
               ),
               title: Text(
@@ -131,7 +153,7 @@ class _LocalReadingCard extends StatelessWidget {
                         DetailRow(S.meterFloor, '${meter.floorNumber}'),
                       if (meter?.description?.isNotEmpty == true)
                         DetailRow(S.meterDescription, meter!.description!),
-                      DetailRow(S.loggedBy, reading.loggedByName),
+                      DetailRow(S.loggedBy, userName),
                       DetailRow(S.loggedAt, fmt.format(loggedAt)),
                       if (syncedAt != null)
                         DetailRow(S.syncedAtLabel, fmt.format(syncedAt)),
@@ -165,18 +187,18 @@ class _LocalReadingCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         child: AspectRatio(
                           aspectRatio: 4 / 3,
-                          child: hasPhoto
-                              ? Image.file(photo, fit: BoxFit.cover)
-                              : Container(
-                                  color: scheme.surfaceContainerHighest,
-                                  alignment: Alignment.center,
-                                  child: Text(
-                                    S.photoLoadFailed,
-                                    style: TextStyle(
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                  ),
+                          child: photoWidget(
+                            placeholder: Container(
+                              color: scheme.surfaceContainerHighest,
+                              alignment: Alignment.center,
+                              child: Text(
+                                S.photoLoadFailed,
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
                                 ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ],

@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
 import '../data/api/api_client.dart';
 import '../data/db/database.dart';
+import '../data/photo_store.dart';
 import 'connectivity_controller.dart';
 import 'session_controller.dart';
 
@@ -96,8 +96,8 @@ class SyncController extends ChangeNotifier {
       try {
         var photoKey = reading.photoKey;
         if (photoKey == null) {
-          final path = reading.localPhotoPath;
-          if (path == null || !await File(path).exists()) {
+          final file = await PhotoStore.resolve(reading.localPhotoPath);
+          if (file == null) {
             await _db.updateReadingSync(
               reading.id,
               status: 'failed',
@@ -106,10 +106,10 @@ class SyncController extends ChangeNotifier {
             );
             continue;
           }
-          final bytes = await File(path).readAsBytes();
+          final bytes = await file.readAsBytes();
           photoKey = await _api.uploadPhoto(
             bytes,
-            contentType: _contentTypeFor(path),
+            contentType: _contentTypeFor(file.path),
           );
           await _db.updateReadingSync(
             reading.id,

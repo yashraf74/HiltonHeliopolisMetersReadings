@@ -34,7 +34,6 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
   late final TextEditingController _location;
   late final TextEditingController _floor;
   late final TextEditingController _description;
-  late bool _belowGround;
   bool _busy = false;
 
   // Photo state: an existing server key, a newly picked file, or a request
@@ -51,10 +50,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     final m = widget.existing;
     _type = m != null ? MeterType.fromApi(m.type) : MeterType.electricity;
     _location = TextEditingController(text: m?.location ?? '');
-    _floor = TextEditingController(
-      text: m != null ? m.floorNumber.abs().toString() : '',
-    );
-    _belowGround = (m?.floorNumber ?? 0) < 0;
+    _floor = TextEditingController(text: m?.floorNumber.toString() ?? '');
     _description = TextEditingController(text: m?.description ?? '');
     _photoKey = m?.photoKey;
   }
@@ -67,10 +63,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     super.dispose();
   }
 
-  int _floorValue() {
-    final n = int.parse(_floor.text.trim());
-    return _belowGround ? -n : n;
-  }
+  int _floorValue() => int.parse(_floor.text.trim());
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
@@ -287,41 +280,18 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
             TextFormField(
               controller: _floor,
               textInputAction: TextInputAction.next,
-              // Plain number pad: iOS has no signed pad, so the sign comes
-              // from the switch below instead of a full keyboard.
-              keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              keyboardType: const TextInputType.numberWithOptions(signed: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[-0-9]')),
+              ],
               contextMenuBuilder: appContextMenuBuilder,
-              decoration: InputDecoration(
-                labelText: S.meterFloor,
-                prefixText: _belowGround ? '- ' : null,
-                prefixStyle: const TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 18,
-                ),
-              ),
+              decoration: const InputDecoration(labelText: S.meterFloor),
               validator: (v) {
                 if ((v ?? '').trim().isEmpty) return S.fieldRequired;
                 return int.tryParse(v!.trim()) == null ? S.floorInvalid : null;
               },
             ),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text(
-                S.belowGround,
-                style: TextStyle(fontWeight: FontWeight.w600),
-              ),
-              subtitle: Text(
-                S.belowGroundHint,
-                style: TextStyle(
-                  color: scheme.onSurfaceVariant,
-                  fontSize: 12.5,
-                ),
-              ),
-              value: _belowGround,
-              onChanged: _busy ? null : (v) => setState(() => _belowGround = v),
-            ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 14),
             TextFormField(
               controller: _description,
               maxLines: 3,

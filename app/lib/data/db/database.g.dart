@@ -601,17 +601,6 @@ class $ReadingsTable extends Readings with TableInfo<$ReadingsTable, Reading> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _loggedByNameMeta = const VerificationMeta(
-    'loggedByName',
-  );
-  @override
-  late final GeneratedColumn<String> loggedByName = GeneratedColumn<String>(
-    'logged_by_name',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
   static const VerificationMeta _loggedAtMeta = const VerificationMeta(
     'loggedAt',
   );
@@ -678,7 +667,6 @@ class $ReadingsTable extends Readings with TableInfo<$ReadingsTable, Reading> {
     photoKey,
     localPhotoPath,
     loggedBy,
-    loggedByName,
     loggedAt,
     syncedAt,
     syncStatus,
@@ -746,17 +734,6 @@ class $ReadingsTable extends Readings with TableInfo<$ReadingsTable, Reading> {
       );
     } else if (isInserting) {
       context.missing(_loggedByMeta);
-    }
-    if (data.containsKey('logged_by_name')) {
-      context.handle(
-        _loggedByNameMeta,
-        loggedByName.isAcceptableOrUnknown(
-          data['logged_by_name']!,
-          _loggedByNameMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_loggedByNameMeta);
     }
     if (data.containsKey('logged_at')) {
       context.handle(
@@ -827,10 +804,6 @@ class $ReadingsTable extends Readings with TableInfo<$ReadingsTable, Reading> {
         DriftSqlType.string,
         data['${effectivePrefix}logged_by'],
       )!,
-      loggedByName: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}logged_by_name'],
-      )!,
       loggedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}logged_at'],
@@ -868,7 +841,6 @@ class Reading extends DataClass implements Insertable<Reading> {
   final String? photoKey;
   final String? localPhotoPath;
   final String loggedBy;
-  final String loggedByName;
   final String loggedAt;
   final String? syncedAt;
   final String syncStatus;
@@ -882,7 +854,6 @@ class Reading extends DataClass implements Insertable<Reading> {
     this.photoKey,
     this.localPhotoPath,
     required this.loggedBy,
-    required this.loggedByName,
     required this.loggedAt,
     this.syncedAt,
     required this.syncStatus,
@@ -905,7 +876,6 @@ class Reading extends DataClass implements Insertable<Reading> {
       map['local_photo_path'] = Variable<String>(localPhotoPath);
     }
     map['logged_by'] = Variable<String>(loggedBy);
-    map['logged_by_name'] = Variable<String>(loggedByName);
     map['logged_at'] = Variable<String>(loggedAt);
     if (!nullToAbsent || syncedAt != null) {
       map['synced_at'] = Variable<String>(syncedAt);
@@ -933,7 +903,6 @@ class Reading extends DataClass implements Insertable<Reading> {
           ? const Value.absent()
           : Value(localPhotoPath),
       loggedBy: Value(loggedBy),
-      loggedByName: Value(loggedByName),
       loggedAt: Value(loggedAt),
       syncedAt: syncedAt == null && nullToAbsent
           ? const Value.absent()
@@ -959,7 +928,6 @@ class Reading extends DataClass implements Insertable<Reading> {
       photoKey: serializer.fromJson<String?>(json['photoKey']),
       localPhotoPath: serializer.fromJson<String?>(json['localPhotoPath']),
       loggedBy: serializer.fromJson<String>(json['loggedBy']),
-      loggedByName: serializer.fromJson<String>(json['loggedByName']),
       loggedAt: serializer.fromJson<String>(json['loggedAt']),
       syncedAt: serializer.fromJson<String?>(json['syncedAt']),
       syncStatus: serializer.fromJson<String>(json['syncStatus']),
@@ -978,7 +946,6 @@ class Reading extends DataClass implements Insertable<Reading> {
       'photoKey': serializer.toJson<String?>(photoKey),
       'localPhotoPath': serializer.toJson<String?>(localPhotoPath),
       'loggedBy': serializer.toJson<String>(loggedBy),
-      'loggedByName': serializer.toJson<String>(loggedByName),
       'loggedAt': serializer.toJson<String>(loggedAt),
       'syncedAt': serializer.toJson<String?>(syncedAt),
       'syncStatus': serializer.toJson<String>(syncStatus),
@@ -995,7 +962,6 @@ class Reading extends DataClass implements Insertable<Reading> {
     Value<String?> photoKey = const Value.absent(),
     Value<String?> localPhotoPath = const Value.absent(),
     String? loggedBy,
-    String? loggedByName,
     String? loggedAt,
     Value<String?> syncedAt = const Value.absent(),
     String? syncStatus,
@@ -1011,7 +977,6 @@ class Reading extends DataClass implements Insertable<Reading> {
         ? localPhotoPath.value
         : this.localPhotoPath,
     loggedBy: loggedBy ?? this.loggedBy,
-    loggedByName: loggedByName ?? this.loggedByName,
     loggedAt: loggedAt ?? this.loggedAt,
     syncedAt: syncedAt.present ? syncedAt.value : this.syncedAt,
     syncStatus: syncStatus ?? this.syncStatus,
@@ -1029,9 +994,6 @@ class Reading extends DataClass implements Insertable<Reading> {
           ? data.localPhotoPath.value
           : this.localPhotoPath,
       loggedBy: data.loggedBy.present ? data.loggedBy.value : this.loggedBy,
-      loggedByName: data.loggedByName.present
-          ? data.loggedByName.value
-          : this.loggedByName,
       loggedAt: data.loggedAt.present ? data.loggedAt.value : this.loggedAt,
       syncedAt: data.syncedAt.present ? data.syncedAt.value : this.syncedAt,
       syncStatus: data.syncStatus.present
@@ -1054,7 +1016,6 @@ class Reading extends DataClass implements Insertable<Reading> {
           ..write('photoKey: $photoKey, ')
           ..write('localPhotoPath: $localPhotoPath, ')
           ..write('loggedBy: $loggedBy, ')
-          ..write('loggedByName: $loggedByName, ')
           ..write('loggedAt: $loggedAt, ')
           ..write('syncedAt: $syncedAt, ')
           ..write('syncStatus: $syncStatus, ')
@@ -1073,7 +1034,6 @@ class Reading extends DataClass implements Insertable<Reading> {
     photoKey,
     localPhotoPath,
     loggedBy,
-    loggedByName,
     loggedAt,
     syncedAt,
     syncStatus,
@@ -1091,7 +1051,6 @@ class Reading extends DataClass implements Insertable<Reading> {
           other.photoKey == this.photoKey &&
           other.localPhotoPath == this.localPhotoPath &&
           other.loggedBy == this.loggedBy &&
-          other.loggedByName == this.loggedByName &&
           other.loggedAt == this.loggedAt &&
           other.syncedAt == this.syncedAt &&
           other.syncStatus == this.syncStatus &&
@@ -1107,7 +1066,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
   final Value<String?> photoKey;
   final Value<String?> localPhotoPath;
   final Value<String> loggedBy;
-  final Value<String> loggedByName;
   final Value<String> loggedAt;
   final Value<String?> syncedAt;
   final Value<String> syncStatus;
@@ -1122,7 +1080,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
     this.photoKey = const Value.absent(),
     this.localPhotoPath = const Value.absent(),
     this.loggedBy = const Value.absent(),
-    this.loggedByName = const Value.absent(),
     this.loggedAt = const Value.absent(),
     this.syncedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -1138,7 +1095,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
     this.photoKey = const Value.absent(),
     this.localPhotoPath = const Value.absent(),
     required String loggedBy,
-    required String loggedByName,
     required String loggedAt,
     this.syncedAt = const Value.absent(),
     this.syncStatus = const Value.absent(),
@@ -1149,7 +1105,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
        meterId = Value(meterId),
        value = Value(value),
        loggedBy = Value(loggedBy),
-       loggedByName = Value(loggedByName),
        loggedAt = Value(loggedAt);
   static Insertable<Reading> custom({
     Expression<String>? id,
@@ -1159,7 +1114,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
     Expression<String>? photoKey,
     Expression<String>? localPhotoPath,
     Expression<String>? loggedBy,
-    Expression<String>? loggedByName,
     Expression<String>? loggedAt,
     Expression<String>? syncedAt,
     Expression<String>? syncStatus,
@@ -1175,7 +1129,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
       if (photoKey != null) 'photo_key': photoKey,
       if (localPhotoPath != null) 'local_photo_path': localPhotoPath,
       if (loggedBy != null) 'logged_by': loggedBy,
-      if (loggedByName != null) 'logged_by_name': loggedByName,
       if (loggedAt != null) 'logged_at': loggedAt,
       if (syncedAt != null) 'synced_at': syncedAt,
       if (syncStatus != null) 'sync_status': syncStatus,
@@ -1193,7 +1146,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
     Value<String?>? photoKey,
     Value<String?>? localPhotoPath,
     Value<String>? loggedBy,
-    Value<String>? loggedByName,
     Value<String>? loggedAt,
     Value<String?>? syncedAt,
     Value<String>? syncStatus,
@@ -1209,7 +1161,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
       photoKey: photoKey ?? this.photoKey,
       localPhotoPath: localPhotoPath ?? this.localPhotoPath,
       loggedBy: loggedBy ?? this.loggedBy,
-      loggedByName: loggedByName ?? this.loggedByName,
       loggedAt: loggedAt ?? this.loggedAt,
       syncedAt: syncedAt ?? this.syncedAt,
       syncStatus: syncStatus ?? this.syncStatus,
@@ -1243,9 +1194,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
     if (loggedBy.present) {
       map['logged_by'] = Variable<String>(loggedBy.value);
     }
-    if (loggedByName.present) {
-      map['logged_by_name'] = Variable<String>(loggedByName.value);
-    }
     if (loggedAt.present) {
       map['logged_at'] = Variable<String>(loggedAt.value);
     }
@@ -1277,7 +1225,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
           ..write('photoKey: $photoKey, ')
           ..write('localPhotoPath: $localPhotoPath, ')
           ..write('loggedBy: $loggedBy, ')
-          ..write('loggedByName: $loggedByName, ')
           ..write('loggedAt: $loggedAt, ')
           ..write('syncedAt: $syncedAt, ')
           ..write('syncStatus: $syncStatus, ')
@@ -1571,7 +1518,6 @@ typedef $$ReadingsTableCreateCompanionBuilder = ReadingsCompanion Function({
   Value<String?> photoKey,
   Value<String?> localPhotoPath,
   required String loggedBy,
-  required String loggedByName,
   required String loggedAt,
   Value<String?> syncedAt,
   Value<String> syncStatus,
@@ -1587,7 +1533,6 @@ typedef $$ReadingsTableUpdateCompanionBuilder = ReadingsCompanion Function({
   Value<String?> photoKey,
   Value<String?> localPhotoPath,
   Value<String> loggedBy,
-  Value<String> loggedByName,
   Value<String> loggedAt,
   Value<String?> syncedAt,
   Value<String> syncStatus,
@@ -1637,11 +1582,6 @@ class $$ReadingsTableFilterComposer
 
   ColumnFilters<String> get loggedBy => $composableBuilder(
     column: $table.loggedBy,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get loggedByName => $composableBuilder(
-    column: $table.loggedByName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1715,11 +1655,6 @@ class $$ReadingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get loggedByName => $composableBuilder(
-    column: $table.loggedByName,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get loggedAt => $composableBuilder(
     column: $table.loggedAt,
     builder: (column) => ColumnOrderings(column),
@@ -1778,11 +1713,6 @@ class $$ReadingsTableAnnotationComposer
   GeneratedColumn<String> get loggedBy =>
       $composableBuilder(column: $table.loggedBy, builder: (column) => column);
 
-  GeneratedColumn<String> get loggedByName => $composableBuilder(
-    column: $table.loggedByName,
-    builder: (column) => column,
-  );
-
   GeneratedColumn<String> get loggedAt =>
       $composableBuilder(column: $table.loggedAt, builder: (column) => column);
 
@@ -1838,7 +1768,6 @@ class $$ReadingsTableTableManager
                 Value<String?> photoKey = const Value.absent(),
                 Value<String?> localPhotoPath = const Value.absent(),
                 Value<String> loggedBy = const Value.absent(),
-                Value<String> loggedByName = const Value.absent(),
                 Value<String> loggedAt = const Value.absent(),
                 Value<String?> syncedAt = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
@@ -1853,7 +1782,6 @@ class $$ReadingsTableTableManager
                 photoKey: photoKey,
                 localPhotoPath: localPhotoPath,
                 loggedBy: loggedBy,
-                loggedByName: loggedByName,
                 loggedAt: loggedAt,
                 syncedAt: syncedAt,
                 syncStatus: syncStatus,
@@ -1870,7 +1798,6 @@ class $$ReadingsTableTableManager
                 Value<String?> photoKey = const Value.absent(),
                 Value<String?> localPhotoPath = const Value.absent(),
                 required String loggedBy,
-                required String loggedByName,
                 required String loggedAt,
                 Value<String?> syncedAt = const Value.absent(),
                 Value<String> syncStatus = const Value.absent(),
@@ -1885,7 +1812,6 @@ class $$ReadingsTableTableManager
                 photoKey: photoKey,
                 localPhotoPath: localPhotoPath,
                 loggedBy: loggedBy,
-                loggedByName: loggedByName,
                 loggedAt: loggedAt,
                 syncedAt: syncedAt,
                 syncStatus: syncStatus,

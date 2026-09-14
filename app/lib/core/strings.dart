@@ -64,10 +64,10 @@ class S {
   static const meterDescriptionHint =
       'اختياري: الرقم التسلسلي، الموديل، ملاحظات';
   static const meterSaved = 'تم حفظ العداد';
-  static const retireMeter = 'إيقاف العداد';
+  static const retireMeter = 'حذف العداد';
   static const retireMeterConfirm =
-      'سيتم إخفاء العداد من قائمة الفنيين مع الاحتفاظ بقراءاته السابقة. هل تريد المتابعة؟';
-  static const meterRetired = 'تم إيقاف العداد';
+      'سيتم حذف العداد ولن يظهر للفنيين ولن يمكن تسجيل قراءات جديدة عليه. القراءات السابقة المسجلة عليه ستبقى محفوظة. هل تريد المتابعة؟';
+  static const meterRetired = 'تم حذف العداد';
   static const fieldRequired = 'هذا الحقل مطلوب';
   static const floorInvalid = 'أدخل رقم طابق صحيح';
   static const onlineRequired = 'هذا الإجراء يتطلب اتصالاً بالإنترنت';
@@ -193,8 +193,6 @@ class S {
       'سيتم حذف القراءة وصورتها نهائيًا من الخادم. هل تريد المتابعة؟';
   static const readingDeleted = 'تم حذف القراءة';
   static const deleteNeedsInternet = 'الحذف يتطلب اتصالاً بالإنترنت';
-  static const belowGround = 'طابق تحت الأرض';
-  static const belowGroundHint = 'مثال: طابق -1 للجراج أو الغلايات';
   static const meterPhoto = 'صورة العداد (مرجع للمهندس فقط)';
   static const meterPhotoHint =
       'تظهر في قائمة العدادات فقط ولا تُستخدم في القراءات';

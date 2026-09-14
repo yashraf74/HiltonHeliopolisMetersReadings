@@ -1,16 +1,16 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
-import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../core/strings.dart';
 import '../../data/db/database.dart';
 import '../../data/models.dart';
+import '../../data/photo_store.dart';
 import '../../state/connectivity_controller.dart';
 import '../../state/session_controller.dart';
 import '../../state/sync_controller.dart';
@@ -89,16 +89,9 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
     final online = context.read<ConnectivityController>().isOnline;
 
     final id = const Uuid().v4();
-    // Move the photo into app storage so it survives the picker's temp dir
-    // being cleared before the sync engine gets to it.
-    final dir = Directory(
-      p.join((await getApplicationDocumentsDirectory()).path, 'photos'),
-    );
-    await dir.create(recursive: true);
-    final ext = p.extension(_photo!.path).isEmpty
-        ? '.jpg'
-        : p.extension(_photo!.path);
-    final stored = await _photo!.copy(p.join(dir.path, '$id$ext'));
+    // Copy the photo into app storage (stored as a relative path) so it
+    // survives the picker's temp dir being cleared and iOS container moves.
+    final storedPath = await PhotoStore.store(_photo!, id);
     final notes = _notes.text.trim();
 
     await db.insertReading(
@@ -107,9 +100,8 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
         meterId: _meter!.id,
         value: value,
         notes: Value(notes.isEmpty ? null : notes),
-        localPhotoPath: Value(stored.path),
+        localPhotoPath: Value(storedPath),
         loggedBy: user.id,
-        loggedByName: user.fullName,
         loggedAt: DateTime.now().toUtc().toIso8601String(),
       ),
     );
@@ -117,28 +109,45 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
 
     if (!mounted) return;
     setState(() => _saving = false);
-    await showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(
-          Icons.check_circle_rounded,
-          color: SyncStatus.synced.color,
-          size: 44,
-        ),
-        title: Text(online ? S.readingSavedOnline : S.readingSaved),
-        content: Text(
+    await _showSavedPopup(
+      title: online ? S.readingSavedOnline : S.readingSaved,
+      detail:
           '${_meter!.location} · ${NumberFormat.decimalPattern('en').format(value)}',
-          textAlign: TextAlign.center,
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text(S.newReadingAgain),
-          ),
-        ],
-      ),
     );
     _reset();
+  }
+
+  /// Brief confirmation: closes itself after two seconds, or on any tap.
+  Future<void> _showSavedPopup({
+    required String title,
+    required String detail,
+  }) async {
+    var closed = false;
+    Timer? timer;
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) {
+        timer = Timer(const Duration(seconds: 2), () {
+          if (!closed && Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+        });
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: () => Navigator.of(ctx).pop(),
+          child: AlertDialog(
+            icon: Icon(
+              Icons.check_circle_rounded,
+              color: SyncStatus.synced.color,
+              size: 44,
+            ),
+            title: Text(title, textAlign: TextAlign.center),
+            content: Text(detail, textAlign: TextAlign.center),
+          ),
+        );
+      },
+    );
+    closed = true;
+    timer?.cancel();
   }
 
   static String _toWesternDigits(String s) {

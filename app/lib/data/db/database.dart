@@ -33,7 +33,6 @@ class Readings extends Table {
   TextColumn get photoKey => text().nullable()();
   TextColumn get localPhotoPath => text().nullable()();
   TextColumn get loggedBy => text()();
-  TextColumn get loggedByName => text()();
   TextColumn get loggedAt => text()();
   TextColumn get syncedAt => text().nullable()();
   TextColumn get syncStatus => text().withDefault(const Constant('pending'))();
@@ -50,7 +49,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'meters_app'));
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -59,6 +58,11 @@ class AppDatabase extends _$AppDatabase {
       if (from < 2) {
         await m.addColumn(meters, meters.photoKey);
         await m.addColumn(readings, readings.notes);
+      }
+      if (from < 3) {
+        // Drops logged_by_name: the name now comes from the session /
+        // server so a renamed account is reflected everywhere.
+        await m.alterTable(TableMigration(readings));
       }
     },
   );
