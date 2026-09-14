@@ -197,9 +197,9 @@ class S {
       'سيتم حذف القراءة وصورتها نهائيًا من الخادم. هل تريد المتابعة؟';
   static const readingDeleted = 'تم حذف القراءة';
   static const deleteNeedsInternet = 'الحذف يتطلب اتصالاً بالإنترنت';
-  static const meterPhoto = 'صورة العداد (مرجع للمهندس فقط)';
+  static const meterPhoto = 'صورة العداد (للمرجع)';
   static const meterPhotoHint =
-      'تظهر في قائمة العدادات فقط ولا تُستخدم في القراءات';
+      'تظهر في قوائم العدادات وليست إلزامية';
   static const addMeterPhoto = 'إضافة صورة';
   static const changePhoto = 'تغيير الصورة';
   static const removePhoto = 'إزالة الصورة';
