@@ -107,8 +107,8 @@ readingRoutes.get("/", requireRole("engineer"), async (c) => {
     params.push(dateTo);
   }
   if (search) {
-    conditions.push("(m.location LIKE ? OR m.description LIKE ? OR u.full_name LIKE ?)");
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+    conditions.push("(m.name LIKE ? OR m.location LIKE ? OR m.description LIKE ? OR u.full_name LIKE ?)");
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
   if (cursor) {
     const decoded = decodeCursor(cursor);
@@ -122,7 +122,7 @@ readingRoutes.get("/", requireRole("engineer"), async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT r.id, r.value, r.photo_key, r.notes, r.logged_by, r.logged_at, r.synced_at,
             u.full_name as logged_by_name, u.username as logged_by_username,
-            m.id as meter_id, m.type as meter_type, m.location as meter_location,
+            m.id as meter_id, m.name as meter_name, m.type as meter_type, m.location as meter_location,
             m.floor_number as meter_floor, m.description as meter_description
      FROM readings r
      JOIN meters m ON m.id = r.meter_id

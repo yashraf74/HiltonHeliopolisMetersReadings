@@ -4,6 +4,12 @@ import type { AuthedVars } from "../middleware";
 import { requireAuth, requireRole } from "../middleware";
 
 const METER_TYPES = ["electricity", "water", "gas"] as const;
+const MAX_NAME_LENGTH = 80;
+
+function isUniqueViolation(err: unknown): boolean {
+  return err instanceof Error && /UNIQUE constraint failed/i.test(err.message);
+}
+const NAME_TAKEN = "A meter with this name already exists on this floor";
 
 export const meterRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
@@ -15,11 +21,11 @@ meterRoutes.get("/", async (c) => {
   // The meter photo is an engineer-only reference image; technicians never
   // receive the key, and the photo route refuses them anyway.
   const columns = isEngineer
-    ? "id, type, location, floor_number, description, is_active, photo_key, created_by, created_at, updated_at"
-    : "id, type, location, floor_number, description, is_active, created_by, created_at, updated_at";
+    ? "id, name, type, location, floor_number, description, is_active, photo_key, created_by, created_at, updated_at"
+    : "id, name, type, location, floor_number, description, is_active, created_by, created_at, updated_at";
   const query = includeInactive
-    ? `SELECT ${columns} FROM meters ORDER BY floor_number, location`
-    : `SELECT ${columns} FROM meters WHERE is_active = 1 ORDER BY floor_number, location`;
+    ? `SELECT ${columns} FROM meters ORDER BY floor_number, name COLLATE NOCASE`
+    : `SELECT ${columns} FROM meters WHERE is_active = 1 ORDER BY floor_number, name COLLATE NOCASE`;
   const { results } = await c.env.DB.prepare(query).all();
   return c.json({ meters: results });
 });
@@ -27,6 +33,7 @@ meterRoutes.get("/", async (c) => {
 meterRoutes.post("/", requireRole("engineer"), async (c) => {
   const body = await c.req.json().catch(() => null);
   const type = body?.type;
+  const name = typeof body?.name === "string" ? body.name.trim() : "";
   const location = typeof body?.location === "string" ? body.location.trim() : "";
   const floorNumber = body?.floorNumber;
   const description = typeof body?.description === "string" ? body.description : null;
@@ -35,18 +42,24 @@ meterRoutes.post("/", requireRole("engineer"), async (c) => {
   if (!METER_TYPES.includes(type)) {
     return c.json({ error: "type must be one of: electricity, water, gas" }, 400);
   }
+  if (!name || name.length > MAX_NAME_LENGTH) return c.json({ error: "name is required (max 80 chars)" }, 400);
   if (!location) return c.json({ error: "location is required" }, 400);
   if (!Number.isInteger(floorNumber)) return c.json({ error: "floorNumber must be an integer" }, 400);
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
-  await c.env.DB.prepare(
-    `INSERT INTO meters (id, type, location, floor_number, description, photo_key, is_active, created_by, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
-  )
-    .bind(id, type, location, floorNumber, description, photoKey, c.get("user").id, now, now)
-    .run();
+  try {
+    await c.env.DB.prepare(
+      `INSERT INTO meters (id, name, type, location, floor_number, description, photo_key, is_active, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
+    )
+      .bind(id, name, type, location, floorNumber, description, photoKey, c.get("user").id, now, now)
+      .run();
+  } catch (err) {
+    if (isUniqueViolation(err)) return c.json({ error: NAME_TAKEN }, 409);
+    throw err;
+  }
 
   return c.json({ id }, 201);
 });
@@ -62,6 +75,10 @@ meterRoutes.put("/:id", requireRole("engineer"), async (c) => {
   if (type !== null && !METER_TYPES.includes(type)) {
     return c.json({ error: "type must be one of: electricity, water, gas" }, 400);
   }
+  const name = typeof body?.name === "string" ? body.name.trim() : null;
+  if (name !== null && (!name || name.length > MAX_NAME_LENGTH)) {
+    return c.json({ error: "name is required (max 80 chars)" }, 400);
+  }
   const location = typeof body?.location === "string" ? body.location.trim() : null;
   const floorNumber = Number.isInteger(body?.floorNumber) ? body.floorNumber : null;
   const description = typeof body?.description === "string" ? body.description : null;
@@ -70,9 +87,11 @@ meterRoutes.put("/:id", requireRole("engineer"), async (c) => {
   const photoKey = hasPhotoKey && typeof body.photoKey === "string" && body.photoKey.startsWith("meters/") ? body.photoKey : null;
   const now = new Date().toISOString();
 
-  await c.env.DB.prepare(
+  try {
+    await c.env.DB.prepare(
     `UPDATE meters SET
        type = COALESCE(?, type),
+       name = COALESCE(?, name),
        location = COALESCE(?, location),
        floor_number = COALESCE(?, floor_number),
        description = COALESCE(?, description),
@@ -80,8 +99,12 @@ meterRoutes.put("/:id", requireRole("engineer"), async (c) => {
        updated_at = ?
      WHERE id = ?`
   )
-    .bind(type, location, floorNumber, description, hasPhotoKey ? 1 : 0, photoKey, now, id)
+    .bind(type, name, location, floorNumber, description, hasPhotoKey ? 1 : 0, photoKey, now, id)
     .run();
+  } catch (err) {
+    if (isUniqueViolation(err)) return c.json({ error: NAME_TAKEN }, 409);
+    throw err;
+  }
 
   return c.json({ ok: true });
 });
