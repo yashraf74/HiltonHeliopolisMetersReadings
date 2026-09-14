@@ -50,9 +50,6 @@ photoRoutes.post("/", async (c) => {
 photoRoutes.get("/", async (c) => {
   const key = c.req.query("key");
   if (!key) return c.json({ error: "key query param is required" }, 400);
-  if (key.startsWith("meters/") && c.get("user").role !== "engineer") {
-    return c.json({ error: "Forbidden" }, 403);
-  }
 
   const object = await c.env.PHOTOS.get(key);
   if (!object) return c.json({ error: "Photo not found" }, 404);

@@ -18,11 +18,10 @@ meterRoutes.use("*", requireAuth);
 meterRoutes.get("/", async (c) => {
   const isEngineer = c.get("user").role === "engineer";
   const includeInactive = c.req.query("includeInactive") === "1" && isEngineer;
-  // The meter photo is an engineer-only reference image; technicians never
-  // receive the key, and the photo route refuses them anyway.
-  const columns = isEngineer
-    ? "id, name, type, location, floor_number, description, is_active, photo_key, created_by, created_at, updated_at"
-    : "id, name, type, location, floor_number, description, is_active, created_by, created_at, updated_at";
+  // The meter photo is shown as the thumbnail in the meter picker for every
+  // role; only uploading/replacing it is engineer-only.
+  const columns =
+    "id, name, type, location, floor_number, description, is_active, photo_key, created_by, created_at, updated_at";
   const query = includeInactive
     ? `SELECT ${columns} FROM meters ORDER BY floor_number, name COLLATE NOCASE`
     : `SELECT ${columns} FROM meters WHERE is_active = 1 ORDER BY floor_number, name COLLATE NOCASE`;
