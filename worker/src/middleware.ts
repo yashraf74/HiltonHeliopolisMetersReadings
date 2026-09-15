@@ -25,10 +25,11 @@ export async function requireAuth(c: AuthedContext, next: Next) {
   await next();
 }
 
-export function requireRole(role: Role) {
+/** Allows any of the given roles. */
+export function requireRole(...roles: Role[]) {
   return async (c: AuthedContext, next: Next) => {
     const user = c.get("user");
-    if (!user || user.role !== role) return c.json({ error: "Forbidden" }, 403);
+    if (!user || !roles.includes(user.role)) return c.json({ error: "Forbidden" }, 403);
     await next();
   };
 }

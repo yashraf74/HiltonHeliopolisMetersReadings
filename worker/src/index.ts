@@ -7,6 +7,7 @@ import { meterRoutes } from "./routes/meters";
 import { readingRoutes } from "./routes/readings";
 import { photoRoutes } from "./routes/photos";
 import { userRoutes } from "./routes/users";
+import { purgeExpiredPhotos } from "./purge";
 
 const app = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
@@ -27,4 +28,12 @@ app.onError((err, c) => {
   return c.json({ error: "Internal server error" }, 500);
 });
 
-export default app;
+const handler: ExportedHandler<Env> = {
+  fetch: (request, env, ctx) => app.fetch(request, env, ctx),
+  // Weekly photo purge; schedule lives in wrangler.toml [triggers].
+  scheduled: (_event, env, ctx) => {
+    ctx.waitUntil(purgeExpiredPhotos(env));
+  },
+};
+
+export default handler;

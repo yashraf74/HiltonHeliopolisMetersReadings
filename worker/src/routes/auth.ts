@@ -7,7 +7,7 @@ interface UserRow {
   username: string;
   password_hash: string;
   full_name: string;
-  role: "engineer" | "technician";
+  role: "moderator" | "engineer" | "technician";
 }
 
 export const authRoutes = new Hono<{ Bindings: Env }>();

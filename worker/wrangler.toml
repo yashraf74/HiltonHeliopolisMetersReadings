@@ -10,3 +10,7 @@ database_id = "ddfd41e9-dd91-44f7-be2b-3135b3c1e3b8"
 [[r2_buckets]]
 binding = "PHOTOS"
 bucket_name = "hilton-heliopolis-meter-photos"
+
+# Friday 10:00 UTC = 12:00/13:00 Cairo: purge reading photos older than 90 days.
+[triggers]
+crons = ["0 10 * * 5"]

@@ -73,20 +73,25 @@ export async function verifyPassword(password: string, stored: string): Promise<
   return timingSafeEqual(toBase64(new Uint8Array(bits)), hashB64);
 }
 
+// Bumped when the meaning of a claim changes (e.g. the role rename); tokens
+// issued with an older version are rejected so every client signs in again.
+export const TOKEN_VERSION = 2;
+
 export interface JwtPayload {
   sub: string;
   username: string;
   fullName: string;
-  role: "engineer" | "technician";
+  role: "moderator" | "engineer" | "technician";
+  ver?: number;
   iat?: number;
   exp?: number;
 }
 
 const TOKEN_LIFETIME_SECONDS = 60 * 60 * 12; // 12h — a technician's shift
 
-export async function signJwt(payload: Omit<JwtPayload, "iat" | "exp">, secret: string): Promise<string> {
+export async function signJwt(payload: Omit<JwtPayload, "iat" | "exp" | "ver">, secret: string): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  const fullPayload: JwtPayload = { ...payload, iat: now, exp: now + TOKEN_LIFETIME_SECONDS };
+  const fullPayload: JwtPayload = { ...payload, ver: TOKEN_VERSION, iat: now, exp: now + TOKEN_LIFETIME_SECONDS };
 
   const encHeader = toBase64Url(new TextEncoder().encode(JSON.stringify({ alg: "HS256", typ: "JWT" })));
   const encPayload = toBase64Url(new TextEncoder().encode(JSON.stringify(fullPayload)));
@@ -127,5 +132,6 @@ export async function verifyJwt(token: string, secret: string): Promise<JwtPaylo
 
   const payload = JSON.parse(new TextDecoder().decode(fromBase64Url(encPayload))) as JwtPayload;
   if (payload.exp && Math.floor(Date.now() / 1000) > payload.exp) return null;
+  if (payload.ver !== TOKEN_VERSION) return null;
   return payload;
 }

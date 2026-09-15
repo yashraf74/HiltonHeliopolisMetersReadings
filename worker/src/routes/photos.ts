@@ -38,7 +38,7 @@ photoRoutes.post("/", async (c) => {
   }
 
   const kind = c.req.query("kind") === "meter" ? "meters" : "readings";
-  if (kind === "meters" && c.get("user").role !== "engineer") {
+  if (kind === "meters" && c.get("user").role !== "moderator") {
     return c.json({ error: "Forbidden" }, 403);
   }
   const key = `${kind}/${crypto.randomUUID()}.${ext}`;

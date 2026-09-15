@@ -4,7 +4,7 @@ import type { AuthedVars } from "../middleware";
 import { requireAuth, requireRole } from "../middleware";
 import { hashPassword } from "../auth";
 
-const ROLES = ["engineer", "technician"] as const;
+const ROLES = ["moderator", "engineer", "technician"] as const;
 const USERNAME_RE = /^[a-z0-9_.]{3,32}$/;
 const MIN_PASSWORD_LENGTH = 6;
 
@@ -12,7 +12,7 @@ interface UserRow {
   id: string;
   username: string;
   full_name: string;
-  role: "engineer" | "technician";
+  role: "moderator" | "engineer" | "technician";
   is_active: number;
   created_at: string;
 }
@@ -30,11 +30,11 @@ function publicUser(u: UserRow) {
 
 export const userRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
-userRoutes.use("*", requireAuth, requireRole("engineer"));
+userRoutes.use("*", requireAuth, requireRole("moderator"));
 
 userRoutes.get("/", async (c) => {
   const { results } = await c.env.DB.prepare(
-    "SELECT id, username, full_name, role, is_active, created_at FROM users ORDER BY is_active DESC, role, full_name"
+    "SELECT id, username, full_name, role, is_active, created_at FROM users WHERE is_active = 1 ORDER BY role, full_name"
   ).all<UserRow>();
   return c.json({ users: results.map(publicUser) });
 });
@@ -55,8 +55,20 @@ userRoutes.post("/", async (c) => {
   if (!fullName) return c.json({ error: "fullName is required" }, 400);
   if (!ROLES.includes(role)) return c.json({ error: "role must be engineer or technician" }, 400);
 
-  const existing = await c.env.DB.prepare("SELECT id FROM users WHERE username = ?").bind(username).first();
-  if (existing) return c.json({ error: "username already exists" }, 409);
+  const existing = await c.env.DB.prepare("SELECT id, is_active FROM users WHERE username = ?")
+    .bind(username)
+    .first<{ id: string; is_active: number }>();
+  if (existing?.is_active) return c.json({ error: "username already exists" }, 409);
+  if (existing) {
+    // A deleted account being re-created: revive it under the same id so
+    // its historical readings keep pointing at it.
+    await c.env.DB.prepare(
+      "UPDATE users SET password_hash = ?, full_name = ?, role = ?, is_active = 1 WHERE id = ?"
+    )
+      .bind(await hashPassword(password), fullName, role, existing.id)
+      .run();
+    return c.json({ id: existing.id }, 201);
+  }
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -91,8 +103,8 @@ userRoutes.put("/:id", async (c) => {
   if (password !== null && password.length < MIN_PASSWORD_LENGTH) {
     return c.json({ error: `password must be at least ${MIN_PASSWORD_LENGTH} characters` }, 400);
   }
-  // An engineer can't lock themselves out or demote themselves.
-  if (id === me.id && (isActive === 0 || (role !== null && role !== "engineer"))) {
+  // A moderator can't delete or demote their own account.
+  if (id === me.id && (isActive === 0 || (role !== null && role !== "moderator"))) {
     return c.json({ error: "You cannot deactivate or demote your own account" }, 400);
   }
 
