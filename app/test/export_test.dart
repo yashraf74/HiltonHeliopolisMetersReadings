@@ -19,6 +19,8 @@ void main() {
           'meter_id': 'm1',
           'meter_name': 'عداد المسبح',
           'meter_type': 'water',
+          'meter_area': 'المبنى الرئيسي',
+          'meter_number': 'SN-7',
           'meter_location': 'المطبخ',
           'meter_floor': 2,
           'meter_description': null,
@@ -30,8 +32,10 @@ void main() {
       final sheet = excel.sheets['القراءات']!;
       expect(sheet.maxRows, 2);
       expect(sheet.rows[1][1]?.value.toString(), 'عداد المسبح');
-      expect(sheet.rows[1][3]?.value.toString(), 'المطبخ');
-      expect(sheet.rows[1][6]?.value, isA<DoubleCellValue>());
+      expect(sheet.rows[1][3]?.value.toString(), 'المبنى الرئيسي');
+      expect(sheet.rows[1][4]?.value.toString(), 'المطبخ');
+      expect(sheet.rows[1][6]?.value.toString(), 'SN-7');
+      expect(sheet.rows[1][7]?.value, isA<DoubleCellValue>());
     },
   );
 
@@ -42,8 +46,17 @@ void main() {
     expect(q['technician'], 'أحمد');
     expect(q['search'], 'مطبخ');
     expect(q.containsKey('type'), isFalse);
+    expect(q['sort'], 'logged_at');
+    expect(q['dir'], 'desc');
     expect(const ReadingFilters().isEmpty, isTrue);
     expect(f.activeCount, 2);
     expect(const ReadingFilters(floor: -1).toQuery()['floor'], '-1');
+    expect(
+      const ReadingFilters(
+        sort: ReadingSort.value,
+        descending: false,
+      ).toQuery()['dir'],
+      'asc',
+    );
   });
 }

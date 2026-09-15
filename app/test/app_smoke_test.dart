@@ -51,13 +51,13 @@ void main() {
     await db.close();
   });
 
-  testWidgets('signed-in engineer shell resolves every provider', (
+  testWidgets('signed-in moderator shell resolves every provider', (
     tester,
   ) async {
     FlutterSecureStorage.setMockInitialValues({
       'auth_token': 't',
       'auth_user':
-          '{"id":"u1","username":"eng","fullName":"مهندس","role":"engineer"}',
+          '{"id":"u1","username":"mod","fullName":"مشرف","role":"moderator"}',
     });
     final db = AppDatabase(NativeDatabase.memory());
     final session = SessionController(storage: const FlutterSecureStorage());

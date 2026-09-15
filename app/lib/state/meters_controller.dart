@@ -36,7 +36,7 @@ class MetersController extends ChangeNotifier {
     _refreshing = true;
     notifyListeners();
     try {
-      final includeInactive = _session.user?.isEngineer ?? false;
+      final includeInactive = _session.user?.canManage ?? false;
       final fromServer = await _api.fetchMeters(
         includeInactive: includeInactive,
       );
@@ -61,16 +61,20 @@ class MetersController extends ChangeNotifier {
   Future<String?> createMeter({
     required MeterType type,
     required String name,
+    required String area,
     required String location,
     required int floorNumber,
+    String? number,
     String? description,
     String? photoKey,
   }) => _mutate(
     () => _api.createMeter(
       type: type,
       name: name,
+      area: area,
       location: location,
       floorNumber: floorNumber,
+      number: number,
       description: description,
       photoKey: photoKey,
     ),
@@ -80,8 +84,10 @@ class MetersController extends ChangeNotifier {
     String id, {
     required MeterType type,
     required String name,
+    required String area,
     required String location,
     required int floorNumber,
+    String? number,
     String? description,
     String? photoKey,
     bool clearPhoto = false,
@@ -90,6 +96,8 @@ class MetersController extends ChangeNotifier {
       id,
       type: type,
       name: name,
+      area: area,
+      number: number ?? '',
       location: location,
       floorNumber: floorNumber,
       description: description ?? '',
@@ -107,7 +115,7 @@ class MetersController extends ChangeNotifier {
       return null;
     } on ApiException catch (e) {
       if (e.isUnauthorized) _session.markTokenRejected();
-      if (e.statusCode == 409) return S.meterNameTaken;
+      if (e.statusCode == 409) return S.meterDuplicate;
       return e.message;
     } on NetworkException {
       return S.onlineRequired;

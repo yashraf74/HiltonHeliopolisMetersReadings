@@ -47,6 +47,25 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _areaMeta = const VerificationMeta('area');
+  @override
+  late final GeneratedColumn<String> area = GeneratedColumn<String>(
+    'area',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
+  static const VerificationMeta _numberMeta = const VerificationMeta('number');
+  @override
+  late final GeneratedColumn<String> number = GeneratedColumn<String>(
+    'number',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _floorNumberMeta = const VerificationMeta(
     'floorNumber',
   );
@@ -75,6 +94,17 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
   @override
   late final GeneratedColumn<String> photoKey = GeneratedColumn<String>(
     'photo_key',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _lastLoggedAtMeta = const VerificationMeta(
+    'lastLoggedAt',
+  );
+  @override
+  late final GeneratedColumn<String> lastLoggedAt = GeneratedColumn<String>(
+    'last_logged_at',
     aliasedName,
     true,
     type: DriftSqlType.string,
@@ -112,9 +142,12 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     name,
     type,
     location,
+    area,
+    number,
     floorNumber,
     description,
     photoKey,
+    lastLoggedAt,
     isActive,
     updatedAt,
   ];
@@ -157,6 +190,18 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     } else if (isInserting) {
       context.missing(_locationMeta);
     }
+    if (data.containsKey('area')) {
+      context.handle(
+        _areaMeta,
+        area.isAcceptableOrUnknown(data['area']!, _areaMeta),
+      );
+    }
+    if (data.containsKey('number')) {
+      context.handle(
+        _numberMeta,
+        number.isAcceptableOrUnknown(data['number']!, _numberMeta),
+      );
+    }
     if (data.containsKey('floor_number')) {
       context.handle(
         _floorNumberMeta,
@@ -181,6 +226,15 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
       context.handle(
         _photoKeyMeta,
         photoKey.isAcceptableOrUnknown(data['photo_key']!, _photoKeyMeta),
+      );
+    }
+    if (data.containsKey('last_logged_at')) {
+      context.handle(
+        _lastLoggedAtMeta,
+        lastLoggedAt.isAcceptableOrUnknown(
+          data['last_logged_at']!,
+          _lastLoggedAtMeta,
+        ),
       );
     }
     if (data.containsKey('is_active')) {
@@ -222,6 +276,14 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
         DriftSqlType.string,
         data['${effectivePrefix}location'],
       )!,
+      area: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}area'],
+      )!,
+      number: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}number'],
+      ),
       floorNumber: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}floor_number'],
@@ -233,6 +295,10 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
       photoKey: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}photo_key'],
+      ),
+      lastLoggedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_logged_at'],
       ),
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
@@ -256,9 +322,12 @@ class Meter extends DataClass implements Insertable<Meter> {
   final String name;
   final String type;
   final String location;
+  final String area;
+  final String? number;
   final int floorNumber;
   final String? description;
   final String? photoKey;
+  final String? lastLoggedAt;
   final bool isActive;
   final String updatedAt;
   const Meter({
@@ -266,9 +335,12 @@ class Meter extends DataClass implements Insertable<Meter> {
     required this.name,
     required this.type,
     required this.location,
+    required this.area,
+    this.number,
     required this.floorNumber,
     this.description,
     this.photoKey,
+    this.lastLoggedAt,
     required this.isActive,
     required this.updatedAt,
   });
@@ -279,12 +351,19 @@ class Meter extends DataClass implements Insertable<Meter> {
     map['name'] = Variable<String>(name);
     map['type'] = Variable<String>(type);
     map['location'] = Variable<String>(location);
+    map['area'] = Variable<String>(area);
+    if (!nullToAbsent || number != null) {
+      map['number'] = Variable<String>(number);
+    }
     map['floor_number'] = Variable<int>(floorNumber);
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
     }
     if (!nullToAbsent || photoKey != null) {
       map['photo_key'] = Variable<String>(photoKey);
+    }
+    if (!nullToAbsent || lastLoggedAt != null) {
+      map['last_logged_at'] = Variable<String>(lastLoggedAt);
     }
     map['is_active'] = Variable<bool>(isActive);
     map['updated_at'] = Variable<String>(updatedAt);
@@ -297,6 +376,10 @@ class Meter extends DataClass implements Insertable<Meter> {
       name: Value(name),
       type: Value(type),
       location: Value(location),
+      area: Value(area),
+      number: number == null && nullToAbsent
+          ? const Value.absent()
+          : Value(number),
       floorNumber: Value(floorNumber),
       description: description == null && nullToAbsent
           ? const Value.absent()
@@ -304,6 +387,9 @@ class Meter extends DataClass implements Insertable<Meter> {
       photoKey: photoKey == null && nullToAbsent
           ? const Value.absent()
           : Value(photoKey),
+      lastLoggedAt: lastLoggedAt == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastLoggedAt),
       isActive: Value(isActive),
       updatedAt: Value(updatedAt),
     );
@@ -319,9 +405,12 @@ class Meter extends DataClass implements Insertable<Meter> {
       name: serializer.fromJson<String>(json['name']),
       type: serializer.fromJson<String>(json['type']),
       location: serializer.fromJson<String>(json['location']),
+      area: serializer.fromJson<String>(json['area']),
+      number: serializer.fromJson<String?>(json['number']),
       floorNumber: serializer.fromJson<int>(json['floorNumber']),
       description: serializer.fromJson<String?>(json['description']),
       photoKey: serializer.fromJson<String?>(json['photoKey']),
+      lastLoggedAt: serializer.fromJson<String?>(json['lastLoggedAt']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -334,9 +423,12 @@ class Meter extends DataClass implements Insertable<Meter> {
       'name': serializer.toJson<String>(name),
       'type': serializer.toJson<String>(type),
       'location': serializer.toJson<String>(location),
+      'area': serializer.toJson<String>(area),
+      'number': serializer.toJson<String?>(number),
       'floorNumber': serializer.toJson<int>(floorNumber),
       'description': serializer.toJson<String?>(description),
       'photoKey': serializer.toJson<String?>(photoKey),
+      'lastLoggedAt': serializer.toJson<String?>(lastLoggedAt),
       'isActive': serializer.toJson<bool>(isActive),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -347,9 +439,12 @@ class Meter extends DataClass implements Insertable<Meter> {
     String? name,
     String? type,
     String? location,
+    String? area,
+    Value<String?> number = const Value.absent(),
     int? floorNumber,
     Value<String?> description = const Value.absent(),
     Value<String?> photoKey = const Value.absent(),
+    Value<String?> lastLoggedAt = const Value.absent(),
     bool? isActive,
     String? updatedAt,
   }) => Meter(
@@ -357,9 +452,12 @@ class Meter extends DataClass implements Insertable<Meter> {
     name: name ?? this.name,
     type: type ?? this.type,
     location: location ?? this.location,
+    area: area ?? this.area,
+    number: number.present ? number.value : this.number,
     floorNumber: floorNumber ?? this.floorNumber,
     description: description.present ? description.value : this.description,
     photoKey: photoKey.present ? photoKey.value : this.photoKey,
+    lastLoggedAt: lastLoggedAt.present ? lastLoggedAt.value : this.lastLoggedAt,
     isActive: isActive ?? this.isActive,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -369,6 +467,8 @@ class Meter extends DataClass implements Insertable<Meter> {
       name: data.name.present ? data.name.value : this.name,
       type: data.type.present ? data.type.value : this.type,
       location: data.location.present ? data.location.value : this.location,
+      area: data.area.present ? data.area.value : this.area,
+      number: data.number.present ? data.number.value : this.number,
       floorNumber: data.floorNumber.present
           ? data.floorNumber.value
           : this.floorNumber,
@@ -376,6 +476,9 @@ class Meter extends DataClass implements Insertable<Meter> {
           ? data.description.value
           : this.description,
       photoKey: data.photoKey.present ? data.photoKey.value : this.photoKey,
+      lastLoggedAt: data.lastLoggedAt.present
+          ? data.lastLoggedAt.value
+          : this.lastLoggedAt,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -388,9 +491,12 @@ class Meter extends DataClass implements Insertable<Meter> {
           ..write('name: $name, ')
           ..write('type: $type, ')
           ..write('location: $location, ')
+          ..write('area: $area, ')
+          ..write('number: $number, ')
           ..write('floorNumber: $floorNumber, ')
           ..write('description: $description, ')
           ..write('photoKey: $photoKey, ')
+          ..write('lastLoggedAt: $lastLoggedAt, ')
           ..write('isActive: $isActive, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -403,9 +509,12 @@ class Meter extends DataClass implements Insertable<Meter> {
     name,
     type,
     location,
+    area,
+    number,
     floorNumber,
     description,
     photoKey,
+    lastLoggedAt,
     isActive,
     updatedAt,
   );
@@ -417,9 +526,12 @@ class Meter extends DataClass implements Insertable<Meter> {
           other.name == this.name &&
           other.type == this.type &&
           other.location == this.location &&
+          other.area == this.area &&
+          other.number == this.number &&
           other.floorNumber == this.floorNumber &&
           other.description == this.description &&
           other.photoKey == this.photoKey &&
+          other.lastLoggedAt == this.lastLoggedAt &&
           other.isActive == this.isActive &&
           other.updatedAt == this.updatedAt);
 }
@@ -429,9 +541,12 @@ class MetersCompanion extends UpdateCompanion<Meter> {
   final Value<String> name;
   final Value<String> type;
   final Value<String> location;
+  final Value<String> area;
+  final Value<String?> number;
   final Value<int> floorNumber;
   final Value<String?> description;
   final Value<String?> photoKey;
+  final Value<String?> lastLoggedAt;
   final Value<bool> isActive;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -440,9 +555,12 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     this.name = const Value.absent(),
     this.type = const Value.absent(),
     this.location = const Value.absent(),
+    this.area = const Value.absent(),
+    this.number = const Value.absent(),
     this.floorNumber = const Value.absent(),
     this.description = const Value.absent(),
     this.photoKey = const Value.absent(),
+    this.lastLoggedAt = const Value.absent(),
     this.isActive = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -452,9 +570,12 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     this.name = const Value.absent(),
     required String type,
     required String location,
+    this.area = const Value.absent(),
+    this.number = const Value.absent(),
     required int floorNumber,
     this.description = const Value.absent(),
     this.photoKey = const Value.absent(),
+    this.lastLoggedAt = const Value.absent(),
     this.isActive = const Value.absent(),
     required String updatedAt,
     this.rowid = const Value.absent(),
@@ -468,9 +589,12 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     Expression<String>? name,
     Expression<String>? type,
     Expression<String>? location,
+    Expression<String>? area,
+    Expression<String>? number,
     Expression<int>? floorNumber,
     Expression<String>? description,
     Expression<String>? photoKey,
+    Expression<String>? lastLoggedAt,
     Expression<bool>? isActive,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -480,9 +604,12 @@ class MetersCompanion extends UpdateCompanion<Meter> {
       if (name != null) 'name': name,
       if (type != null) 'type': type,
       if (location != null) 'location': location,
+      if (area != null) 'area': area,
+      if (number != null) 'number': number,
       if (floorNumber != null) 'floor_number': floorNumber,
       if (description != null) 'description': description,
       if (photoKey != null) 'photo_key': photoKey,
+      if (lastLoggedAt != null) 'last_logged_at': lastLoggedAt,
       if (isActive != null) 'is_active': isActive,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -494,9 +621,12 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     Value<String>? name,
     Value<String>? type,
     Value<String>? location,
+    Value<String>? area,
+    Value<String?>? number,
     Value<int>? floorNumber,
     Value<String?>? description,
     Value<String?>? photoKey,
+    Value<String?>? lastLoggedAt,
     Value<bool>? isActive,
     Value<String>? updatedAt,
     Value<int>? rowid,
@@ -506,9 +636,12 @@ class MetersCompanion extends UpdateCompanion<Meter> {
       name: name ?? this.name,
       type: type ?? this.type,
       location: location ?? this.location,
+      area: area ?? this.area,
+      number: number ?? this.number,
       floorNumber: floorNumber ?? this.floorNumber,
       description: description ?? this.description,
       photoKey: photoKey ?? this.photoKey,
+      lastLoggedAt: lastLoggedAt ?? this.lastLoggedAt,
       isActive: isActive ?? this.isActive,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -530,6 +663,12 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     if (location.present) {
       map['location'] = Variable<String>(location.value);
     }
+    if (area.present) {
+      map['area'] = Variable<String>(area.value);
+    }
+    if (number.present) {
+      map['number'] = Variable<String>(number.value);
+    }
     if (floorNumber.present) {
       map['floor_number'] = Variable<int>(floorNumber.value);
     }
@@ -538,6 +677,9 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     }
     if (photoKey.present) {
       map['photo_key'] = Variable<String>(photoKey.value);
+    }
+    if (lastLoggedAt.present) {
+      map['last_logged_at'] = Variable<String>(lastLoggedAt.value);
     }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
@@ -558,9 +700,12 @@ class MetersCompanion extends UpdateCompanion<Meter> {
           ..write('name: $name, ')
           ..write('type: $type, ')
           ..write('location: $location, ')
+          ..write('area: $area, ')
+          ..write('number: $number, ')
           ..write('floorNumber: $floorNumber, ')
           ..write('description: $description, ')
           ..write('photoKey: $photoKey, ')
+          ..write('lastLoggedAt: $lastLoggedAt, ')
           ..write('isActive: $isActive, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -602,15 +747,6 @@ class $ReadingsTable extends Readings with TableInfo<$ReadingsTable, Reading> {
     false,
     type: DriftSqlType.double,
     requiredDuringInsert: true,
-  );
-  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
-  @override
-  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
-    'notes',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
   );
   static const VerificationMeta _photoKeyMeta = const VerificationMeta(
     'photoKey',
@@ -707,7 +843,6 @@ class $ReadingsTable extends Readings with TableInfo<$ReadingsTable, Reading> {
     id,
     meterId,
     value,
-    notes,
     photoKey,
     localPhotoPath,
     loggedBy,
@@ -749,12 +884,6 @@ class $ReadingsTable extends Readings with TableInfo<$ReadingsTable, Reading> {
       );
     } else if (isInserting) {
       context.missing(_valueMeta);
-    }
-    if (data.containsKey('notes')) {
-      context.handle(
-        _notesMeta,
-        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
-      );
     }
     if (data.containsKey('photo_key')) {
       context.handle(
@@ -832,10 +961,6 @@ class $ReadingsTable extends Readings with TableInfo<$ReadingsTable, Reading> {
         DriftSqlType.double,
         data['${effectivePrefix}value'],
       )!,
-      notes: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}notes'],
-      ),
       photoKey: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}photo_key'],
@@ -881,7 +1006,6 @@ class Reading extends DataClass implements Insertable<Reading> {
   final String id;
   final String meterId;
   final double value;
-  final String? notes;
   final String? photoKey;
   final String? localPhotoPath;
   final String loggedBy;
@@ -894,7 +1018,6 @@ class Reading extends DataClass implements Insertable<Reading> {
     required this.id,
     required this.meterId,
     required this.value,
-    this.notes,
     this.photoKey,
     this.localPhotoPath,
     required this.loggedBy,
@@ -910,9 +1033,6 @@ class Reading extends DataClass implements Insertable<Reading> {
     map['id'] = Variable<String>(id);
     map['meter_id'] = Variable<String>(meterId);
     map['value'] = Variable<double>(value);
-    if (!nullToAbsent || notes != null) {
-      map['notes'] = Variable<String>(notes);
-    }
     if (!nullToAbsent || photoKey != null) {
       map['photo_key'] = Variable<String>(photoKey);
     }
@@ -937,9 +1057,6 @@ class Reading extends DataClass implements Insertable<Reading> {
       id: Value(id),
       meterId: Value(meterId),
       value: Value(value),
-      notes: notes == null && nullToAbsent
-          ? const Value.absent()
-          : Value(notes),
       photoKey: photoKey == null && nullToAbsent
           ? const Value.absent()
           : Value(photoKey),
@@ -968,7 +1085,6 @@ class Reading extends DataClass implements Insertable<Reading> {
       id: serializer.fromJson<String>(json['id']),
       meterId: serializer.fromJson<String>(json['meterId']),
       value: serializer.fromJson<double>(json['value']),
-      notes: serializer.fromJson<String?>(json['notes']),
       photoKey: serializer.fromJson<String?>(json['photoKey']),
       localPhotoPath: serializer.fromJson<String?>(json['localPhotoPath']),
       loggedBy: serializer.fromJson<String>(json['loggedBy']),
@@ -986,7 +1102,6 @@ class Reading extends DataClass implements Insertable<Reading> {
       'id': serializer.toJson<String>(id),
       'meterId': serializer.toJson<String>(meterId),
       'value': serializer.toJson<double>(value),
-      'notes': serializer.toJson<String?>(notes),
       'photoKey': serializer.toJson<String?>(photoKey),
       'localPhotoPath': serializer.toJson<String?>(localPhotoPath),
       'loggedBy': serializer.toJson<String>(loggedBy),
@@ -1002,7 +1117,6 @@ class Reading extends DataClass implements Insertable<Reading> {
     String? id,
     String? meterId,
     double? value,
-    Value<String?> notes = const Value.absent(),
     Value<String?> photoKey = const Value.absent(),
     Value<String?> localPhotoPath = const Value.absent(),
     String? loggedBy,
@@ -1015,7 +1129,6 @@ class Reading extends DataClass implements Insertable<Reading> {
     id: id ?? this.id,
     meterId: meterId ?? this.meterId,
     value: value ?? this.value,
-    notes: notes.present ? notes.value : this.notes,
     photoKey: photoKey.present ? photoKey.value : this.photoKey,
     localPhotoPath: localPhotoPath.present
         ? localPhotoPath.value
@@ -1032,7 +1145,6 @@ class Reading extends DataClass implements Insertable<Reading> {
       id: data.id.present ? data.id.value : this.id,
       meterId: data.meterId.present ? data.meterId.value : this.meterId,
       value: data.value.present ? data.value.value : this.value,
-      notes: data.notes.present ? data.notes.value : this.notes,
       photoKey: data.photoKey.present ? data.photoKey.value : this.photoKey,
       localPhotoPath: data.localPhotoPath.present
           ? data.localPhotoPath.value
@@ -1056,7 +1168,6 @@ class Reading extends DataClass implements Insertable<Reading> {
           ..write('id: $id, ')
           ..write('meterId: $meterId, ')
           ..write('value: $value, ')
-          ..write('notes: $notes, ')
           ..write('photoKey: $photoKey, ')
           ..write('localPhotoPath: $localPhotoPath, ')
           ..write('loggedBy: $loggedBy, ')
@@ -1074,7 +1185,6 @@ class Reading extends DataClass implements Insertable<Reading> {
     id,
     meterId,
     value,
-    notes,
     photoKey,
     localPhotoPath,
     loggedBy,
@@ -1091,7 +1201,6 @@ class Reading extends DataClass implements Insertable<Reading> {
           other.id == this.id &&
           other.meterId == this.meterId &&
           other.value == this.value &&
-          other.notes == this.notes &&
           other.photoKey == this.photoKey &&
           other.localPhotoPath == this.localPhotoPath &&
           other.loggedBy == this.loggedBy &&
@@ -1106,7 +1215,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
   final Value<String> id;
   final Value<String> meterId;
   final Value<double> value;
-  final Value<String?> notes;
   final Value<String?> photoKey;
   final Value<String?> localPhotoPath;
   final Value<String> loggedBy;
@@ -1120,7 +1228,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
     this.id = const Value.absent(),
     this.meterId = const Value.absent(),
     this.value = const Value.absent(),
-    this.notes = const Value.absent(),
     this.photoKey = const Value.absent(),
     this.localPhotoPath = const Value.absent(),
     this.loggedBy = const Value.absent(),
@@ -1135,7 +1242,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
     required String id,
     required String meterId,
     required double value,
-    this.notes = const Value.absent(),
     this.photoKey = const Value.absent(),
     this.localPhotoPath = const Value.absent(),
     required String loggedBy,
@@ -1154,7 +1260,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
     Expression<String>? id,
     Expression<String>? meterId,
     Expression<double>? value,
-    Expression<String>? notes,
     Expression<String>? photoKey,
     Expression<String>? localPhotoPath,
     Expression<String>? loggedBy,
@@ -1169,7 +1274,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
       if (id != null) 'id': id,
       if (meterId != null) 'meter_id': meterId,
       if (value != null) 'value': value,
-      if (notes != null) 'notes': notes,
       if (photoKey != null) 'photo_key': photoKey,
       if (localPhotoPath != null) 'local_photo_path': localPhotoPath,
       if (loggedBy != null) 'logged_by': loggedBy,
@@ -1186,7 +1290,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
     Value<String>? id,
     Value<String>? meterId,
     Value<double>? value,
-    Value<String?>? notes,
     Value<String?>? photoKey,
     Value<String?>? localPhotoPath,
     Value<String>? loggedBy,
@@ -1201,7 +1304,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
       id: id ?? this.id,
       meterId: meterId ?? this.meterId,
       value: value ?? this.value,
-      notes: notes ?? this.notes,
       photoKey: photoKey ?? this.photoKey,
       localPhotoPath: localPhotoPath ?? this.localPhotoPath,
       loggedBy: loggedBy ?? this.loggedBy,
@@ -1225,9 +1327,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
     }
     if (value.present) {
       map['value'] = Variable<double>(value.value);
-    }
-    if (notes.present) {
-      map['notes'] = Variable<String>(notes.value);
     }
     if (photoKey.present) {
       map['photo_key'] = Variable<String>(photoKey.value);
@@ -1265,7 +1364,6 @@ class ReadingsCompanion extends UpdateCompanion<Reading> {
           ..write('id: $id, ')
           ..write('meterId: $meterId, ')
           ..write('value: $value, ')
-          ..write('notes: $notes, ')
           ..write('photoKey: $photoKey, ')
           ..write('localPhotoPath: $localPhotoPath, ')
           ..write('loggedBy: $loggedBy, ')
@@ -1297,9 +1395,12 @@ typedef $$MetersTableCreateCompanionBuilder = MetersCompanion Function({
   Value<String> name,
   required String type,
   required String location,
+  Value<String> area,
+  Value<String?> number,
   required int floorNumber,
   Value<String?> description,
   Value<String?> photoKey,
+  Value<String?> lastLoggedAt,
   Value<bool> isActive,
   required String updatedAt,
   Value<int> rowid,
@@ -1309,9 +1410,12 @@ typedef $$MetersTableUpdateCompanionBuilder = MetersCompanion Function({
   Value<String> name,
   Value<String> type,
   Value<String> location,
+  Value<String> area,
+  Value<String?> number,
   Value<int> floorNumber,
   Value<String?> description,
   Value<String?> photoKey,
+  Value<String?> lastLoggedAt,
   Value<bool> isActive,
   Value<String> updatedAt,
   Value<int> rowid,
@@ -1346,6 +1450,16 @@ class $$MetersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get area => $composableBuilder(
+    column: $table.area,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get number => $composableBuilder(
+    column: $table.number,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<int> get floorNumber => $composableBuilder(
     column: $table.floorNumber,
     builder: (column) => ColumnFilters(column),
@@ -1358,6 +1472,11 @@ class $$MetersTableFilterComposer
 
   ColumnFilters<String> get photoKey => $composableBuilder(
     column: $table.photoKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastLoggedAt => $composableBuilder(
+    column: $table.lastLoggedAt,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1401,6 +1520,16 @@ class $$MetersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get area => $composableBuilder(
+    column: $table.area,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get number => $composableBuilder(
+    column: $table.number,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get floorNumber => $composableBuilder(
     column: $table.floorNumber,
     builder: (column) => ColumnOrderings(column),
@@ -1413,6 +1542,11 @@ class $$MetersTableOrderingComposer
 
   ColumnOrderings<String> get photoKey => $composableBuilder(
     column: $table.photoKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastLoggedAt => $composableBuilder(
+    column: $table.lastLoggedAt,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -1448,6 +1582,12 @@ class $$MetersTableAnnotationComposer
   GeneratedColumn<String> get location =>
       $composableBuilder(column: $table.location, builder: (column) => column);
 
+  GeneratedColumn<String> get area =>
+      $composableBuilder(column: $table.area, builder: (column) => column);
+
+  GeneratedColumn<String> get number =>
+      $composableBuilder(column: $table.number, builder: (column) => column);
+
   GeneratedColumn<int> get floorNumber => $composableBuilder(
     column: $table.floorNumber,
     builder: (column) => column,
@@ -1460,6 +1600,11 @@ class $$MetersTableAnnotationComposer
 
   GeneratedColumn<String> get photoKey =>
       $composableBuilder(column: $table.photoKey, builder: (column) => column);
+
+  GeneratedColumn<String> get lastLoggedAt => $composableBuilder(
+    column: $table.lastLoggedAt,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
@@ -1500,9 +1645,12 @@ class $$MetersTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<String> location = const Value.absent(),
+                Value<String> area = const Value.absent(),
+                Value<String?> number = const Value.absent(),
                 Value<int> floorNumber = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<String?> photoKey = const Value.absent(),
+                Value<String?> lastLoggedAt = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -1511,9 +1659,12 @@ class $$MetersTableTableManager
                 name: name,
                 type: type,
                 location: location,
+                area: area,
+                number: number,
                 floorNumber: floorNumber,
                 description: description,
                 photoKey: photoKey,
+                lastLoggedAt: lastLoggedAt,
                 isActive: isActive,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -1524,9 +1675,12 @@ class $$MetersTableTableManager
                 Value<String> name = const Value.absent(),
                 required String type,
                 required String location,
+                Value<String> area = const Value.absent(),
+                Value<String?> number = const Value.absent(),
                 required int floorNumber,
                 Value<String?> description = const Value.absent(),
                 Value<String?> photoKey = const Value.absent(),
+                Value<String?> lastLoggedAt = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -1535,9 +1689,12 @@ class $$MetersTableTableManager
                 name: name,
                 type: type,
                 location: location,
+                area: area,
+                number: number,
                 floorNumber: floorNumber,
                 description: description,
                 photoKey: photoKey,
+                lastLoggedAt: lastLoggedAt,
                 isActive: isActive,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -1577,7 +1734,6 @@ typedef $$ReadingsTableCreateCompanionBuilder = ReadingsCompanion Function({
   required String id,
   required String meterId,
   required double value,
-  Value<String?> notes,
   Value<String?> photoKey,
   Value<String?> localPhotoPath,
   required String loggedBy,
@@ -1592,7 +1748,6 @@ typedef $$ReadingsTableUpdateCompanionBuilder = ReadingsCompanion Function({
   Value<String> id,
   Value<String> meterId,
   Value<double> value,
-  Value<String?> notes,
   Value<String?> photoKey,
   Value<String?> localPhotoPath,
   Value<String> loggedBy,
@@ -1625,11 +1780,6 @@ class $$ReadingsTableFilterComposer
 
   ColumnFilters<double> get value => $composableBuilder(
     column: $table.value,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get notes => $composableBuilder(
-    column: $table.notes,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1698,11 +1848,6 @@ class $$ReadingsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get notes => $composableBuilder(
-    column: $table.notes,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get photoKey => $composableBuilder(
     column: $table.photoKey,
     builder: (column) => ColumnOrderings(column),
@@ -1761,9 +1906,6 @@ class $$ReadingsTableAnnotationComposer
 
   GeneratedColumn<double> get value =>
       $composableBuilder(column: $table.value, builder: (column) => column);
-
-  GeneratedColumn<String> get notes =>
-      $composableBuilder(column: $table.notes, builder: (column) => column);
 
   GeneratedColumn<String> get photoKey =>
       $composableBuilder(column: $table.photoKey, builder: (column) => column);
@@ -1827,7 +1969,6 @@ class $$ReadingsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> meterId = const Value.absent(),
                 Value<double> value = const Value.absent(),
-                Value<String?> notes = const Value.absent(),
                 Value<String?> photoKey = const Value.absent(),
                 Value<String?> localPhotoPath = const Value.absent(),
                 Value<String> loggedBy = const Value.absent(),
@@ -1841,7 +1982,6 @@ class $$ReadingsTableTableManager
                 id: id,
                 meterId: meterId,
                 value: value,
-                notes: notes,
                 photoKey: photoKey,
                 localPhotoPath: localPhotoPath,
                 loggedBy: loggedBy,
@@ -1857,7 +1997,6 @@ class $$ReadingsTableTableManager
                 required String id,
                 required String meterId,
                 required double value,
-                Value<String?> notes = const Value.absent(),
                 Value<String?> photoKey = const Value.absent(),
                 Value<String?> localPhotoPath = const Value.absent(),
                 required String loggedBy,
@@ -1871,7 +2010,6 @@ class $$ReadingsTableTableManager
                 id: id,
                 meterId: meterId,
                 value: value,
-                notes: notes,
                 photoKey: photoKey,
                 localPhotoPath: localPhotoPath,
                 loggedBy: loggedBy,

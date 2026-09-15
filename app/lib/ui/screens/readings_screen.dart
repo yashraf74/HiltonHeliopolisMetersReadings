@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,8 +11,23 @@ import '../../data/api/api_client.dart';
 import '../../data/db/database.dart';
 import '../../data/export/excel_export.dart';
 import '../../data/models.dart';
+import '../../data/photo_store.dart';
 import '../../state/session_controller.dart';
+import '../../state/sync_controller.dart';
 import '../widgets/status_widgets.dart';
+
+enum ReadingSort {
+  loggedAt('logged_at', S.sortDate),
+  value('value', S.sortValue),
+  meterName('meter_name', S.sortMeterName),
+  floor('floor', S.sortFloor),
+  technician('technician', S.sortTechnician);
+
+  const ReadingSort(this.apiName, this.label);
+
+  final String apiName;
+  final String label;
+}
 
 class ReadingFilters {
   const ReadingFilters({
@@ -20,6 +37,8 @@ class ReadingFilters {
     this.from,
     this.to,
     this.search = '',
+    this.sort = ReadingSort.loggedAt,
+    this.descending = true,
   });
 
   final MeterType? type;
@@ -28,6 +47,8 @@ class ReadingFilters {
   final DateTime? from;
   final DateTime? to;
   final String search;
+  final ReadingSort sort;
+  final bool descending;
 
   bool get isEmpty =>
       type == null &&
@@ -36,6 +57,8 @@ class ReadingFilters {
       from == null &&
       to == null &&
       search.isEmpty;
+
+  bool get isDefaultSort => sort == ReadingSort.loggedAt && descending;
 
   int get activeCount =>
       (type != null ? 1 : 0) +
@@ -53,6 +76,8 @@ class ReadingFilters {
     DateTime? to,
     bool clearDates = false,
     String? search,
+    ReadingSort? sort,
+    bool? descending,
   }) => ReadingFilters(
     type: clearType ? null : (type ?? this.type),
     floor: clearFloor ? null : (floor ?? this.floor),
@@ -60,6 +85,8 @@ class ReadingFilters {
     from: clearDates ? null : (from ?? this.from),
     to: clearDates ? null : (to ?? this.to),
     search: search ?? this.search,
+    sort: sort ?? this.sort,
+    descending: descending ?? this.descending,
   );
 
   Map<String, String> toQuery() => {
@@ -82,10 +109,14 @@ class ReadingFilters {
         59,
       ).toUtc().toIso8601String(),
     if (search.isNotEmpty) 'search': search,
+    'sort': sort.apiName,
+    'dir': descending ? 'desc' : 'asc',
   };
 }
 
-/// Engineer's server-side list of every reading, with filters and export.
+/// Server-backed readings list for every role. Technicians see their own
+/// readings (the server scopes them); moderators and engineers see all.
+/// Readings still queued on this device are pinned at the top.
 class ReadingsScreen extends StatefulWidget {
   const ReadingsScreen({super.key});
 
@@ -120,9 +151,9 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
 
   void _onScroll() {
     if (!_scroll.hasClients) return;
-    final nearBottom =
-        _scroll.position.pixels >= _scroll.position.maxScrollExtent - 400;
-    if (nearBottom) _loadMore();
+    if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 400) {
+      _loadMore();
+    }
   }
 
   void _handleError(Object e) {
@@ -138,7 +169,6 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     }
   }
 
-  /// First page for the current filters (also used by pull-to-refresh).
   Future<void> _load() async {
     setState(() {
       _loading = true;
@@ -178,8 +208,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
       });
     } catch (e) {
       if (!mounted) return;
-      final messenger = ScaffoldMessenger.of(context);
-      messenger.showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             e is NetworkException ? S.readingsNeedInternet : S.loadFailed,
@@ -191,12 +220,25 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     }
   }
 
-  Future<void> _openFilters() async {
+  Future<void> _openFilters(bool showTechnician) async {
     final result = await showModalBottomSheet<ReadingFilters>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) => _FilterSheet(initial: _filters),
+      builder: (_) =>
+          _FilterSheet(initial: _filters, showTechnician: showTechnician),
+    );
+    if (result == null) return;
+    setState(() => _filters = result);
+    _load();
+  }
+
+  Future<void> _openSort(bool showTechnician) async {
+    final result = await showModalBottomSheet<ReadingFilters>(
+      context: context,
+      showDragHandle: true,
+      builder: (_) =>
+          _SortSheet(initial: _filters, showTechnician: showTechnician),
     );
     if (result == null) return;
     setState(() => _filters = result);
@@ -248,6 +290,10 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final user = context.watch<SessionController>().user!;
+    final isAdmin = user.canSeeAllReadings;
+    final db = context.read<AppDatabase>();
+
     return Column(
       children: [
         Padding(
@@ -258,6 +304,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
                 child: TextField(
                   controller: _search,
                   textInputAction: TextInputAction.search,
+                  contextMenuBuilder: appContextMenuBuilder,
                   onSubmitted: (v) {
                     setState(
                       () => _filters = _filters.copyWith(search: v.trim()),
@@ -283,43 +330,55 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
+              Badge(
+                isLabelVisible: !_filters.isDefaultSort,
+                child: IconButton.filledTonal(
+                  tooltip: S.sort,
+                  onPressed: () => _openSort(isAdmin),
+                  icon: const Icon(Icons.swap_vert_rounded),
+                ),
+              ),
               Badge(
                 isLabelVisible: _filters.activeCount > 0,
                 label: Text('${_filters.activeCount}'),
                 child: IconButton.filledTonal(
                   tooltip: S.filters,
-                  onPressed: _openFilters,
+                  onPressed: () => _openFilters(isAdmin),
                   icon: const Icon(Icons.tune_rounded),
                 ),
               ),
-              IconButton.filledTonal(
-                tooltip: S.exportExcel,
-                onPressed: _exporting || _loading ? null : _export,
-                icon: _exporting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.table_view_rounded),
-              ),
+              if (isAdmin)
+                IconButton.filledTonal(
+                  tooltip: S.exportExcel,
+                  onPressed: _exporting || _loading ? null : _export,
+                  icon: _exporting
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.table_view_rounded),
+                ),
             ],
           ),
         ),
-        if (!_filters.isEmpty)
+        if (!_filters.isEmpty || !_filters.isDefaultSort)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                Text(
-                  '${S.readingsCount}: ${_rows.length}${_nextCursor != null ? '+' : ''}',
-                  style: TextStyle(
-                    color: scheme.onSurfaceVariant,
-                    fontSize: 12.5,
+                Expanded(
+                  child: Text(
+                    '${S.readingsCount}: ${_rows.length}${_nextCursor != null ? '+' : ''}'
+                    ' · ${S.sortBy}: ${_filters.sort.label} ${_filters.descending ? '↓' : '↑'}',
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 12.5,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const Spacer(),
                 TextButton.icon(
                   onPressed: () {
                     _search.clear();
@@ -333,92 +392,372 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
             ),
           ),
         Expanded(
-          child: RefreshIndicator(
-            onRefresh: _load,
-            child: _loading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                ? ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: [
-                      const SizedBox(height: 100),
-                      EmptyState(icon: Icons.cloud_off_rounded, title: _error!),
-                      Center(
-                        child: TextButton(
-                          onPressed: _load,
-                          child: const Text(S.retry),
-                        ),
-                      ),
-                    ],
-                  )
-                : _rows.isEmpty
-                ? ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: const [
-                      SizedBox(height: 100),
-                      EmptyState(
-                        icon: Icons.list_alt_rounded,
-                        title: S.noReadingsMatch,
-                      ),
-                    ],
-                  )
-                : ListView.separated(
-                    controller: _scroll,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                    itemCount: _rows.length + (_nextCursor != null ? 1 : 0),
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (context, i) {
-                      if (i == _rows.length) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                S.loadingMore,
-                                style: TextStyle(
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }
-                      return _ReadingCard(
-                        row: _rows[i],
-                        onDeleted: () =>
-                            setState(() => _rows = [..._rows]..removeAt(i)),
-                      );
-                    },
-                  ),
+          child: StreamBuilder<List<Reading>>(
+            stream: db.watchQueue(user.id),
+            builder: (context, queueSnap) {
+              final queue = queueSnap.data ?? const <Reading>[];
+              return RefreshIndicator(
+                onRefresh: _load,
+                child: _buildBody(queue, isAdmin, scheme),
+              );
+            },
           ),
         ),
       ],
     );
   }
+
+  Widget _buildBody(List<Reading> queue, bool isAdmin, ColorScheme scheme) {
+    final header = queue.isEmpty ? 0 : queue.length + 1;
+    final footer = _nextCursor != null ? 1 : 0;
+
+    if (_loading && queue.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final showError = !_loading && _error != null;
+    final showEmpty = !_loading && _error == null && _rows.isEmpty;
+    final serverCount = showError || showEmpty || _loading ? 1 : _rows.length;
+
+    return ListView.separated(
+      controller: _scroll,
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      itemCount: header + serverCount + footer,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, i) {
+        if (header > 0 && i == 0) {
+          return Text(
+            S.pendingSection,
+            style: TextStyle(
+              color: SyncStatus.pending.color,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          );
+        }
+        if (i < header) return _PendingReadingCard(reading: queue[i - 1]);
+        final j = i - header;
+        if (j == serverCount) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  S.loadingMore,
+                  style: TextStyle(color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          );
+        }
+        if (_loading) {
+          return const Padding(
+            padding: EdgeInsets.all(40),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (showError) {
+          return Column(
+            children: [
+              const SizedBox(height: 40),
+              EmptyState(icon: Icons.cloud_off_rounded, title: _error!),
+              TextButton(onPressed: _load, child: const Text(S.retry)),
+            ],
+          );
+        }
+        if (showEmpty) {
+          return const Padding(
+            padding: EdgeInsets.only(top: 40),
+            child: EmptyState(
+              icon: Icons.list_alt_rounded,
+              title: S.noReadingsMatch,
+            ),
+          );
+        }
+        return _ReadingCard(
+          row: _rows[j],
+          canEdit: true,
+          onDeleted: () => setState(() => _rows = [..._rows]..removeAt(j)),
+          onValueChanged: (v) => setState(() {
+            final copy = [..._rows];
+            copy[j] = {...copy[j], 'value': v};
+            _rows = copy;
+          }),
+        );
+      },
+    );
+  }
 }
 
+// ---- pending (local) card --------------------------------------------------
+
+class _PendingReadingCard extends StatelessWidget {
+  const _PendingReadingCard({required this.reading});
+
+  final Reading reading;
+
+  Future<(Meter?, File?)> _load(AppDatabase db) async => (
+    await db.meterById(reading.meterId),
+    await PhotoStore.resolve(reading.localPhotoPath),
+  );
+
+  Future<void> _discard(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(S.deleteLocalReading),
+        content: const Text(S.deleteLocalReadingConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(S.cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              minimumSize: const Size(0, 44),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(S.deleteReading),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      await context.read<SyncController>().discard(reading);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final db = context.read<AppDatabase>();
+    final scheme = Theme.of(context).colorScheme;
+    final status = SyncStatus.fromDb(reading.syncStatus);
+    final fmt = DateFormat('d/M/yyyy · HH:mm', 'ar');
+    final loggedAt = DateTime.parse(reading.loggedAt).toLocal();
+    final value = NumberFormat.decimalPattern('en').format(reading.value);
+
+    return FutureBuilder<(Meter?, File?)>(
+      future: _load(db),
+      builder: (context, snap) {
+        final meter = snap.data?.$1;
+        final photo = snap.data?.$2;
+        final type = meter != null
+            ? MeterType.fromApi(meter.type)
+            : MeterType.electricity;
+        final image = photo != null ? FileImage(photo) : null;
+        return Card(
+          clipBehavior: Clip.antiAlias,
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              tilePadding: const EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 4,
+              ),
+              leading: PhotoThumb(type: type, image: image),
+              title: Text(
+                meter?.name ?? reading.meterId,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: Text(
+                fmt.format(loggedAt),
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
+                  fontSize: 12.5,
+                ),
+              ),
+              trailing: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  SyncStatusChip(status),
+                ],
+              ),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (meter != null) ...[
+                        DetailRow(S.meterType, type.label),
+                        DetailRow(S.meterArea, meter.area),
+                        DetailRow(S.meterLocation, meter.location),
+                        DetailRow(S.meterFloor, '${meter.floorNumber}'),
+                        if (meter.number?.isNotEmpty == true)
+                          DetailRow(S.meterNumber, meter.number!),
+                      ],
+                      DetailRow(S.loggedAt, fmt.format(loggedAt)),
+                      DetailRow(S.readingId, reading.id, mono: true),
+                      if (status == SyncStatus.failed) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          '${S.lastErrorLabel}: ${reading.lastError ?? '—'}',
+                          style: TextStyle(color: scheme.error, fontSize: 12.5),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      ReadingPhoto(image: image),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          if (status == SyncStatus.failed)
+                            Expanded(
+                              child: FilledButton.tonalIcon(
+                                onPressed: () => context
+                                    .read<SyncController>()
+                                    .retry(reading.id),
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: const Text(S.retrySync),
+                              ),
+                            ),
+                          if (status == SyncStatus.failed)
+                            const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              style: FilledButton.styleFrom(
+                                backgroundColor: scheme.errorContainer,
+                                foregroundColor: scheme.onErrorContainer,
+                              ),
+                              onPressed: () => _discard(context),
+                              icon: const Icon(Icons.delete_outline_rounded),
+                              label: const Text(S.deleteReading),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ---- server card -----------------------------------------------------------
+
 class _ReadingCard extends StatefulWidget {
-  const _ReadingCard({required this.row, required this.onDeleted});
+  const _ReadingCard({
+    required this.row,
+    required this.canEdit,
+    required this.onDeleted,
+    required this.onValueChanged,
+  });
 
   final Map<String, dynamic> row;
+  final bool canEdit;
   final VoidCallback onDeleted;
+  final ValueChanged<double> onValueChanged;
 
   @override
   State<_ReadingCard> createState() => _ReadingCardState();
 }
 
 class _ReadingCardState extends State<_ReadingCard> {
-  bool _deleting = false;
+  bool _busy = false;
+
+  Future<void> _edit() async {
+    final controller = TextEditingController(text: '${widget.row['value']}');
+    final result = await showDialog<double>(
+      context: context,
+      builder: (ctx) {
+        String? error;
+        return StatefulBuilder(
+          builder: (ctx, setLocal) => AlertDialog(
+            title: const Text(S.editReading),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              textDirection: TextDirection.ltr,
+              textAlign: TextAlign.center,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,٠-٩٫]')),
+              ],
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+              decoration: InputDecoration(
+                hintText: S.editReadingHint,
+                errorText: error,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text(S.cancel),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+                onPressed: () {
+                  final raw = controller.text
+                      .trim()
+                      .replaceAll('٫', '.')
+                      .replaceAll(',', '.');
+                  const arabic = '٠١٢٣٤٥٦٧٨٩';
+                  final western = raw.runes.map((c) {
+                    final i = arabic.indexOf(String.fromCharCode(c));
+                    return i >= 0 ? '$i' : String.fromCharCode(c);
+                  }).join();
+                  final v = double.tryParse(western);
+                  if (v == null) {
+                    setLocal(() => error = S.valueInvalid);
+                    return;
+                  }
+                  Navigator.pop(ctx, v);
+                },
+                child: const Text(S.save),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    controller.dispose();
+    if (result == null || !mounted) return;
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await context.read<ApiClient>().updateReadingValue(
+        widget.row['id'] as String,
+        result,
+      );
+      widget.onValueChanged(result);
+      messenger.showSnackBar(const SnackBar(content: Text(S.readingUpdated)));
+    } on NetworkException {
+      messenger.showSnackBar(
+        const SnackBar(content: Text(S.editNeedsInternet)),
+      );
+    } on ApiException catch (e) {
+      if (e.isUnauthorized && mounted) {
+        context.read<SessionController>().markTokenRejected();
+      }
+      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   Future<void> _delete() async {
     final confirmed = await showDialog<bool>(
@@ -443,13 +782,10 @@ class _ReadingCardState extends State<_ReadingCard> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    setState(() => _deleting = true);
+    setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
-    final id = widget.row['id'] as String;
     try {
-      await context.read<ApiClient>().deleteReading(id);
-      // If the engineer logged it on this device, drop the local copy too.
-      if (mounted) await context.read<AppDatabase>().deleteReading(id);
+      await context.read<ApiClient>().deleteReading(widget.row['id'] as String);
       messenger.showSnackBar(const SnackBar(content: Text(S.readingDeleted)));
       widget.onDeleted();
     } on NetworkException {
@@ -462,7 +798,7 @@ class _ReadingCardState extends State<_ReadingCard> {
       }
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
-      if (mounted) setState(() => _deleting = false);
+      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -478,6 +814,14 @@ class _ReadingCardState extends State<_ReadingCard> {
     final fmt = DateFormat('d/M/yyyy · HH:mm', 'ar');
     final api = context.read<ApiClient>();
     final value = NumberFormat.decimalPattern('en').format(row['value'] as num);
+    final photoKey = row['photo_key'] as String?;
+    final image = photoKey == null
+        ? null
+        : NetworkImage(
+            api.photoUri(photoKey).toString(),
+            headers: api.authHeaders,
+          );
+    final number = row['meter_number'] as String?;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -485,19 +829,13 @@ class _ReadingCardState extends State<_ReadingCard> {
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-          leading: PhotoThumb(
-            type: type,
-            image: NetworkImage(
-              api.photoUri(row['photo_key'] as String).toString(),
-              headers: api.authHeaders,
-            ),
-          ),
+          leading: PhotoThumb(type: type, image: image),
           title: Text(
             (row['meter_name'] as String?) ?? row['meter_location'] as String,
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           subtitle: Text(
-            '${row['meter_location']} · ${row['logged_by_name']} · ${fmt.format(loggedAt)}',
+            '${row['meter_area'] ?? ''} · ${row['logged_by_name']} · ${fmt.format(loggedAt)}',
             style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
           ),
           trailing: Text(
@@ -511,8 +849,11 @@ class _ReadingCardState extends State<_ReadingCard> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   DetailRow(S.meterType, type.label),
+                  DetailRow(S.meterArea, (row['meter_area'] as String?) ?? ''),
                   DetailRow(S.meterLocation, row['meter_location'] as String),
                   DetailRow(S.meterFloor, '${row['meter_floor']}'),
+                  if (number?.isNotEmpty == true)
+                    DetailRow(S.meterNumber, number!),
                   if ((row['meter_description'] as String?)?.isNotEmpty == true)
                     DetailRow(
                       S.meterDescription,
@@ -523,56 +864,42 @@ class _ReadingCardState extends State<_ReadingCard> {
                   if (syncedAt != null)
                     DetailRow(S.syncedAtLabel, fmt.format(syncedAt)),
                   DetailRow(S.readingId, row['id'] as String, mono: true),
-                  NotesBlock(row['notes'] as String?),
                   const SizedBox(height: 12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: AspectRatio(
-                      aspectRatio: 4 / 3,
-                      child: Image.network(
-                        api.photoUri(row['photo_key'] as String).toString(),
-                        headers: api.authHeaders,
-                        fit: BoxFit.cover,
-                        loadingBuilder: (context, child, progress) =>
-                            progress == null
-                            ? child
-                            : Container(
-                                color: scheme.surfaceContainerHighest,
-                                child: const Center(
-                                  child: CircularProgressIndicator(),
-                                ),
-                              ),
-                        errorBuilder: (context, _, _) => Container(
-                          color: scheme.surfaceContainerHighest,
-                          alignment: Alignment.center,
-                          child: Text(
-                            S.photoLoadFailed,
-                            style: TextStyle(color: scheme.onSurfaceVariant),
+                  ReadingPhoto(image: image),
+                  if (widget.canEdit) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            onPressed: _busy ? null : _edit,
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text(S.editReading),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: FilledButton.tonalIcon(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: scheme.errorContainer,
+                              foregroundColor: scheme.onErrorContainer,
+                            ),
+                            onPressed: _busy ? null : _delete,
+                            icon: _busy
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Icon(Icons.delete_outline_rounded),
+                            label: const Text(S.deleteReading),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.tonalIcon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: scheme.errorContainer,
-                        foregroundColor: scheme.onErrorContainer,
-                        minimumSize: const Size.fromHeight(44),
-                      ),
-                      onPressed: _deleting ? null : _delete,
-                      icon: _deleting
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.delete_outline_rounded),
-                      label: const Text(S.deleteReading),
-                    ),
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -583,10 +910,95 @@ class _ReadingCardState extends State<_ReadingCard> {
   }
 }
 
-class _FilterSheet extends StatefulWidget {
-  const _FilterSheet({required this.initial});
+// ---- sort sheet ------------------------------------------------------------
+
+class _SortSheet extends StatefulWidget {
+  const _SortSheet({required this.initial, required this.showTechnician});
 
   final ReadingFilters initial;
+  final bool showTechnician;
+
+  @override
+  State<_SortSheet> createState() => _SortSheetState();
+}
+
+class _SortSheetState extends State<_SortSheet> {
+  late ReadingSort _sort = widget.initial.sort;
+  late bool _desc = widget.initial.descending;
+
+  @override
+  Widget build(BuildContext context) {
+    final options = ReadingSort.values.where(
+      (s) => widget.showTechnician || s != ReadingSort.technician,
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            S.sortBy,
+            style: Theme.of(context).textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          RadioGroup<ReadingSort>(
+            groupValue: _sort,
+            onChanged: (v) => setState(() => _sort = v!),
+            child: Column(
+              children: [
+                for (final s in options)
+                  RadioListTile<ReadingSort>(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: Text(s.label),
+                    value: s,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: true,
+                  label: Text(S.sortDesc),
+                  icon: Icon(Icons.arrow_downward_rounded, size: 16),
+                ),
+                ButtonSegment(
+                  value: false,
+                  label: Text(S.sortAsc),
+                  icon: Icon(Icons.arrow_upward_rounded, size: 16),
+                ),
+              ],
+              selected: {_desc},
+              onSelectionChanged: (s) => setState(() => _desc = s.first),
+            ),
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: () => Navigator.pop(
+              context,
+              widget.initial.copyWith(sort: _sort, descending: _desc),
+            ),
+            child: const Text(S.applyFilters),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---- filter sheet ----------------------------------------------------------
+
+class _FilterSheet extends StatefulWidget {
+  const _FilterSheet({required this.initial, required this.showTechnician});
+
+  final ReadingFilters initial;
+  final bool showTechnician;
 
   @override
   State<_FilterSheet> createState() => _FilterSheetState();
@@ -689,17 +1101,19 @@ class _FilterSheetState extends State<_FilterSheet> {
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: TextField(
-                  controller: _tech,
-                  decoration: const InputDecoration(
-                    labelText: S.filterTechnician,
-                    isDense: true,
+              if (widget.showTechnician) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  flex: 2,
+                  child: TextField(
+                    controller: _tech,
+                    decoration: const InputDecoration(
+                      labelText: S.filterTechnician,
+                      isDense: true,
+                    ),
                   ),
                 ),
-              ),
+              ],
             ],
           ),
           const SizedBox(height: 16),
@@ -734,8 +1148,10 @@ class _FilterSheetState extends State<_FilterSheet> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () =>
-                      Navigator.pop(context, const ReadingFilters()),
+                  onPressed: () => Navigator.pop(
+                    context,
+                    ReadingFilters(sort: _f.sort, descending: _f.descending),
+                  ),
                   child: const Text(S.clearFilters),
                 ),
               ),
@@ -751,10 +1167,14 @@ class _FilterSheetState extends State<_FilterSheet> {
                         floor: floorText.isEmpty
                             ? null
                             : int.tryParse(floorText),
-                        technician: _tech.text.trim(),
+                        technician: widget.showTechnician
+                            ? _tech.text.trim()
+                            : '',
                         from: _f.from,
                         to: _f.to,
                         search: widget.initial.search,
+                        sort: _f.sort,
+                        descending: _f.descending,
                       ),
                     );
                   },

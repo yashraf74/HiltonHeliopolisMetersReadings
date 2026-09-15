@@ -140,8 +140,10 @@ class ApiClient {
   Future<String> createMeter({
     required MeterType type,
     required String name,
+    required String area,
     required String location,
     required int floorNumber,
+    String? number,
     String? description,
     String? photoKey,
   }) async {
@@ -152,6 +154,8 @@ class ApiClient {
         body: jsonEncode({
           'type': type.name,
           'name': name,
+          'area': area,
+          'number': number ?? '',
           'location': location,
           'floorNumber': floorNumber,
           'description': description,
@@ -168,6 +172,8 @@ class ApiClient {
     String id, {
     MeterType? type,
     String? name,
+    String? area,
+    String? number,
     String? location,
     int? floorNumber,
     String? description,
@@ -181,6 +187,8 @@ class ApiClient {
         body: jsonEncode({
           'type': ?type?.name,
           'name': ?name,
+          'area': ?area,
+          'number': ?number,
           'location': ?location,
           'floorNumber': ?floorNumber,
           'description': ?description,
@@ -223,7 +231,6 @@ class ApiClient {
     required double value,
     required String photoKey,
     required String loggedAt,
-    String? notes,
   }) async {
     final body = await _json(
       _http.post(
@@ -235,11 +242,20 @@ class ApiClient {
           'value': value,
           'photoKey': photoKey,
           'loggedAt': loggedAt,
-          'notes': ?notes,
         }),
       ),
     );
     return body['syncedAt'] as String;
+  }
+
+  Future<void> updateReadingValue(String id, double value) async {
+    await _json(
+      _http.put(
+        _uri('/readings/$id'),
+        headers: _headers(contentType: 'application/json'),
+        body: jsonEncode({'value': value}),
+      ),
+    );
   }
 
   Future<void> deleteReading(String id) async {
@@ -336,6 +352,9 @@ class ApiClient {
     name: j['name'] as String? ?? j['location'] as String,
     type: j['type'] as String,
     location: j['location'] as String,
+    area: j['area'] as String? ?? '',
+    number: j['number'] as String?,
+    lastLoggedAt: j['last_logged_at'] as String?,
     floorNumber: j['floor_number'] as int,
     description: j['description'] as String?,
     photoKey: j['photo_key'] as String?,

@@ -87,11 +87,11 @@ Point the app at it: `flutter run --dart-define=API_BASE_URL=http://localhost:87
 
 Note: the local database is keyed by the D1 `database_id` in `wrangler.toml`; changing that id starts a fresh empty local database.
 
-## 8. Creating the very first engineer account (no app access yet)
+## 8. Creating the very first moderator account (no app access yet)
 
 ```
 cd ~/projects/HiltonHeliopolisMetersReadings/worker
-npm run create-user -- <username> '<password>' "<Full Name>" engineer
+npm run create-user -- <username> '<password>' "<Full Name>" moderator
 ```
 
 It prints a `wrangler d1 execute ... --file` command; run that. After that, create every other account from the app's Users tab.
@@ -102,6 +102,13 @@ It prints a `wrangler d1 execute ... --file` command; run that. After that, crea
 npx wrangler login                # once per machine
 npx wrangler secret put JWT_SECRET
 npx wrangler d1 execute DB --remote --command "SELECT username, role FROM users"
+npx wrangler d1 export DB --remote --output backups/backup.sql   # full backup before risky migrations
+```
+
+Trigger the weekly photo purge by hand (local dev server started with `npm run dev -- --test-scheduled`):
+
+```
+curl "http://localhost:8787/__scheduled?cron=0+10+*+*+5"
 ```
 
 ## 10. Where things are

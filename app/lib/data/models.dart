@@ -4,6 +4,7 @@ import '../core/theme.dart';
 import 'package:flutter/material.dart';
 
 enum UserRole {
+  moderator,
   engineer,
   technician;
 
@@ -11,9 +12,18 @@ enum UserRole {
       values.firstWhere((r) => r.name == value, orElse: () => technician);
 
   String get label => switch (this) {
+    moderator => S.roleModerator,
     engineer => S.roleEngineer,
     technician => S.roleTechnician,
   };
+
+  /// Meters and user accounts.
+  bool get canManage => this == moderator;
+
+  /// Sees every reading and may edit/delete any of them; can export.
+  bool get canSeeAllReadings => this != technician;
+
+  bool get canSeeDashboard => this != technician;
 }
 
 enum MeterType {
@@ -80,7 +90,9 @@ class AuthUser {
   final String fullName;
   final UserRole role;
 
-  bool get isEngineer => role == UserRole.engineer;
+  bool get canManage => role.canManage;
+  bool get canSeeAllReadings => role.canSeeAllReadings;
+  bool get canSeeDashboard => role.canSeeDashboard;
 
   factory AuthUser.fromJson(Map<String, dynamic> json) => AuthUser(
     id: json['id'] as String,

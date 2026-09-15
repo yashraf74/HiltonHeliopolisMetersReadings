@@ -214,44 +214,6 @@ class DetailRow extends StatelessWidget {
   }
 }
 
-/// A notes block that renders nothing at all when there are no notes.
-class NotesBlock extends StatelessWidget {
-  const NotesBlock(this.notes, {super.key});
-
-  final String? notes;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = notes?.trim() ?? '';
-    if (text.isEmpty) return const SizedBox.shrink();
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.only(top: 10),
-      padding: const EdgeInsets.all(12),
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: scheme.secondaryContainer.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            S.notes,
-            style: TextStyle(
-              color: scheme.onSurfaceVariant,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(text, style: const TextStyle(fontSize: 14)),
-        ],
-      ),
-    );
-  }
-}
-
 /// Square thumbnail: the photo with the meter-type icon pinned to the
 /// lower corner. Falls back to the plain type badge when there is no image
 /// or it fails to load.
@@ -299,6 +261,104 @@ class PhotoThumb extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Full-size reading photo for an expanded card: the whole image, letterboxed
+/// on a dark ground, tap to open a pinch-zoom viewer. `image == null` means
+/// the photo was purged after the retention period.
+class ReadingPhoto extends StatelessWidget {
+  const ReadingPhoto({super.key, required this.image});
+
+  final ImageProvider? image;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (image == null) {
+      return Container(
+        height: 120,
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.hide_image_outlined, color: scheme.outline, size: 30),
+            const SizedBox(height: 6),
+            Text(
+              S.photoExpired,
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
+            ),
+          ],
+        ),
+      );
+    }
+    return Tooltip(
+      message: S.openPhoto,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => PhotoViewerScreen(image: image!),
+            fullscreenDialog: true,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            color: const Color(0xFF1D2422),
+            constraints: const BoxConstraints(maxHeight: 360, minHeight: 160),
+            width: double.infinity,
+            child: Image(
+              image: image!,
+              fit: BoxFit.contain,
+              loadingBuilder: (context, child, progress) => progress == null
+                  ? child
+                  : const SizedBox(
+                      height: 160,
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+              errorBuilder: (context, _, _) => SizedBox(
+                height: 160,
+                child: Center(
+                  child: Text(
+                    S.photoLoadFailed,
+                    style: const TextStyle(color: Colors.white70),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PhotoViewerScreen extends StatelessWidget {
+  const PhotoViewerScreen({super.key, required this.image});
+
+  final ImageProvider image;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 1,
+          maxScale: 5,
+          child: Image(image: image, fit: BoxFit.contain),
         ),
       ),
     );

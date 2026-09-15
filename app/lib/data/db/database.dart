@@ -5,16 +5,19 @@ part 'database.g.dart';
 
 /// Local cache of the server's meters so the technician can pick a meter
 /// with no connectivity. Refreshed from the API whenever it is reachable.
-/// `photoKey` is only ever populated for engineers (the API withholds it
-/// from technicians).
+/// `lastLoggedAt` is the newest reading on the server for that meter (by
+/// anyone), used with the local queue to mark meters done for today.
 class Meters extends Table {
   TextColumn get id => text()();
   TextColumn get name => text().withDefault(const Constant(''))();
   TextColumn get type => text()();
   TextColumn get location => text()();
+  TextColumn get area => text().withDefault(const Constant(''))();
+  TextColumn get number => text().nullable()();
   IntColumn get floorNumber => integer()();
   TextColumn get description => text().nullable()();
   TextColumn get photoKey => text().nullable()();
+  TextColumn get lastLoggedAt => text().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   TextColumn get updatedAt => text()();
 
@@ -22,15 +25,14 @@ class Meters extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-/// Every reading is written here first, at the moment of logging, and only
-/// later pushed to the server by the sync engine. The `syncStatus`,
-/// `retryCount`, `lastError` and `localPhotoPath` columns are device-only
-/// bookkeeping and never leave the phone.
+/// The upload queue. A reading is written here the moment it is logged and
+/// removed once the server has it (from then on the readings tab reads it
+/// from the server). `localPhotoPath` is relative to the app documents
+/// directory (see photo_store.dart).
 class Readings extends Table {
   TextColumn get id => text()();
   TextColumn get meterId => text()();
   RealColumn get value => real()();
-  TextColumn get notes => text().nullable()();
   TextColumn get photoKey => text().nullable()();
   TextColumn get localPhotoPath => text().nullable()();
   TextColumn get loggedBy => text()();
@@ -50,7 +52,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'meters_app'));
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -58,19 +60,24 @@ class AppDatabase extends _$AppDatabase {
     onUpgrade: (m, from, to) async {
       if (from < 2) {
         await m.addColumn(meters, meters.photoKey);
-        await m.addColumn(readings, readings.notes);
       }
       if (from < 3) {
-        // Drops logged_by_name: the name now comes from the session /
-        // server so a renamed account is reflected everywhere.
         await m.alterTable(TableMigration(readings));
       }
       if (from < 4) {
         await m.addColumn(meters, meters.name);
-        // Backfilled from location until the next server refresh replaces
-        // it with the real names.
         await customStatement(
           "UPDATE meters SET name = location WHERE name = ''",
+        );
+      }
+      if (from < 5) {
+        await m.addColumn(meters, meters.area);
+        await m.addColumn(meters, meters.number);
+        await m.addColumn(meters, meters.lastLoggedAt);
+        // Drops `notes`; already-synced rows are no longer kept locally.
+        await m.alterTable(TableMigration(readings));
+        await customStatement(
+          "DELETE FROM readings WHERE sync_status = 'synced'",
         );
       }
     },
@@ -80,7 +87,7 @@ class AppDatabase extends _$AppDatabase {
 
   /// Upserts everything the server returned and marks any locally-known
   /// meter that the server no longer lists as inactive. Rows are never
-  /// deleted, because local readings may still reference them.
+  /// deleted, because queued readings may still reference them.
   Future<void> replaceMeters(List<Meter> fromServer) async {
     await transaction(() async {
       await batch((b) => b.insertAllOnConflictUpdate(meters, fromServer));
@@ -110,7 +117,19 @@ class AppDatabase extends _$AppDatabase {
   Future<Meter?> meterById(String id) =>
       (select(meters)..where((m) => m.id.equals(id))).getSingleOrNull();
 
-  // ---- readings -----------------------------------------------------------
+  /// Bumps the meter's last reading time after a successful upload so the
+  /// "done today" tick stays correct even before the next server refresh.
+  Future<void> touchMeterLastLogged(String meterId, String loggedAt) async {
+    final m = await meterById(meterId);
+    if (m == null) return;
+    final current = m.lastLoggedAt;
+    if (current != null && current.compareTo(loggedAt) >= 0) return;
+    await (update(meters)..where((r) => r.id.equals(meterId))).write(
+      MetersCompanion(lastLoggedAt: Value(loggedAt)),
+    );
+  }
+
+  // ---- readings queue -----------------------------------------------------
 
   Future<void> insertReading(ReadingsCompanion reading) =>
       into(readings).insert(reading);
@@ -118,7 +137,8 @@ class AppDatabase extends _$AppDatabase {
   Future<void> deleteReading(String id) =>
       (delete(readings)..where((r) => r.id.equals(id))).go();
 
-  Stream<List<Reading>> watchReadingsBy(String userId) =>
+  /// Everything still on the device, newest first.
+  Stream<List<Reading>> watchQueue(String userId) =>
       (select(readings)
             ..where((r) => r.loggedBy.equals(userId))
             ..orderBy([(r) => OrderingTerm.desc(r.loggedAt)]))

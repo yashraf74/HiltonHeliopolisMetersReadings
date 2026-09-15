@@ -22,6 +22,7 @@ class S {
   static const networkError = 'تعذر الاتصال بالخادم';
 
   // Roles
+  static const roleModerator = 'مشرف';
   static const roleEngineer = 'مهندس';
   static const roleTechnician = 'فني';
 
@@ -52,7 +53,13 @@ class S {
   // Meters
   static const meterName = 'اسم العداد';
   static const meterNameHint = 'مثال: عداد المطبخ الرئيسي';
-  static const meterNameTaken = 'يوجد عداد بهذا الاسم في نفس الطابق';
+  static const meterDuplicate = 'يوجد عداد بنفس الاسم والطابق والرقم والمنطقة';
+  static const meterArea = 'المنطقة';
+  static const meterAreaHint = 'مثال: المبنى الرئيسي';
+  static const meterNumber = 'رقم العداد';
+  static const meterNumberHint = 'اختياري: الرقم التسلسلي';
+  static const colMeterArea = 'المنطقة';
+  static const colMeterNumber = 'رقم العداد';
   static const colMeterName = 'اسم العداد';
   static const meterLocation = 'الموقع';
   static const meterFloor = 'الطابق';
@@ -87,10 +94,15 @@ class S {
   static const loggedAt = 'التاريخ';
 
   // New reading flow
+  static const todoTitle = 'عدادات اليوم';
+  static const todoProgress = 'تم تسجيل {done} من {total} عدادًا اليوم';
+  static const doneToday = 'تم اليوم';
+  static const notDoneToday = 'لم يُسجَّل اليوم';
+  static const allDoneToday = 'تم تسجيل كل العدادات اليوم';
   static const stepType = 'اختر نوع العداد';
   static const stepMeter = 'اختر العداد';
   static const stepDetails = 'الصورة والقراءة';
-  static const searchMeters = 'ابحث بالاسم أو الموقع أو الطابق';
+  static const searchMeters = 'ابحث بالاسم أو المنطقة أو الرقم أو الموقع';
   static const noMetersOfType = 'لا توجد عدادات من هذا النوع';
   static const takePhoto = 'التقاط صورة';
   static const pickFromGallery = 'اختيار من المعرض';
@@ -118,10 +130,30 @@ class S {
   static const lastErrorLabel = 'سبب الفشل';
 
   // Engineer readings list
+  static const pendingSection = 'بانتظار المزامنة على هذا الجهاز';
+  static const sort = 'ترتيب';
+  static const sortBy = 'ترتيب حسب';
+  static const sortDate = 'التاريخ';
+  static const sortValue = 'القراءة';
+  static const sortMeterName = 'اسم العداد';
+  static const sortFloor = 'الطابق';
+  static const sortTechnician = 'اسم الفني';
+  static const sortAsc = 'تصاعدي';
+  static const sortDesc = 'تنازلي';
+  static const editReading = 'تعديل القراءة';
+  static const editReadingHint = 'أدخل القيمة الجديدة';
+  static const readingUpdated = 'تم تعديل القراءة';
+  static const editNeedsInternet = 'التعديل يتطلب اتصالاً بالإنترنت';
+  static const photoExpired = 'انتهت مدة الاحتفاظ بالصورة (90 يومًا)';
+  static const openPhoto = 'عرض الصورة بالحجم الكامل';
+  static const deleteLocalReading = 'حذف القراءة من الجهاز';
+  static const deleteLocalReadingConfirm =
+      'هذه القراءة لم تُرفع بعد. سيتم حذفها نهائيًا من الجهاز. هل تريد المتابعة؟';
   static const filters = 'تصفية';
   static const clearFilters = 'مسح التصفية';
   static const applyFilters = 'تطبيق';
-  static const searchReadings = 'ابحث باسم العداد أو الموقع أو اسم الفني';
+  static const searchReadings =
+      'ابحث باسم العداد أو المنطقة أو الرقم أو اسم الفني';
   static const filterType = 'نوع العداد';
   static const filterAllTypes = 'كل الأنواع';
   static const filterFloor = 'رقم الطابق';
@@ -172,6 +204,11 @@ class S {
   static const inactiveUsers = 'الحسابات الموقوفة';
   static const active = 'نشط';
   static const inactive = 'موقوف';
+  static const deleteUser = 'حذف المستخدم';
+  static const deleteUserConfirm =
+      'سيتم حذف الحساب ولن يتمكن من تسجيل الدخول. القراءات المسجلة باسمه ستبقى محفوظة. هل تريد المتابعة؟';
+  static const userDeleted = 'تم حذف المستخدم';
+  static const cannotDeleteSelf = 'لا يمكنك حذف حسابك أو تغيير دورك';
   static const accountActive = 'الحساب نشط';
   static const accountActiveHint = 'الحساب الموقوف لا يستطيع تسجيل الدخول';
   static const newPassword = 'كلمة مرور جديدة';
@@ -190,16 +227,13 @@ class S {
   static const exportingPages = 'جارٍ تجميع كل القراءات…';
 
   // Polish round
-  static const notes = 'ملاحظات';
-  static const notesOptionalHint = 'اختياري: أي ملاحظة عن العداد أو القراءة';
   static const deleteReading = 'حذف القراءة';
   static const deleteReadingConfirm =
       'سيتم حذف القراءة وصورتها نهائيًا من الخادم. هل تريد المتابعة؟';
   static const readingDeleted = 'تم حذف القراءة';
   static const deleteNeedsInternet = 'الحذف يتطلب اتصالاً بالإنترنت';
   static const meterPhoto = 'صورة العداد (للمرجع)';
-  static const meterPhotoHint =
-      'تظهر في قوائم العدادات وليست إلزامية';
+  static const meterPhotoHint = 'تظهر في قوائم العدادات وليست إلزامية';
   static const addMeterPhoto = 'إضافة صورة';
   static const changePhoto = 'تغيير الصورة';
   static const removePhoto = 'إزالة الصورة';

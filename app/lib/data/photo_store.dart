@@ -45,4 +45,14 @@ class PhotoStore {
     final file = File(p.join(base.path, stored));
     return await file.exists() ? file : null;
   }
+
+  /// Deletes a stored photo if it exists; silent otherwise.
+  static Future<void> delete(String? stored) async {
+    final file = await resolve(stored);
+    if (file != null) {
+      try {
+        await file.delete();
+      } catch (_) {}
+    }
+  }
 }

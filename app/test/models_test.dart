@@ -12,13 +12,17 @@ void main() {
     final restored = AuthUser.fromJson(user.toJson());
     expect(restored.id, 'u1');
     expect(restored.role, UserRole.technician);
-    expect(restored.isEngineer, isFalse);
+    expect(restored.canManage, isFalse);
   });
 
   test('enums parse API values and fall back safely', () {
     expect(MeterType.fromApi('water'), MeterType.water);
     expect(MeterType.fromApi('unknown'), MeterType.electricity);
     expect(UserRole.fromApi('engineer'), UserRole.engineer);
+    expect(UserRole.fromApi('moderator').canManage, isTrue);
+    expect(UserRole.engineer.canManage, isFalse);
+    expect(UserRole.engineer.canSeeAllReadings, isTrue);
+    expect(UserRole.technician.canSeeAllReadings, isFalse);
     expect(SyncStatus.fromDb('synced'), SyncStatus.synced);
     expect(SyncStatus.fromDb('garbage'), SyncStatus.pending);
   });

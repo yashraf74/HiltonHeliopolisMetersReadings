@@ -15,8 +15,9 @@ import 'session_controller.dart';
 /// a trigger during a run just marks that another pass is wanted.
 ///
 /// Per reading: upload the photo (if not already uploaded) → post the
-/// reading → mark synced. The reading id is generated on-device, so a retry
-/// after a half-finished sync is idempotent on the server.
+/// reading → drop the local row and photo (the server is now the source of
+/// truth and the readings tab reads from it). The reading id is generated
+/// on-device, so a retry after a half-finished sync is idempotent.
 class SyncController extends ChangeNotifier {
   SyncController({
     required AppDatabase db,
@@ -118,19 +119,16 @@ class SyncController extends ChangeNotifier {
           );
         }
 
-        final syncedAt = await _api.submitReading(
+        await _api.submitReading(
           id: reading.id,
           meterId: reading.meterId,
           value: reading.value,
           photoKey: photoKey,
           loggedAt: reading.loggedAt,
-          notes: reading.notes,
         );
-        await _db.updateReadingSync(
-          reading.id,
-          status: 'synced',
-          syncedAt: syncedAt,
-        );
+        await _db.touchMeterLastLogged(reading.meterId, reading.loggedAt);
+        await _db.deleteReading(reading.id);
+        await PhotoStore.delete(reading.localPhotoPath);
         synced++;
         _lastSuccess = DateTime.now();
       } on NetworkException {
@@ -171,6 +169,12 @@ class SyncController extends ChangeNotifier {
   Future<void> retry(String readingId) async {
     await _db.updateReadingSync(readingId, status: 'pending', lastError: null);
     unawaited(sync());
+  }
+
+  /// Removes a not-yet-uploaded reading and its photo from the device.
+  Future<void> discard(Reading reading) async {
+    await _db.deleteReading(reading.id);
+    await PhotoStore.delete(reading.localPhotoPath);
   }
 
   String _contentTypeFor(String path) {

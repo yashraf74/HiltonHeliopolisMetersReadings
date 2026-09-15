@@ -6,7 +6,7 @@ import 'package:intl/intl.dart';
 import '../../core/strings.dart';
 import '../models.dart';
 
-/// Builds an .xlsx workbook from the engineer's (possibly filtered) list.
+/// Builds an .xlsx workbook from the (possibly filtered) readings list.
 /// Rows are the raw API objects from GET /api/readings.
 Uint8List buildReadingsWorkbook(List<Map<String, dynamic>> readings) {
   final excel = Excel.createExcel();
@@ -22,11 +22,11 @@ Uint8List buildReadingsWorkbook(List<Map<String, dynamic>> readings) {
     S.colDateTime,
     S.colMeterName,
     S.colType,
+    S.colMeterArea,
     S.colLocation,
     S.colFloor,
-    S.colDescription,
+    S.colMeterNumber,
     S.colValue,
-    S.notes,
     S.colLoggedBy,
     S.colSyncedAt,
     S.colReadingId,
@@ -51,11 +51,11 @@ Uint8List buildReadingsWorkbook(List<Map<String, dynamic>> readings) {
       TextCellValue(local(r['logged_at'] as String?)),
       TextCellValue(r['meter_name'] as String? ?? ''),
       TextCellValue(MeterType.fromApi(r['meter_type'] as String).label),
+      TextCellValue(r['meter_area'] as String? ?? ''),
       TextCellValue(r['meter_location'] as String? ?? ''),
       IntCellValue(r['meter_floor'] as int? ?? 0),
-      TextCellValue(r['meter_description'] as String? ?? ''),
+      TextCellValue(r['meter_number'] as String? ?? ''),
       DoubleCellValue((r['value'] as num).toDouble()),
-      TextCellValue(r['notes'] as String? ?? ''),
       TextCellValue(r['logged_by_name'] as String? ?? ''),
       TextCellValue(local(r['synced_at'] as String?)),
       TextCellValue(r['id'] as String),
@@ -66,11 +66,11 @@ Uint8List buildReadingsWorkbook(List<Map<String, dynamic>> readings) {
     18.0,
     22.0,
     12.0,
+    20.0,
     26.0,
     8.0,
-    28.0,
+    16.0,
     14.0,
-    30.0,
     20.0,
     18.0,
     38.0,

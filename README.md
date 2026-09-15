@@ -2,10 +2,13 @@
 
 Offline-first mobile app (Android + iOS, Arabic / RTL) for logging electricity, water and gas meter readings in the hotel, backed by a Cloudflare Worker API.
 
-Two roles:
+Three roles:
 
-- **Technician** — signs in, picks a meter, takes a photo, enters the value. The reading is saved on the phone instantly and synced to the server whenever there is connectivity.
-- **Engineer** — everything a technician can do, plus meter management, user accounts, the full readings list with filters and Excel export, and deleting readings.
+- **Technician** — signs in, works through the daily meter list, takes a photo, enters the value. The reading is saved on the phone instantly and synced whenever there is connectivity. Sees, edits and deletes only their own readings.
+- **Engineer** — everything a technician can do, plus the full readings list (all users) with filters, sort, edit, delete and Excel export, and the dashboard.
+- **Moderator** — everything an engineer can do, plus meter management and user accounts.
+
+Every meter is expected to get one reading per calendar day; the reading screen is a to-do list that ticks meters off as readings come in (from anyone) and floats the remaining ones to the top. Extra readings on the same day are allowed.
 
 See [`CHEATSHEET.md`](CHEATSHEET.md) for the day-to-day commands.
 
@@ -26,8 +29,9 @@ Flutter app ── REST + JWT ──▶ Cloudflare Worker ──▶ D1 (SQLite):
 ```
 
 - **Local-first.** Every reading is written to the on-device database first. A sync engine drains the queue on app start, on reconnect, after each save, every two minutes, and on demand. Reading ids are generated on the device, so a retried upload is a no-op on the server, never a duplicate.
-- **Auth.** Passwords are PBKDF2-SHA256 hashes; sessions are HS256 JWTs (12 h) stored in secure storage. The app stays usable offline with a stored session; a rejected token shows a re-login banner without losing local data.
-- **Photos** are downscaled on the device (1600 px, quality 70) and capped at 3 MB on both sides. Reading photos are stored under `readings/`, engineer-uploaded meter reference photos under `meters/`.
+- **Auth.** Passwords are PBKDF2-SHA256 hashes; sessions are HS256 JWTs (12 h, carrying a token version so a role change can force a one-time re-login) stored in secure storage. The app stays usable offline with a stored session; a rejected token shows a re-login banner without losing local data.
+- **Photos** are downscaled on the device (1600 px, quality 70) and capped at 3 MB on both sides. Reading photos are stored under `readings/`, moderator-uploaded meter reference photos under `meters/`. A weekly cron (Friday 10:00 UTC) purges reading photos older than 90 days and nulls their key; the app then shows an "expired" placeholder. Meter photos are never purged.
+- **Once a reading reaches the server it leaves the phone.** The local database is purely the upload queue; the readings tab reads from the server, with still-queued readings pinned on top.
 - **Names are never denormalised.** Readings reference `users.id`; names are joined at read time, so renaming an account updates history.
 
 ## Live environment
@@ -50,28 +54,29 @@ All routes are under `/api`. Every route except `/health` and `/auth/login` need
 | Method | Route | Role | Notes |
 |---|---|---|---|
 | POST | `/auth/login` | — | `{username, password}` → `{token, user}` |
-| GET | `/meters` | any | active meters; engineers may add `?includeInactive=1` |
-| POST | `/meters` | engineer | `{name, type, location, floorNumber, description?, photoKey?}`; name unique per floor → 409 |
-| PUT | `/meters/:id` | engineer | partial update; `photoKey: null` clears the photo |
-| DELETE | `/meters/:id` | engineer | soft delete (hidden from technicians, readings kept) |
-| POST | `/photos` | any | raw image body (`image/jpeg`, `png`, `webp`), ≤ 3 MB → `{photoKey}`; `?kind=meter` is engineer-only |
+| GET | `/meters` | any | active meters with `last_logged_at`; moderators may add `?includeInactive=1` |
+| POST | `/meters` | moderator | `{name, area, type, location, floorNumber, number?, description?, photoKey?}`; duplicate (name, floor, number, area) → 409 |
+| PUT | `/meters/:id` | moderator | partial update; `photoKey: null` clears the photo, `number: ""` clears the number |
+| DELETE | `/meters/:id` | moderator | soft delete (hidden from technicians, readings kept) |
+| POST | `/photos` | any | raw image body (`image/jpeg`, `png`, `webp`), ≤ 3 MB → `{photoKey}`; `?kind=meter` is moderator-only |
 | GET | `/photos?key=` | any | streams the image |
-| POST | `/readings` | any | `{id, meterId, value, photoKey, loggedAt, notes?}`; idempotent by `id` |
-| GET | `/readings` | engineer | filters `type, floor, technician, dateFrom, dateTo, search`; pagination `limit` (≤ 200) + `cursor` → `{readings, nextCursor}` |
-| DELETE | `/readings/:id` | engineer | removes the row and its photo |
-| GET | `/users` | engineer | all accounts |
-| POST | `/users` | engineer | `{username, password, fullName, role}` |
-| PUT | `/users/:id` | engineer | `{fullName?, role?, isActive?, password?}`; cannot deactivate/demote yourself |
+| POST | `/readings` | any | `{id, meterId, value, photoKey, loggedAt}`; idempotent by `id` |
+| GET | `/readings` | any | technicians get only their own; filters `type, floor, technician, dateFrom, dateTo, search`; `sort` (`logged_at`, `value`, `meter_name`, `floor`, `technician`) + `dir`; pagination `limit` (≤ 200) + `cursor` → `{readings, nextCursor}` |
+| PUT | `/readings/:id` | owner or engineer/moderator | `{value}` |
+| DELETE | `/readings/:id` | owner or engineer/moderator | removes the row and its photo |
+| GET | `/users` | moderator | active accounts |
+| POST | `/users` | moderator | `{username, password, fullName, role}`; re-creating a deleted username revives the same account |
+| PUT | `/users/:id` | moderator | `{fullName?, role?, isActive?, password?}`; `isActive: false` is the delete; cannot delete/demote yourself |
 
 ## Database
 
 `worker/migrations/` is the source of truth; applied in order with `wrangler d1 migrations apply`.
 
-- **users** — id, username (unique), password_hash, full_name, role (`engineer`/`technician`), is_active
-- **meters** — id, name, type, location, floor_number, description, photo_key, is_active, created_by; unique `(floor_number, name)` among active meters
-- **readings** — id (device-generated uuid), meter_id, value, photo_key, notes, logged_by → users, logged_at (device time), synced_at (server time)
+- **users** — id, username (unique), password_hash, full_name, role (`moderator`/`engineer`/`technician`), is_active
+- **meters** — id, name, area, number, type, location, floor_number, description, photo_key, is_active, created_by; unique `(name, floor_number, number, area)` among active meters
+- **readings** — id (device-generated uuid), meter_id, value, photo_key (null once purged), logged_by → users, logged_at (device time), synced_at (server time)
 
-The phone mirrors `meters` (as a cache) and `readings` (as the queue) in drift, adding device-only columns: `local_photo_path`, `sync_status`, `retry_count`, `last_error`.
+The phone caches `meters` (plus `last_logged_at`) and keeps `readings` only as the upload queue, with device-only columns: `local_photo_path`, `sync_status`, `retry_count`, `last_error`.
 
 ## App structure (`app/lib`)
 
@@ -82,7 +87,7 @@ state/       SessionController, ConnectivityController, MetersController, SyncCo
 ui/          login, HomeShell (role-based tabs), screens/, shared widgets/
 ```
 
-Tabs — technician: new reading, my readings. Engineer: new reading, meters, readings, users, dashboard (placeholder).
+Tabs — technician: new reading, readings. Engineer: new reading, readings, dashboard (placeholder). Moderator: new reading, meters, readings, users, dashboard.
 
 ## Local development
 
@@ -98,5 +103,5 @@ cd app && flutter pub get && flutter run
 
 ## Roadmap
 
-- Dashboard (placeholder tab exists for engineers)
+- Dashboard (placeholder tab exists for engineers and moderators)
 - Session length: currently 12 h; longer would reduce re-logins for offline-heavy technicians

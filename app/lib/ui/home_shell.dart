@@ -9,7 +9,6 @@ import '../state/meters_controller.dart';
 import '../state/session_controller.dart';
 import '../state/sync_controller.dart';
 import 'screens/meters_screen.dart';
-import 'screens/my_readings_screen.dart';
 import 'screens/new_reading_screen.dart';
 import 'screens/readings_screen.dart';
 import 'screens/users_screen.dart';
@@ -74,31 +73,24 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       icon: Icons.add_circle_outline_rounded,
       body: NewReadingScreen(),
     ),
-    if (user.isEngineer)
+    if (user.canManage)
       const _Tab(
         label: S.navMeters,
         icon: Icons.speed_rounded,
         body: MetersScreen(),
       ),
-    if (user.isEngineer)
-      const _Tab(
-        label: S.navReadings,
-        icon: Icons.list_alt_rounded,
-        body: ReadingsScreen(),
-      ),
-    if (user.isEngineer)
+    const _Tab(
+      label: S.navReadings,
+      icon: Icons.list_alt_rounded,
+      body: ReadingsScreen(),
+    ),
+    if (user.canManage)
       const _Tab(
         label: S.navUsers,
         icon: Icons.group_outlined,
         body: UsersScreen(),
       ),
-    if (!user.isEngineer)
-      const _Tab(
-        label: S.navMyReadings,
-        icon: Icons.history_rounded,
-        body: MyReadingsScreen(),
-      ),
-    if (user.isEngineer)
+    if (user.canSeeDashboard)
       const _Tab(
         label: S.navDashboard,
         icon: Icons.dashboard_outlined,

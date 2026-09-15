@@ -31,7 +31,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
   late final TextEditingController _fullName;
   final _password = TextEditingController();
   late UserRole _role;
-  late bool _isActive;
   bool _obscure = true;
   bool _busy = false;
 
@@ -45,7 +44,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _username = TextEditingController(text: widget.existing?.username ?? '');
     _fullName = TextEditingController(text: widget.existing?.fullName ?? '');
     _role = widget.existing?.role ?? UserRole.technician;
-    _isActive = widget.existing?.isActive ?? true;
   }
 
   @override
@@ -60,7 +58,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
     if (e.statusCode == 409) return S.usernameTaken;
     if (e.message.startsWith('username must')) return S.usernameRules;
     if (e.message.startsWith('password must')) return S.passwordRules;
-    if (e.message.startsWith('You cannot deactivate')) return S.cannotEditSelf;
+    if (e.message.startsWith('You cannot deactivate')) {
+      return S.cannotDeleteSelf;
+    }
     return e.message;
   }
 
@@ -76,7 +76,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
           widget.existing!.id,
           fullName: _fullName.text.trim(),
           role: _role,
-          isActive: _isActive,
           password: password.isEmpty ? null : password,
         );
       } else {
@@ -97,6 +96,51 @@ class _UserFormScreenState extends State<UserFormScreen> {
       if (e.isUnauthorized && mounted) {
         context.read<SessionController>().markTokenRejected();
       }
+      messenger.showSnackBar(SnackBar(content: Text(_arabicError(e))));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// Soft delete: the account is deactivated, disappears from the list and
+  /// cannot sign in; its readings keep their author.
+  Future<void> _delete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text(S.deleteUser),
+        content: const Text(S.deleteUserConfirm),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(S.cancel),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(ctx).colorScheme.error,
+              minimumSize: const Size(0, 44),
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text(S.deleteUser),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await context.read<ApiClient>().updateUser(
+        widget.existing!.id,
+        isActive: false,
+      );
+      messenger.showSnackBar(const SnackBar(content: Text(S.userDeleted)));
+      if (mounted) Navigator.of(context).pop(true);
+    } on NetworkException {
+      messenger.showSnackBar(
+        const SnackBar(content: Text(S.usersNeedInternet)),
+      );
+    } on ApiException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(_arabicError(e))));
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -179,7 +223,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
                   ChoiceChip(
                     label: Text(r.label),
                     avatar: Icon(
-                      r == UserRole.engineer
+                      r == UserRole.moderator
+                          ? Icons.admin_panel_settings_rounded
+                          : r == UserRole.engineer
                           ? Icons.engineering_rounded
                           : Icons.build_rounded,
                       size: 18,
@@ -191,25 +237,17 @@ class _UserFormScreenState extends State<UserFormScreen> {
                   ),
               ],
             ),
-            if (_isEdit) ...[
-              const SizedBox(height: 16),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text(
-                  S.accountActive,
-                  style: TextStyle(fontWeight: FontWeight.w700),
+            if (_isEdit && !_isSelf) ...[
+              const SizedBox(height: 24),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: scheme.error,
+                  side: BorderSide(color: scheme.error.withValues(alpha: 0.6)),
+                  minimumSize: const Size.fromHeight(48),
                 ),
-                subtitle: Text(
-                  _isSelf ? S.cannotEditSelf : S.accountActiveHint,
-                  style: TextStyle(
-                    color: scheme.onSurfaceVariant,
-                    fontSize: 12.5,
-                  ),
-                ),
-                value: _isActive,
-                onChanged: _busy || _isSelf
-                    ? null
-                    : (v) => setState(() => _isActive = v),
+                onPressed: _busy ? null : _delete,
+                icon: const Icon(Icons.person_remove_outlined),
+                label: const Text(S.deleteUser),
               ),
             ],
             const SizedBox(height: 28),

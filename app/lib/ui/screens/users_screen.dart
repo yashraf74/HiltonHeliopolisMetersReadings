@@ -59,7 +59,6 @@ class _UsersScreenState extends State<UsersScreen> {
   Widget build(BuildContext context) {
     final me = context.watch<SessionController>().user!;
     final active = _users.where((u) => u.isActive).toList();
-    final inactive = _users.where((u) => !u.isActive).toList();
 
     return Scaffold(
       floatingActionButton: FloatingActionButton.extended(
@@ -97,47 +96,14 @@ class _UsersScreenState extends State<UsersScreen> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
                 children: [
-                  _SectionLabel(S.activeUsers),
                   for (final u in active)
                     _UserTile(
                       user: u,
                       isMe: u.id == me.id,
                       onTap: () => _open(existing: u),
                     ),
-                  if (inactive.isNotEmpty) ...[
-                    const SizedBox(height: 16),
-                    _SectionLabel(S.inactiveUsers),
-                    for (final u in inactive)
-                      _UserTile(
-                        user: u,
-                        isMe: false,
-                        onTap: () => _open(existing: u),
-                      ),
-                  ],
                 ],
               ),
-      ),
-    );
-  }
-}
-
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-          fontSize: 12.5,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.3,
-        ),
       ),
     );
   }
@@ -157,7 +123,7 @@ class _UserTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final isEngineer = user.role == UserRole.engineer;
+    final isStaff = user.role != UserRole.technician;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Card(
@@ -169,14 +135,13 @@ class _UserTile extends StatelessWidget {
             child: Row(
               children: [
                 CircleAvatar(
-                  backgroundColor:
-                      (isEngineer ? scheme.primary : scheme.tertiary)
-                          .withValues(alpha: 0.14),
-                  foregroundColor: isEngineer
-                      ? scheme.primary
-                      : scheme.tertiary,
+                  backgroundColor: (isStaff ? scheme.primary : scheme.tertiary)
+                      .withValues(alpha: 0.14),
+                  foregroundColor: isStaff ? scheme.primary : scheme.tertiary,
                   child: Icon(
-                    isEngineer
+                    user.role == UserRole.moderator
+                        ? Icons.admin_panel_settings_rounded
+                        : isStaff
                         ? Icons.engineering_rounded
                         : Icons.build_rounded,
                   ),

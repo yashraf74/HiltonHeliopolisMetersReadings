@@ -30,11 +30,11 @@ async function hashPassword(password) {
 const [, , username, password, fullName, role] = process.argv;
 
 if (!username || !password || !fullName || !role) {
-  console.error('Usage: npm run create-user -- <username> <password> "<full name>" <engineer|technician>');
+  console.error('Usage: npm run create-user -- <username> <password> "<full name>" <moderator|engineer|technician>');
   process.exit(1);
 }
-if (!["engineer", "technician"].includes(role)) {
-  console.error('role must be "engineer" or "technician"');
+if (!["moderator", "engineer", "technician"].includes(role)) {
+  console.error('role must be "moderator", "engineer" or "technician"');
   process.exit(1);
 }
 

@@ -118,11 +118,13 @@ class _MetersScreenState extends State<MetersScreen> {
 
 /// Shared meter row: the reference photo (with the type icon in the
 /// corner) when the meter has one, otherwise the plain type badge.
+/// [doneToday] shows the daily to-do tick in the reading flow.
 class MeterTile extends StatelessWidget {
-  const MeterTile({super.key, required this.meter, this.onTap});
+  const MeterTile({super.key, required this.meter, this.onTap, this.doneToday});
 
   final Meter meter;
   final VoidCallback? onTap;
+  final bool? doneToday;
 
   @override
   Widget build(BuildContext context) {
@@ -130,6 +132,8 @@ class MeterTile extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final api = context.read<ApiClient>();
     final photoKey = meter.photoKey;
+    final number = meter.number;
+    final done = doneToday;
     return Card(
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -162,8 +166,8 @@ class MeterTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${meter.location} · ${type.label} · ${S.floorLabel} ${meter.floorNumber}'
-                      '${meter.description?.isNotEmpty == true ? ' · ${meter.description}' : ''}',
+                      '${meter.area} · ${meter.location} · ${S.floorLabel} ${meter.floorNumber}'
+                      '${number?.isNotEmpty == true ? ' · ${S.meterNumber} $number' : ''}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -171,10 +175,31 @@ class MeterTile extends StatelessWidget {
                         fontSize: 13,
                       ),
                     ),
+                    if (done != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        done ? S.doneToday : S.notDoneToday,
+                        style: TextStyle(
+                          color: done
+                              ? SyncStatus.synced.color
+                              : SyncStatus.pending.color,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
-              if (onTap != null)
+              if (done != null)
+                Icon(
+                  done
+                      ? Icons.check_circle_rounded
+                      : Icons.radio_button_unchecked_rounded,
+                  color: done ? SyncStatus.synced.color : scheme.outline,
+                  size: 26,
+                )
+              else if (onTap != null)
                 Icon(Icons.chevron_left_rounded, color: scheme.outline),
             ],
           ),
