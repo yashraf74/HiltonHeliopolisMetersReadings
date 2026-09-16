@@ -1,3 +1,6 @@
+import 'dart:math';
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -9,7 +12,7 @@ import '../state/connectivity_controller.dart';
 import '../state/session_controller.dart';
 import 'widgets/status_widgets.dart';
 
-/// Full-bleed hotel photo fading into the ink ground, the gauge badge, and
+/// Hotel photo wallpaper (see [_Wallpaper]), the gauge badge, and
 /// translucent fields — per the design reference.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -94,25 +97,14 @@ class _LoginScreenState extends State<LoginScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Full-screen photo raised by 20% of the screen height; the bottom
-          // 20% it leaves behind is plain black.
+          // Sized to the whole screen so it stays put when the keyboard
+          // shrinks the body.
           Positioned(
-            top: -height * 0.2,
+            top: 0,
             left: 0,
             right: 0,
             height: height,
-            child: Image.asset(
-              'assets/images/login_bg.jpg',
-              fit: BoxFit.cover,
-              alignment: Alignment.topCenter,
-            ),
-          ),
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            height: height * 0.2,
-            child: const ColoredBox(color: Colors.black),
+            child: const _Wallpaper(),
           ),
           SafeArea(
             child: Center(
@@ -269,4 +261,154 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+/// The login photo, shown whole and centred at its own proportions. When the
+/// screen's shape differs from the photo's, the spare space is filled by
+/// stretching the photo's edge strips outward and blurring them, and the
+/// photo's edges on those sides fade into that, so the sky carries on above,
+/// the ground below, and the scene to either side.
+class _Wallpaper extends StatefulWidget {
+  const _Wallpaper();
+
+  @override
+  State<_Wallpaper> createState() => _WallpaperState();
+}
+
+class _WallpaperState extends State<_Wallpaper> {
+  static const _asset = AssetImage('assets/images/login_bg.jpg');
+
+  ImageStream? _stream;
+  ImageInfo? _info;
+  late final _listener = ImageStreamListener((info, _) {
+    if (!mounted) return info.dispose();
+    setState(() {
+      _info?.dispose();
+      _info = info;
+    });
+  });
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final stream = _asset.resolve(createLocalImageConfiguration(context));
+    if (stream.key == _stream?.key) return;
+    _stream?.removeListener(_listener);
+    _stream = stream..addListener(_listener);
+  }
+
+  @override
+  void dispose() {
+    _stream?.removeListener(_listener);
+    _info?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final image = _info?.image;
+    if (image == null) return const SizedBox.shrink();
+    final screen = MediaQuery.sizeOf(context);
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ImageFiltered(
+          imageFilter: ui.ImageFilter.blur(
+            sigmaX: 30,
+            sigmaY: 30,
+            tileMode: TileMode.clamp,
+          ),
+          child: CustomPaint(painter: _StretchedEdgesPainter(image)),
+        ),
+        FittedBox(
+          child: ShaderMask(
+            blendMode: BlendMode.dstIn,
+            shaderCallback: (photo) => _edgeFade(photo, screen),
+            child: RawImage(image: image),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// [photo] is in the photo's own pixels; the fade is sized on screen.
+  static Shader _edgeFade(Rect photo, Size screen) {
+    final scale = min(screen.width / photo.width, screen.height / photo.height);
+    final spareX = screen.width - photo.width * scale;
+    final spareY = screen.height - photo.height * scale;
+    final vertical = spareY > spareX;
+    final spare = vertical ? spareY : spareX;
+    if (spare < 1) {
+      return const LinearGradient(colors: [Colors.white, Colors.white])
+          .createShader(photo);
+    }
+    final length = (vertical ? photo.height : photo.width) * scale;
+    final fade = min(max(spare, 32.0), length * 0.18) / length;
+    return LinearGradient(
+      begin: vertical ? Alignment.topCenter : Alignment.centerLeft,
+      end: vertical ? Alignment.bottomCenter : Alignment.centerRight,
+      colors: const [
+        Colors.transparent,
+        Colors.white,
+        Colors.white,
+        Colors.transparent,
+      ],
+      stops: [0, fade, 1 - fade, 1],
+    ).createShader(photo);
+  }
+}
+
+/// Paints the photo centred (contain) with a thin strip from each edge
+/// stretched across the spare space beside it.
+class _StretchedEdgesPainter extends CustomPainter {
+  _StretchedEdgesPainter(this.image);
+
+  final ui.Image image;
+
+  /// Fraction of the photo taken as the strip to stretch.
+  static const _strip = 0.02;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final src =
+        Offset.zero & Size(image.width.toDouble(), image.height.toDouble());
+    final fitted = applyBoxFit(BoxFit.contain, src.size, size).destination;
+    final photo = Alignment.center.inscribe(fitted, Offset.zero & size);
+    final paint = Paint()..filterQuality = FilterQuality.low;
+    canvas.drawImageRect(image, src, photo, paint);
+
+    final sw = src.width * _strip;
+    final sh = src.height * _strip;
+    if (photo.left > 0) {
+      canvas.drawImageRect(
+        image,
+        Rect.fromLTWH(0, 0, sw, src.height),
+        Rect.fromLTRB(0, photo.top, photo.left, photo.bottom),
+        paint,
+      );
+      canvas.drawImageRect(
+        image,
+        Rect.fromLTWH(src.width - sw, 0, sw, src.height),
+        Rect.fromLTRB(photo.right, photo.top, size.width, photo.bottom),
+        paint,
+      );
+    }
+    if (photo.top > 0) {
+      canvas.drawImageRect(
+        image,
+        Rect.fromLTWH(0, 0, src.width, sh),
+        Rect.fromLTRB(photo.left, 0, photo.right, photo.top),
+        paint,
+      );
+      canvas.drawImageRect(
+        image,
+        Rect.fromLTWH(0, src.height - sh, src.width, sh),
+        Rect.fromLTRB(photo.left, photo.bottom, photo.right, size.height),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_StretchedEdgesPainter old) => old.image != image;
 }

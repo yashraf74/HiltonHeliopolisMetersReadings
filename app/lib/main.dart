@@ -102,6 +102,13 @@ class MetersApp extends StatelessWidget {
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
         ],
+        // Tapping anywhere that isn't a control (a text field, button, ...)
+        // closes the keyboard.
+        builder: (context, child) => GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+          child: child,
+        ),
         home: Consumer2<SessionController, AppStatusController>(
           builder: (context, session, status, _) {
             // Hard gates come first: an outdated build or maintenance mode
