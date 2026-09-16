@@ -161,8 +161,8 @@ readingRoutes.get("/", async (c) => {
     params.push(dateTo);
   }
   if (search) {
-    conditions.push("(m.name LIKE ? OR m.area LIKE ? OR m.number LIKE ? OR m.location LIKE ? OR m.description LIKE ? OR u.full_name LIKE ?)");
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
+    conditions.push("(m.name LIKE ? OR m.area LIKE ? OR m.number LIKE ? OR u.full_name LIKE ?)");
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
   if (cursor) {
     const decoded = decodeCursor(cursor, keys.length);
@@ -197,8 +197,8 @@ readingRoutes.get("/", async (c) => {
   const { results } = await c.env.DB.prepare(
     `SELECT r.id, r.value, r.gain, r.photo_key, r.logged_by, r.logged_at, r.synced_at,
             u.full_name as logged_by_name, u.username as logged_by_username,
-            m.id as meter_id, m.name as meter_name, m.type as meter_type, m.location as meter_location,
-            m.area as meter_area, m.number as meter_number, m.description as meter_description,
+            m.id as meter_id, m.name as meter_name, m.type as meter_type, m.area as meter_location, -- meter_location: for 2.0.0 apps
+            m.area as meter_area, m.number as meter_number,
             m.export_order as meter_export_order,
             ${sortSelects}
      FROM readings r
