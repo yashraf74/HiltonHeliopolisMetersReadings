@@ -11,10 +11,8 @@ class Meters extends Table {
   TextColumn get id => text()();
   TextColumn get name => text().withDefault(const Constant(''))();
   TextColumn get type => text()();
-  TextColumn get location => text()();
   TextColumn get area => text().withDefault(const Constant(''))();
   TextColumn get number => text().nullable()();
-  TextColumn get description => text().nullable()();
   TextColumn get photoKey => text().nullable()();
   TextColumn get lastLoggedAt => text().nullable()();
   IntColumn get todoOrder => integer().nullable()();
@@ -53,7 +51,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'meters_app'));
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -85,6 +83,10 @@ class AppDatabase extends _$AppDatabase {
         // Drops floor_number, adds the order numbers.
         await m.addColumn(meters, meters.todoOrder);
         await m.addColumn(meters, meters.exportOrder);
+        await m.alterTable(TableMigration(meters));
+      }
+      if (from < 7) {
+        // Drops location and description (the cache refills from the server).
         await m.alterTable(TableMigration(meters));
       }
     },

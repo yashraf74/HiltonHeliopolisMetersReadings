@@ -36,17 +36,6 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
-  static const VerificationMeta _locationMeta = const VerificationMeta(
-    'location',
-  );
-  @override
-  late final GeneratedColumn<String> location = GeneratedColumn<String>(
-    'location',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-  );
   static const VerificationMeta _areaMeta = const VerificationMeta('area');
   @override
   late final GeneratedColumn<String> area = GeneratedColumn<String>(
@@ -61,17 +50,6 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
   @override
   late final GeneratedColumn<String> number = GeneratedColumn<String>(
     'number',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _descriptionMeta = const VerificationMeta(
-    'description',
-  );
-  @override
-  late final GeneratedColumn<String> description = GeneratedColumn<String>(
-    'description',
     aliasedName,
     true,
     type: DriftSqlType.string,
@@ -152,10 +130,8 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     id,
     name,
     type,
-    location,
     area,
     number,
-    description,
     photoKey,
     lastLoggedAt,
     todoOrder,
@@ -194,14 +170,6 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     } else if (isInserting) {
       context.missing(_typeMeta);
     }
-    if (data.containsKey('location')) {
-      context.handle(
-        _locationMeta,
-        location.isAcceptableOrUnknown(data['location']!, _locationMeta),
-      );
-    } else if (isInserting) {
-      context.missing(_locationMeta);
-    }
     if (data.containsKey('area')) {
       context.handle(
         _areaMeta,
@@ -212,15 +180,6 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
       context.handle(
         _numberMeta,
         number.isAcceptableOrUnknown(data['number']!, _numberMeta),
-      );
-    }
-    if (data.containsKey('description')) {
-      context.handle(
-        _descriptionMeta,
-        description.isAcceptableOrUnknown(
-          data['description']!,
-          _descriptionMeta,
-        ),
       );
     }
     if (data.containsKey('photo_key')) {
@@ -288,10 +247,6 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
         DriftSqlType.string,
         data['${effectivePrefix}type'],
       )!,
-      location: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}location'],
-      )!,
       area: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}area'],
@@ -299,10 +254,6 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
       number: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}number'],
-      ),
-      description: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}description'],
       ),
       photoKey: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -341,10 +292,8 @@ class Meter extends DataClass implements Insertable<Meter> {
   final String id;
   final String name;
   final String type;
-  final String location;
   final String area;
   final String? number;
-  final String? description;
   final String? photoKey;
   final String? lastLoggedAt;
   final int? todoOrder;
@@ -355,10 +304,8 @@ class Meter extends DataClass implements Insertable<Meter> {
     required this.id,
     required this.name,
     required this.type,
-    required this.location,
     required this.area,
     this.number,
-    this.description,
     this.photoKey,
     this.lastLoggedAt,
     this.todoOrder,
@@ -372,13 +319,9 @@ class Meter extends DataClass implements Insertable<Meter> {
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['type'] = Variable<String>(type);
-    map['location'] = Variable<String>(location);
     map['area'] = Variable<String>(area);
     if (!nullToAbsent || number != null) {
       map['number'] = Variable<String>(number);
-    }
-    if (!nullToAbsent || description != null) {
-      map['description'] = Variable<String>(description);
     }
     if (!nullToAbsent || photoKey != null) {
       map['photo_key'] = Variable<String>(photoKey);
@@ -402,14 +345,10 @@ class Meter extends DataClass implements Insertable<Meter> {
       id: Value(id),
       name: Value(name),
       type: Value(type),
-      location: Value(location),
       area: Value(area),
       number: number == null && nullToAbsent
           ? const Value.absent()
           : Value(number),
-      description: description == null && nullToAbsent
-          ? const Value.absent()
-          : Value(description),
       photoKey: photoKey == null && nullToAbsent
           ? const Value.absent()
           : Value(photoKey),
@@ -436,10 +375,8 @@ class Meter extends DataClass implements Insertable<Meter> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       type: serializer.fromJson<String>(json['type']),
-      location: serializer.fromJson<String>(json['location']),
       area: serializer.fromJson<String>(json['area']),
       number: serializer.fromJson<String?>(json['number']),
-      description: serializer.fromJson<String?>(json['description']),
       photoKey: serializer.fromJson<String?>(json['photoKey']),
       lastLoggedAt: serializer.fromJson<String?>(json['lastLoggedAt']),
       todoOrder: serializer.fromJson<int?>(json['todoOrder']),
@@ -455,10 +392,8 @@ class Meter extends DataClass implements Insertable<Meter> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'type': serializer.toJson<String>(type),
-      'location': serializer.toJson<String>(location),
       'area': serializer.toJson<String>(area),
       'number': serializer.toJson<String?>(number),
-      'description': serializer.toJson<String?>(description),
       'photoKey': serializer.toJson<String?>(photoKey),
       'lastLoggedAt': serializer.toJson<String?>(lastLoggedAt),
       'todoOrder': serializer.toJson<int?>(todoOrder),
@@ -472,10 +407,8 @@ class Meter extends DataClass implements Insertable<Meter> {
     String? id,
     String? name,
     String? type,
-    String? location,
     String? area,
     Value<String?> number = const Value.absent(),
-    Value<String?> description = const Value.absent(),
     Value<String?> photoKey = const Value.absent(),
     Value<String?> lastLoggedAt = const Value.absent(),
     Value<int?> todoOrder = const Value.absent(),
@@ -486,10 +419,8 @@ class Meter extends DataClass implements Insertable<Meter> {
     id: id ?? this.id,
     name: name ?? this.name,
     type: type ?? this.type,
-    location: location ?? this.location,
     area: area ?? this.area,
     number: number.present ? number.value : this.number,
-    description: description.present ? description.value : this.description,
     photoKey: photoKey.present ? photoKey.value : this.photoKey,
     lastLoggedAt: lastLoggedAt.present ? lastLoggedAt.value : this.lastLoggedAt,
     todoOrder: todoOrder.present ? todoOrder.value : this.todoOrder,
@@ -502,12 +433,8 @@ class Meter extends DataClass implements Insertable<Meter> {
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       type: data.type.present ? data.type.value : this.type,
-      location: data.location.present ? data.location.value : this.location,
       area: data.area.present ? data.area.value : this.area,
       number: data.number.present ? data.number.value : this.number,
-      description: data.description.present
-          ? data.description.value
-          : this.description,
       photoKey: data.photoKey.present ? data.photoKey.value : this.photoKey,
       lastLoggedAt: data.lastLoggedAt.present
           ? data.lastLoggedAt.value
@@ -527,10 +454,8 @@ class Meter extends DataClass implements Insertable<Meter> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('type: $type, ')
-          ..write('location: $location, ')
           ..write('area: $area, ')
           ..write('number: $number, ')
-          ..write('description: $description, ')
           ..write('photoKey: $photoKey, ')
           ..write('lastLoggedAt: $lastLoggedAt, ')
           ..write('todoOrder: $todoOrder, ')
@@ -546,10 +471,8 @@ class Meter extends DataClass implements Insertable<Meter> {
     id,
     name,
     type,
-    location,
     area,
     number,
-    description,
     photoKey,
     lastLoggedAt,
     todoOrder,
@@ -564,10 +487,8 @@ class Meter extends DataClass implements Insertable<Meter> {
           other.id == this.id &&
           other.name == this.name &&
           other.type == this.type &&
-          other.location == this.location &&
           other.area == this.area &&
           other.number == this.number &&
-          other.description == this.description &&
           other.photoKey == this.photoKey &&
           other.lastLoggedAt == this.lastLoggedAt &&
           other.todoOrder == this.todoOrder &&
@@ -580,10 +501,8 @@ class MetersCompanion extends UpdateCompanion<Meter> {
   final Value<String> id;
   final Value<String> name;
   final Value<String> type;
-  final Value<String> location;
   final Value<String> area;
   final Value<String?> number;
-  final Value<String?> description;
   final Value<String?> photoKey;
   final Value<String?> lastLoggedAt;
   final Value<int?> todoOrder;
@@ -595,10 +514,8 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.type = const Value.absent(),
-    this.location = const Value.absent(),
     this.area = const Value.absent(),
     this.number = const Value.absent(),
-    this.description = const Value.absent(),
     this.photoKey = const Value.absent(),
     this.lastLoggedAt = const Value.absent(),
     this.todoOrder = const Value.absent(),
@@ -611,10 +528,8 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     required String id,
     this.name = const Value.absent(),
     required String type,
-    required String location,
     this.area = const Value.absent(),
     this.number = const Value.absent(),
-    this.description = const Value.absent(),
     this.photoKey = const Value.absent(),
     this.lastLoggedAt = const Value.absent(),
     this.todoOrder = const Value.absent(),
@@ -624,16 +539,13 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        type = Value(type),
-       location = Value(location),
        updatedAt = Value(updatedAt);
   static Insertable<Meter> custom({
     Expression<String>? id,
     Expression<String>? name,
     Expression<String>? type,
-    Expression<String>? location,
     Expression<String>? area,
     Expression<String>? number,
-    Expression<String>? description,
     Expression<String>? photoKey,
     Expression<String>? lastLoggedAt,
     Expression<int>? todoOrder,
@@ -646,10 +558,8 @@ class MetersCompanion extends UpdateCompanion<Meter> {
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (type != null) 'type': type,
-      if (location != null) 'location': location,
       if (area != null) 'area': area,
       if (number != null) 'number': number,
-      if (description != null) 'description': description,
       if (photoKey != null) 'photo_key': photoKey,
       if (lastLoggedAt != null) 'last_logged_at': lastLoggedAt,
       if (todoOrder != null) 'todo_order': todoOrder,
@@ -664,10 +574,8 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     Value<String>? id,
     Value<String>? name,
     Value<String>? type,
-    Value<String>? location,
     Value<String>? area,
     Value<String?>? number,
-    Value<String?>? description,
     Value<String?>? photoKey,
     Value<String?>? lastLoggedAt,
     Value<int?>? todoOrder,
@@ -680,10 +588,8 @@ class MetersCompanion extends UpdateCompanion<Meter> {
       id: id ?? this.id,
       name: name ?? this.name,
       type: type ?? this.type,
-      location: location ?? this.location,
       area: area ?? this.area,
       number: number ?? this.number,
-      description: description ?? this.description,
       photoKey: photoKey ?? this.photoKey,
       lastLoggedAt: lastLoggedAt ?? this.lastLoggedAt,
       todoOrder: todoOrder ?? this.todoOrder,
@@ -706,17 +612,11 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     if (type.present) {
       map['type'] = Variable<String>(type.value);
     }
-    if (location.present) {
-      map['location'] = Variable<String>(location.value);
-    }
     if (area.present) {
       map['area'] = Variable<String>(area.value);
     }
     if (number.present) {
       map['number'] = Variable<String>(number.value);
-    }
-    if (description.present) {
-      map['description'] = Variable<String>(description.value);
     }
     if (photoKey.present) {
       map['photo_key'] = Variable<String>(photoKey.value);
@@ -748,10 +648,8 @@ class MetersCompanion extends UpdateCompanion<Meter> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('type: $type, ')
-          ..write('location: $location, ')
           ..write('area: $area, ')
           ..write('number: $number, ')
-          ..write('description: $description, ')
           ..write('photoKey: $photoKey, ')
           ..write('lastLoggedAt: $lastLoggedAt, ')
           ..write('todoOrder: $todoOrder, ')
@@ -1444,10 +1342,8 @@ typedef $$MetersTableCreateCompanionBuilder = MetersCompanion Function({
   required String id,
   Value<String> name,
   required String type,
-  required String location,
   Value<String> area,
   Value<String?> number,
-  Value<String?> description,
   Value<String?> photoKey,
   Value<String?> lastLoggedAt,
   Value<int?> todoOrder,
@@ -1460,10 +1356,8 @@ typedef $$MetersTableUpdateCompanionBuilder = MetersCompanion Function({
   Value<String> id,
   Value<String> name,
   Value<String> type,
-  Value<String> location,
   Value<String> area,
   Value<String?> number,
-  Value<String?> description,
   Value<String?> photoKey,
   Value<String?> lastLoggedAt,
   Value<int?> todoOrder,
@@ -1497,11 +1391,6 @@ class $$MetersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get location => $composableBuilder(
-    column: $table.location,
-    builder: (column) => ColumnFilters(column),
-  );
-
   ColumnFilters<String> get area => $composableBuilder(
     column: $table.area,
     builder: (column) => ColumnFilters(column),
@@ -1509,11 +1398,6 @@ class $$MetersTableFilterComposer
 
   ColumnFilters<String> get number => $composableBuilder(
     column: $table.number,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get description => $composableBuilder(
-    column: $table.description,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1572,11 +1456,6 @@ class $$MetersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get location => $composableBuilder(
-    column: $table.location,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get area => $composableBuilder(
     column: $table.area,
     builder: (column) => ColumnOrderings(column),
@@ -1584,11 +1463,6 @@ class $$MetersTableOrderingComposer
 
   ColumnOrderings<String> get number => $composableBuilder(
     column: $table.number,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get description => $composableBuilder(
-    column: $table.description,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -1641,19 +1515,11 @@ class $$MetersTableAnnotationComposer
   GeneratedColumn<String> get type =>
       $composableBuilder(column: $table.type, builder: (column) => column);
 
-  GeneratedColumn<String> get location =>
-      $composableBuilder(column: $table.location, builder: (column) => column);
-
   GeneratedColumn<String> get area =>
       $composableBuilder(column: $table.area, builder: (column) => column);
 
   GeneratedColumn<String> get number =>
       $composableBuilder(column: $table.number, builder: (column) => column);
-
-  GeneratedColumn<String> get description => $composableBuilder(
-    column: $table.description,
-    builder: (column) => column,
-  );
 
   GeneratedColumn<String> get photoKey =>
       $composableBuilder(column: $table.photoKey, builder: (column) => column);
@@ -1709,10 +1575,8 @@ class $$MetersTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> type = const Value.absent(),
-                Value<String> location = const Value.absent(),
                 Value<String> area = const Value.absent(),
                 Value<String?> number = const Value.absent(),
-                Value<String?> description = const Value.absent(),
                 Value<String?> photoKey = const Value.absent(),
                 Value<String?> lastLoggedAt = const Value.absent(),
                 Value<int?> todoOrder = const Value.absent(),
@@ -1724,10 +1588,8 @@ class $$MetersTableTableManager
                 id: id,
                 name: name,
                 type: type,
-                location: location,
                 area: area,
                 number: number,
-                description: description,
                 photoKey: photoKey,
                 lastLoggedAt: lastLoggedAt,
                 todoOrder: todoOrder,
@@ -1741,10 +1603,8 @@ class $$MetersTableTableManager
                 required String id,
                 Value<String> name = const Value.absent(),
                 required String type,
-                required String location,
                 Value<String> area = const Value.absent(),
                 Value<String?> number = const Value.absent(),
-                Value<String?> description = const Value.absent(),
                 Value<String?> photoKey = const Value.absent(),
                 Value<String?> lastLoggedAt = const Value.absent(),
                 Value<int?> todoOrder = const Value.absent(),
@@ -1756,10 +1616,8 @@ class $$MetersTableTableManager
                 id: id,
                 name: name,
                 type: type,
-                location: location,
                 area: area,
                 number: number,
-                description: description,
                 photoKey: photoKey,
                 lastLoggedAt: lastLoggedAt,
                 todoOrder: todoOrder,

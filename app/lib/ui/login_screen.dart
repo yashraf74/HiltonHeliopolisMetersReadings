@@ -25,7 +25,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _busy = false;
   String? _error;
 
-  static const _ink = Color(0xFF0F1A1E);
   static const _fieldFill = Color(0x66142229);
   static const _fieldBorder = Color(0x80FFFFFF);
 
@@ -90,31 +89,30 @@ class _LoginScreenState extends State<LoginScreen> {
     final height = MediaQuery.sizeOf(context).height;
 
     return Scaffold(
-      backgroundColor: _ink,
+      backgroundColor: Colors.black,
       resizeToAvoidBottomInset: true,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Photo occupies the top ~55% and fades into the ink ground.
+          // Full-screen photo raised by 20% of the screen height; the bottom
+          // 20% it leaves behind is plain black.
           Positioned(
-            top: 0,
+            top: -height * 0.2,
             left: 0,
             right: 0,
-            height: height * 0.62,
-            child: ShaderMask(
-              shaderCallback: (rect) => const LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [Colors.white, Colors.white, Colors.transparent],
-                stops: [0, 0.55, 1],
-              ).createShader(rect),
-              blendMode: BlendMode.dstIn,
-              child: Image.asset(
-                'assets/images/login_bg.jpg',
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-              ),
+            height: height,
+            child: Image.asset(
+              'assets/images/login_bg.jpg',
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
             ),
+          ),
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: height * 0.2,
+            child: const ColoredBox(color: Colors.black),
           ),
           SafeArea(
             child: Center(

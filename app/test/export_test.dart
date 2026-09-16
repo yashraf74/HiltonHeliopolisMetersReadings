@@ -23,8 +23,6 @@ void main() {
           'meter_type': 'water',
           'meter_area': 'المبنى الرئيسي',
           'meter_number': 'SN-7',
-          'meter_location': 'المطبخ',
-          'meter_description': null,
         },
       ];
       final bytes = buildReadingsWorkbook(rows);
@@ -34,11 +32,10 @@ void main() {
       expect(sheet.maxRows, 2);
       expect(sheet.rows[1][1]?.value.toString(), 'عداد المسبح');
       expect(sheet.rows[1][3]?.value.toString(), 'المبنى الرئيسي');
-      expect(sheet.rows[1][4]?.value.toString(), 'المطبخ');
-      expect(sheet.rows[1][5]?.value.toString(), 'SN-7');
+      expect(sheet.rows[1][4]?.value.toString(), 'SN-7');
+      expect(sheet.rows[1][5]?.value, isA<DoubleCellValue>());
       expect(sheet.rows[1][6]?.value, isA<DoubleCellValue>());
-      expect(sheet.rows[1][7]?.value, isA<DoubleCellValue>());
-      expect(sheet.rows[1][8]?.value.toString(), 'م³');
+      expect(sheet.rows[1][7]?.value.toString(), 'م³');
     },
   );
 

@@ -34,8 +34,6 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
   late final TextEditingController _name;
   late final TextEditingController _area;
   late final TextEditingController _number;
-  late final TextEditingController _location;
-  late final TextEditingController _description;
   late final TextEditingController _todoOrder;
   late final TextEditingController _exportOrder;
   bool _busy = false;
@@ -56,8 +54,6 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     _name = TextEditingController(text: m?.name ?? '');
     _area = TextEditingController(text: m?.area ?? '');
     _number = TextEditingController(text: m?.number ?? '');
-    _location = TextEditingController(text: m?.location ?? '');
-    _description = TextEditingController(text: m?.description ?? '');
     _todoOrder = TextEditingController(text: m?.todoOrder?.toString() ?? '');
     _exportOrder = TextEditingController(
       text: m?.exportOrder?.toString() ?? '',
@@ -70,8 +66,6 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     _name.dispose();
     _area.dispose();
     _number.dispose();
-    _location.dispose();
-    _description.dispose();
     _todoOrder.dispose();
     _exportOrder.dispose();
     super.dispose();
@@ -88,8 +82,6 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     final name = _name.text.trim();
     final area = _area.text.trim();
     final number = _number.text.trim();
-    final location = _location.text.trim();
-    final description = _description.text.trim();
     final todoOrder = _orderValue(_todoOrder);
     final exportOrder = _orderValue(_exportOrder);
 
@@ -116,8 +108,6 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
             name: name,
             area: area,
             number: number.isEmpty ? null : number,
-            location: location,
-            description: description,
             photoKey: uploadedKey,
             clearPhoto: _removePhoto && uploadedKey == null,
             todoOrder: todoOrder,
@@ -128,8 +118,6 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
             name: name,
             area: area,
             number: number.isEmpty ? null : number,
-            location: location,
-            description: description.isEmpty ? null : description,
             photoKey: uploadedKey,
             todoOrder: todoOrder,
             exportOrder: exportOrder,
@@ -319,29 +307,6 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
                 labelText: S.meterNumber,
                 hintText: S.meterNumberHint,
                 counterText: '',
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _location,
-              textInputAction: TextInputAction.next,
-              contextMenuBuilder: appContextMenuBuilder,
-              decoration: const InputDecoration(
-                labelText: S.meterLocation,
-                hintText: S.meterLocationHint,
-              ),
-              validator: (v) =>
-                  (v ?? '').trim().isEmpty ? S.fieldRequired : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _description,
-              maxLines: 3,
-              contextMenuBuilder: appContextMenuBuilder,
-              decoration: const InputDecoration(
-                labelText: S.meterDescription,
-                hintText: S.meterDescriptionHint,
-                alignLabelWithHint: true,
               ),
             ),
             const SizedBox(height: 20),

@@ -72,17 +72,12 @@ class S {
   static const colMeterArea = 'المنطقة';
   static const colMeterNumber = 'رقم العداد';
   static const colMeterName = 'اسم العداد';
-  static const meterLocation = 'الموقع';
-  static const meterDescription = 'الوصف';
   static const noMeters = 'لا توجد عدادات بعد';
   static const noMetersHint = 'اضغط زر الإضافة لتسجيل أول عداد';
   static const noMetersHintTechnician = 'لم يضف المهندس أي عدادات بعد';
   static const addMeter = 'إضافة عداد';
   static const editMeter = 'تعديل العداد';
   static const meterType = 'نوع العداد';
-  static const meterLocationHint = 'مثال: المطبخ الرئيسي';
-  static const meterDescriptionHint =
-      'اختياري: الرقم التسلسلي، الموديل، ملاحظات';
   static const meterSaved = 'تم حفظ العداد';
   static const retireMeter = 'حذف العداد';
   static const retireMeterConfirm =
@@ -190,8 +185,6 @@ class S {
   static const exportNothing = 'لا توجد قراءات لتصديرها';
   static const colDateTime = 'التاريخ والوقت';
   static const colType = 'نوع العداد';
-  static const colLocation = 'الموقع';
-  static const colDescription = 'الوصف';
   static const colValue = 'القراءة';
   static const colLoggedBy = 'سجّلها';
   static const colSyncedAt = 'وقت المزامنة';

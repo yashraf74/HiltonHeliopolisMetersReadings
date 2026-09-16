@@ -250,9 +250,7 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
                                 q.isEmpty ||
                                 m.name.contains(q) ||
                                 m.area.contains(q) ||
-                                (m.number ?? '').contains(q) ||
-                                m.location.contains(q) ||
-                                (m.description ?? '').contains(q),
+                                (m.number ?? '').contains(q),
                           )
                           .toList()
                         ..sort((a, b) {

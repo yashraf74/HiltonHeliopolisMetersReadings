@@ -632,7 +632,6 @@ class _PendingReadingCard extends StatelessWidget {
                       if (meter != null) ...[
                         DetailRow(S.meterType, type.label),
                         DetailRow(S.meterArea, meter.area),
-                        DetailRow(S.meterLocation, meter.location),
                         if (meter.number?.isNotEmpty == true)
                           DetailRow(S.meterNumber, meter.number!),
                       ],
@@ -874,7 +873,7 @@ class _ReadingCardState extends State<_ReadingCard> {
           tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           leading: PhotoThumb(type: type, image: image),
           title: Text(
-            (row['meter_name'] as String?) ?? row['meter_location'] as String,
+            row['meter_name'] as String,
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           subtitle: Text(
@@ -897,14 +896,8 @@ class _ReadingCardState extends State<_ReadingCard> {
                 children: [
                   DetailRow(S.meterType, type.label),
                   DetailRow(S.meterArea, (row['meter_area'] as String?) ?? ''),
-                  DetailRow(S.meterLocation, row['meter_location'] as String),
                   if (number?.isNotEmpty == true)
                     DetailRow(S.meterNumber, number!),
-                  if ((row['meter_description'] as String?)?.isNotEmpty == true)
-                    DetailRow(
-                      S.meterDescription,
-                      row['meter_description'] as String,
-                    ),
                   DetailRow(
                     S.colValue,
                     '${numFmt.format(row['value'] as num)} ${type.unit}',

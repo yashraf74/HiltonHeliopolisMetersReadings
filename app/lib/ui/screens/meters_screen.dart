@@ -157,7 +157,7 @@ class MeterTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${meter.area} · ${meter.location}'
+                      '${meter.area}'
                       '${number?.isNotEmpty == true ? ' · ${S.meterNumber} $number' : ''}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
