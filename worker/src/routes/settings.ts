@@ -42,6 +42,18 @@ settingsRoutes.put("/settings", requireAuth, requireRole("moderator"), async (c)
     }
     next.photoRetentionDays = n;
   }
+  if (body?.prices !== undefined) {
+    const prices = { ...current.prices };
+    for (const type of ["electricity", "water", "gas"] as const) {
+      if (body.prices?.[type] === undefined) continue;
+      const n = Number(body.prices[type]);
+      if (!Number.isFinite(n) || n < 0 || n > 100000) {
+        return c.json({ error: "prices must be numbers between 0 and 100000" }, 400);
+      }
+      prices[type] = n;
+    }
+    next.prices = prices;
+  }
 
   await saveSettings(c.env, next);
   return c.json(next);

@@ -24,4 +24,12 @@ export interface Settings {
   readingDeleteEnabled: boolean;
   exportEnabled: boolean;
   photoRetentionDays: number;
+  /** EGP per kWh / m³ for the dashboard cost chart; 0 = not set. */
+  prices: Prices;
+}
+
+export interface Prices {
+  electricity: number;
+  water: number;
+  gas: number;
 }

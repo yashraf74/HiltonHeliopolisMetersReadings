@@ -6,6 +6,9 @@ export const SETTINGS_KEYS = [
   "reading_delete_enabled",
   "export_enabled",
   "photo_retention_days",
+  "price_electricity",
+  "price_water",
+  "price_gas",
 ] as const;
 export type SettingsKey = (typeof SETTINGS_KEYS)[number];
 
@@ -15,11 +18,17 @@ export const DEFAULT_SETTINGS: Settings = {
   readingDeleteEnabled: true,
   exportEnabled: true,
   photoRetentionDays: 90,
+  prices: { electricity: 0, water: 0, gas: 0 },
 };
 
 function bool(v: string | null, fallback: boolean): boolean {
   if (v === null) return fallback;
   return v === "true" || v === "1";
+}
+
+function price(v: string | null): number {
+  const n = Number(v);
+  return v !== null && Number.isFinite(n) && n >= 0 ? n : 0;
 }
 
 function int(v: string | null, fallback: number): number {
@@ -29,7 +38,7 @@ function int(v: string | null, fallback: number): number {
 
 /** One KV round-trip per request (KV is edge-cached; values are tiny). */
 export async function loadSettings(env: Env): Promise<Settings> {
-  const [minVersion, maintenance, del, exp, retention] = await Promise.all(
+  const [minVersion, maintenance, del, exp, retention, pElectricity, pWater, pGas] = await Promise.all(
     SETTINGS_KEYS.map((k) => env.SETTINGS.get(k))
   );
   return {
@@ -38,6 +47,7 @@ export async function loadSettings(env: Env): Promise<Settings> {
     readingDeleteEnabled: bool(del, DEFAULT_SETTINGS.readingDeleteEnabled),
     exportEnabled: bool(exp, DEFAULT_SETTINGS.exportEnabled),
     photoRetentionDays: int(retention, DEFAULT_SETTINGS.photoRetentionDays),
+    prices: { electricity: price(pElectricity), water: price(pWater), gas: price(pGas) },
   };
 }
 
@@ -48,6 +58,9 @@ export async function saveSettings(env: Env, s: Settings): Promise<void> {
     env.SETTINGS.put("reading_delete_enabled", String(s.readingDeleteEnabled)),
     env.SETTINGS.put("export_enabled", String(s.exportEnabled)),
     env.SETTINGS.put("photo_retention_days", String(s.photoRetentionDays)),
+    env.SETTINGS.put("price_electricity", String(s.prices.electricity)),
+    env.SETTINGS.put("price_water", String(s.prices.water)),
+    env.SETTINGS.put("price_gas", String(s.prices.gas)),
   ]);
 }
 
