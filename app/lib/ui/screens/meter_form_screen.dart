@@ -12,8 +12,8 @@ import '../../state/meters_controller.dart';
 import '../widgets/photo_picker.dart';
 import '../widgets/status_widgets.dart';
 
-/// Add a new meter, or edit / retire an existing one when [existing] is set.
-/// The optional reference photo is uploaded on save (engineer-only).
+/// Add a new meter, or edit / delete an existing one when [existing] is set.
+/// The optional reference photo is uploaded on save (moderator-only).
 class MeterFormScreen extends StatefulWidget {
   const MeterFormScreen({super.key, this.existing});
 
@@ -35,8 +35,9 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
   late final TextEditingController _area;
   late final TextEditingController _number;
   late final TextEditingController _location;
-  late final TextEditingController _floor;
   late final TextEditingController _description;
+  late final TextEditingController _todoOrder;
+  late final TextEditingController _exportOrder;
   bool _busy = false;
 
   // Photo state: an existing server key, a newly picked file, or a request
@@ -56,8 +57,11 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     _area = TextEditingController(text: m?.area ?? '');
     _number = TextEditingController(text: m?.number ?? '');
     _location = TextEditingController(text: m?.location ?? '');
-    _floor = TextEditingController(text: m?.floorNumber.toString() ?? '');
     _description = TextEditingController(text: m?.description ?? '');
+    _todoOrder = TextEditingController(text: m?.todoOrder?.toString() ?? '');
+    _exportOrder = TextEditingController(
+      text: m?.exportOrder?.toString() ?? '',
+    );
     _photoKey = m?.photoKey;
   }
 
@@ -67,12 +71,13 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     _area.dispose();
     _number.dispose();
     _location.dispose();
-    _floor.dispose();
     _description.dispose();
+    _todoOrder.dispose();
+    _exportOrder.dispose();
     super.dispose();
   }
 
-  int _floorValue() => int.parse(_floor.text.trim());
+  int? _orderValue(TextEditingController c) => int.tryParse(c.text.trim());
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
@@ -84,8 +89,9 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     final area = _area.text.trim();
     final number = _number.text.trim();
     final location = _location.text.trim();
-    final floor = _floorValue();
     final description = _description.text.trim();
+    final todoOrder = _orderValue(_todoOrder);
+    final exportOrder = _orderValue(_exportOrder);
 
     String? error;
     String? uploadedKey;
@@ -111,10 +117,11 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
             area: area,
             number: number.isEmpty ? null : number,
             location: location,
-            floorNumber: floor,
             description: description,
             photoKey: uploadedKey,
             clearPhoto: _removePhoto && uploadedKey == null,
+            todoOrder: todoOrder,
+            exportOrder: exportOrder,
           )
         : await meters.createMeter(
             type: _type,
@@ -122,9 +129,10 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
             area: area,
             number: number.isEmpty ? null : number,
             location: location,
-            floorNumber: floor,
             description: description.isEmpty ? null : description,
             photoKey: uploadedKey,
+            todoOrder: todoOrder,
+            exportOrder: exportOrder,
           );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -265,20 +273,10 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
               spacing: 8,
               children: [
                 for (final t in MeterType.values)
-                  ChoiceChip(
-                    label: Text(t.label),
-                    avatar: Icon(
-                      t.icon,
-                      size: 18,
-                      color: _type == t ? Colors.white : t.color,
-                    ),
+                  TypeChip(
+                    type: t,
                     selected: _type == t,
-                    selectedColor: t.color,
-                    labelStyle: TextStyle(
-                      color: _type == t ? Colors.white : null,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    onSelected: _busy ? null : (_) => setState(() => _type = t),
+                    onSelected: (_) => _busy ? null : setState(() => _type = t),
                   ),
               ],
             ),
@@ -337,21 +335,6 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
             ),
             const SizedBox(height: 14),
             TextFormField(
-              controller: _floor,
-              textInputAction: TextInputAction.next,
-              keyboardType: const TextInputType.numberWithOptions(signed: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[-0-9]')),
-              ],
-              contextMenuBuilder: appContextMenuBuilder,
-              decoration: const InputDecoration(labelText: S.meterFloor),
-              validator: (v) {
-                if ((v ?? '').trim().isEmpty) return S.fieldRequired;
-                return int.tryParse(v!.trim()) == null ? S.floorInvalid : null;
-              },
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
               controller: _description,
               maxLines: 3,
               contextMenuBuilder: appContextMenuBuilder,
@@ -360,6 +343,40 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
                 hintText: S.meterDescriptionHint,
                 alignLabelWithHint: true,
               ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              S.moderatorOnlyFields,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _todoOrder,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    contextMenuBuilder: appContextMenuBuilder,
+                    decoration: const InputDecoration(labelText: S.todoOrder),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _exportOrder,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    contextMenuBuilder: appContextMenuBuilder,
+                    decoration: const InputDecoration(labelText: S.exportOrder),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '${S.todoOrderHint}\n${S.exportOrderHint}',
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
             ),
             const SizedBox(height: 20),
             _buildPhotoSection(context),

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:meters_app/data/api/api_client.dart';
 import 'package:meters_app/data/db/database.dart';
 import 'package:meters_app/main.dart';
+import 'package:meters_app/state/app_status_controller.dart';
 import 'package:meters_app/state/connectivity_controller.dart';
 import 'package:meters_app/state/meters_controller.dart';
 import 'package:meters_app/state/session_controller.dart';
@@ -21,7 +22,10 @@ void main() {
   testWidgets('signed-out app renders the login screen', (tester) async {
     final db = AppDatabase(NativeDatabase.memory());
     final session = SessionController(storage: const FlutterSecureStorage());
-    final api = ApiClient(tokenProvider: () => session.token);
+    final api = ApiClient(
+      tokenProvider: () => session.token,
+      appVersion: '2.0.0',
+    );
     final connectivity = ConnectivityController();
     final sync = SyncController(
       db: db,
@@ -39,6 +43,7 @@ void main() {
         meters: MetersController(db: db, api: api, session: session),
         connectivity: connectivity,
         sync: sync,
+        status: AppStatusController(appVersion: '2.0.0'),
       ),
     );
     await tester.pump();
@@ -63,6 +68,7 @@ void main() {
     final session = SessionController(storage: const FlutterSecureStorage());
     final api = ApiClient(
       tokenProvider: () => session.token,
+      appVersion: '2.0.0',
       baseUrl: 'http://127.0.0.1:9',
     );
     final connectivity = ConnectivityController();
@@ -82,6 +88,7 @@ void main() {
         meters: MetersController(db: db, api: api, session: session),
         connectivity: connectivity,
         sync: sync,
+        status: AppStatusController(appVersion: '2.0.0'),
       ),
     );
     await tester.pump();

@@ -15,6 +15,7 @@ git push origin main
 
 - Pushing triggers the Android build on GitHub. Watch it with `gh run watch`; ~5 minutes later the APK on the `latest` release is replaced.
 - If analyze or test fails, the push still goes through but CI fails and no APK is published. Fix first.
+- Bump `version:` in `app/pubspec.yaml` for every release. The app sends it to the server; a build below the "minimum app version" setting is refused, so a new minimum must never exceed the version you ship.
 
 ## 2. Running on the iOS simulator
 
@@ -96,7 +97,19 @@ npm run create-user -- <username> '<password>' "<Full Name>" moderator
 
 It prints a `wrangler d1 execute ... --file` command; run that. After that, create every other account from the app's Users tab.
 
-## 9. Cloudflare account tasks
+## 9. Runtime settings (site properties)
+
+Moderators change these from the app (account menu → app settings). They live in the Workers KV namespace `SETTINGS` and can also be edited in the Cloudflare dashboard (Storage & Databases → KV → SETTINGS) or from the terminal:
+
+```
+cd ~/projects/HiltonHeliopolisMetersReadings/worker
+npx wrangler kv key put --binding SETTINGS --remote min_app_version 2.0.0
+npx wrangler kv key get --binding SETTINGS --remote maintenance_mode
+```
+
+Keys: `min_app_version`, `maintenance_mode` (true/false), `reading_delete_enabled`, `export_enabled`, `photo_retention_days`.
+
+## 10. Cloudflare account tasks
 
 ```
 npx wrangler login                # once per machine
@@ -111,7 +124,7 @@ Trigger the weekly photo purge by hand (local dev server started with `npm run d
 curl "http://localhost:8787/__scheduled?cron=0+10+*+*+5"
 ```
 
-## 10. Where things are
+## 11. Where things are
 
 | Need | File |
 |---|---|
@@ -120,6 +133,11 @@ curl "http://localhost:8787/__scheduled?cron=0+10+*+*+5"
 | Colours / fonts | `app/lib/core/theme.dart` |
 | Local DB schema | `app/lib/data/db/database.dart` (regenerate after editing) |
 | Sync engine | `app/lib/state/sync_controller.dart` |
+| Runtime settings / version gate | `worker/src/settings.ts`, `worker/src/middleware.ts` |
+| Gain recompute | `worker/src/gain.ts` |
+| Dashboard | `worker/src/routes/dashboard.ts`, `app/lib/ui/screens/dashboard_screen.dart` |
+| Launcher icon source | `app/assets/icon/icon.png` (`dart run flutter_launcher_icons` after replacing) |
+| Login background | `app/assets/images/login_bg.jpg` |
 | Tabs per role | `app/lib/ui/home_shell.dart` |
 | Server DB schema | `worker/migrations/` |
 | API routes | `worker/src/routes/` |

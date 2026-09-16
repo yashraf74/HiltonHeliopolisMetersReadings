@@ -14,10 +14,11 @@ class Meters extends Table {
   TextColumn get location => text()();
   TextColumn get area => text().withDefault(const Constant(''))();
   TextColumn get number => text().nullable()();
-  IntColumn get floorNumber => integer()();
   TextColumn get description => text().nullable()();
   TextColumn get photoKey => text().nullable()();
   TextColumn get lastLoggedAt => text().nullable()();
+  IntColumn get todoOrder => integer().nullable()();
+  IntColumn get exportOrder => integer().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   TextColumn get updatedAt => text()();
 
@@ -52,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'meters_app'));
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -80,6 +81,12 @@ class AppDatabase extends _$AppDatabase {
           "DELETE FROM readings WHERE sync_status = 'synced'",
         );
       }
+      if (from < 6) {
+        // Drops floor_number, adds the order numbers.
+        await m.addColumn(meters, meters.todoOrder);
+        await m.addColumn(meters, meters.exportOrder);
+        await m.alterTable(TableMigration(meters));
+      }
     },
   );
 
@@ -106,10 +113,7 @@ class AppDatabase extends _$AppDatabase {
   Stream<List<Meter>> watchActiveMeters({String? type}) {
     final q = select(meters)
       ..where((m) => m.isActive.equals(true))
-      ..orderBy([
-        (m) => OrderingTerm.asc(m.floorNumber),
-        (m) => OrderingTerm.asc(m.name),
-      ]);
+      ..orderBy([(m) => OrderingTerm.asc(m.name)]);
     if (type != null) q.where((m) => m.type.equals(type));
     return q.watch();
   }

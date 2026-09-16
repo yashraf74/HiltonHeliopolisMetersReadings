@@ -12,16 +12,18 @@ import '../../data/db/database.dart';
 import '../../data/export/excel_export.dart';
 import '../../data/models.dart';
 import '../../data/photo_store.dart';
+import '../../state/app_status_controller.dart';
 import '../../state/session_controller.dart';
 import '../../state/sync_controller.dart';
 import '../widgets/status_widgets.dart';
 
 enum ReadingSort {
+  byDefault('default', S.sortDefault),
   loggedAt('logged_at', S.sortDate),
   value('value', S.sortValue),
   meterName('meter_name', S.sortMeterName),
-  floor('floor', S.sortFloor),
-  technician('technician', S.sortTechnician);
+  meterType('meter_type', S.sortType),
+  user('technician', S.sortUser);
 
   const ReadingSort(this.apiName, this.label);
 
@@ -31,47 +33,42 @@ enum ReadingSort {
 
 class ReadingFilters {
   const ReadingFilters({
-    this.type,
-    this.floor,
-    this.technician = '',
+    this.types = const {},
+    this.number = '',
+    this.userId,
     this.from,
     this.to,
     this.search = '',
-    this.sort = ReadingSort.loggedAt,
-    this.descending = true,
+    this.sort = ReadingSort.byDefault,
+    this.descending = false,
   });
 
-  final MeterType? type;
-  final int? floor;
-  final String technician;
+  final Set<MeterType> types;
+  final String number;
+  final String? userId;
   final DateTime? from;
   final DateTime? to;
   final String search;
   final ReadingSort sort;
+
+  /// The default sort is ascending by export order; the others default to
+  /// newest / highest first.
   final bool descending;
 
-  bool get isEmpty =>
-      type == null &&
-      floor == null &&
-      technician.isEmpty &&
-      from == null &&
-      to == null &&
-      search.isEmpty;
-
-  bool get isDefaultSort => sort == ReadingSort.loggedAt && descending;
-
-  int get activeCount =>
-      (type != null ? 1 : 0) +
-      (floor != null ? 1 : 0) +
-      (technician.isNotEmpty ? 1 : 0) +
-      (from != null || to != null ? 1 : 0);
+  bool get isEmpty => !hasActiveFilters && search.isEmpty;
+  bool get hasActiveFilters =>
+      types.isNotEmpty ||
+      number.isNotEmpty ||
+      userId != null ||
+      from != null ||
+      to != null;
+  bool get isDefaultSort => sort == ReadingSort.byDefault && !descending;
 
   ReadingFilters copyWith({
-    MeterType? type,
-    bool clearType = false,
-    int? floor,
-    bool clearFloor = false,
-    String? technician,
+    Set<MeterType>? types,
+    String? number,
+    String? userId,
+    bool clearUser = false,
     DateTime? from,
     DateTime? to,
     bool clearDates = false,
@@ -79,9 +76,9 @@ class ReadingFilters {
     ReadingSort? sort,
     bool? descending,
   }) => ReadingFilters(
-    type: clearType ? null : (type ?? this.type),
-    floor: clearFloor ? null : (floor ?? this.floor),
-    technician: technician ?? this.technician,
+    types: types ?? this.types,
+    number: number ?? this.number,
+    userId: clearUser ? null : (userId ?? this.userId),
     from: clearDates ? null : (from ?? this.from),
     to: clearDates ? null : (to ?? this.to),
     search: search ?? this.search,
@@ -90,9 +87,9 @@ class ReadingFilters {
   );
 
   Map<String, String> toQuery() => {
-    if (type != null) 'type': type!.name,
-    if (floor != null) 'floor': floor.toString(),
-    if (technician.isNotEmpty) 'technician': technician,
+    if (types.isNotEmpty) 'type': types.map((t) => t.name).join(','),
+    if (number.isNotEmpty) 'number': number,
+    'userId': ?userId,
     if (from != null)
       'dateFrom': DateTime(
         from!.year,
@@ -134,12 +131,16 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
   bool _loadingMore = false;
   String? _error;
   bool _exporting = false;
+  List<UserName> _userNames = const [];
 
   @override
   void initState() {
     super.initState();
     _scroll.addListener(_onScroll);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _load();
+      _loadUserNames();
+    });
   }
 
   @override
@@ -150,9 +151,24 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
   }
 
   void _onScroll() {
-    if (!_scroll.hasClients) return;
+    if (!_scroll.hasClients) {
+      return;
+    }
     if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 400) {
       _loadMore();
+    }
+  }
+
+  Future<void> _loadUserNames() async {
+    final user = context.read<SessionController>().user;
+    if (user == null || !user.canSeeAllReadings) {
+      return;
+    }
+    try {
+      final names = await context.read<ApiClient>().fetchUserNames();
+      if (mounted) setState(() => _userNames = names);
+    } catch (_) {
+      // The dropdown just stays empty; not worth surfacing.
     }
   }
 
@@ -179,13 +195,17 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
       final page = await context.read<ApiClient>().fetchReadings(
         _filters.toQuery(),
       );
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _rows = page.rows;
         _nextCursor = page.nextCursor;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() => _handleError(e));
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -194,20 +214,26 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
 
   Future<void> _loadMore() async {
     final cursor = _nextCursor;
-    if (cursor == null || _loadingMore || _loading) return;
+    if (cursor == null || _loadingMore || _loading) {
+      return;
+    }
     setState(() => _loadingMore = true);
     try {
       final page = await context.read<ApiClient>().fetchReadings(
         _filters.toQuery(),
         cursor: cursor,
       );
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _rows = [..._rows, ...page.rows];
         _nextCursor = page.nextCursor;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -220,27 +246,33 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     }
   }
 
-  Future<void> _openFilters(bool showTechnician) async {
+  Future<void> _openFilters(bool showUser) async {
     final result = await showModalBottomSheet<ReadingFilters>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (_) =>
-          _FilterSheet(initial: _filters, showTechnician: showTechnician),
+      builder: (_) => _FilterSheet(
+        initial: _filters,
+        showUser: showUser,
+        users: _userNames,
+      ),
     );
-    if (result == null) return;
+    if (result == null) {
+      return;
+    }
     setState(() => _filters = result);
     _load();
   }
 
-  Future<void> _openSort(bool showTechnician) async {
+  Future<void> _openSort(bool showUser) async {
     final result = await showModalBottomSheet<ReadingFilters>(
       context: context,
       showDragHandle: true,
-      builder: (_) =>
-          _SortSheet(initial: _filters, showTechnician: showTechnician),
+      builder: (_) => _SortSheet(initial: _filters, showUser: showUser),
     );
-    if (result == null) return;
+    if (result == null) {
+      return;
+    }
     setState(() => _filters = result);
     _load();
   }
@@ -257,9 +289,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final api = context.read<ApiClient>();
     try {
-      final all = _nextCursor == null
-          ? _rows
-          : await api.fetchAllReadings(_filters.toQuery());
+      final all = await api.fetchAllReadings(_filters.toQuery());
       final bytes = buildReadingsWorkbook(all);
       final stamp = DateFormat('yyyy-MM-dd_HHmm').format(DateTime.now());
       final saved = await FilePicker.saveFile(
@@ -280,6 +310,14 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
       messenger.showSnackBar(
         const SnackBar(content: Text(S.readingsNeedInternet)),
       );
+    } on ApiException catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            e.code == 'export_disabled' ? S.exportDisabledByAdmin : e.message,
+          ),
+        ),
+      );
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('${S.exportFailed}: $e')));
     } finally {
@@ -292,6 +330,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     final scheme = Theme.of(context).colorScheme;
     final user = context.watch<SessionController>().user!;
     final isAdmin = user.canSeeAllReadings;
+    final config = context.watch<AppStatusController>().config;
     final db = context.read<AppDatabase>();
 
     return Column(
@@ -340,15 +379,14 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
                 ),
               ),
               Badge(
-                isLabelVisible: _filters.activeCount > 0,
-                label: Text('${_filters.activeCount}'),
+                isLabelVisible: _filters.hasActiveFilters,
                 child: IconButton.filledTonal(
                   tooltip: S.filters,
                   onPressed: () => _openFilters(isAdmin),
                   icon: const Icon(Icons.tune_rounded),
                 ),
               ),
-              if (isAdmin)
+              if (isAdmin && config.exportEnabled)
                 IconButton.filledTonal(
                   tooltip: S.exportExcel,
                   onPressed: _exporting || _loading ? null : _export,
@@ -358,7 +396,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.table_view_rounded),
+                      : const Icon(Icons.ios_share_rounded),
                 ),
             ],
           ),
@@ -398,7 +436,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
               final queue = queueSnap.data ?? const <Reading>[];
               return RefreshIndicator(
                 onRefresh: _load,
-                child: _buildBody(queue, isAdmin, scheme),
+                child: _buildBody(queue, config.readingDeleteEnabled, scheme),
               );
             },
           ),
@@ -407,7 +445,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     );
   }
 
-  Widget _buildBody(List<Reading> queue, bool isAdmin, ColorScheme scheme) {
+  Widget _buildBody(List<Reading> queue, bool canDelete, ColorScheme scheme) {
     final header = queue.isEmpty ? 0 : queue.length + 1;
     final footer = _nextCursor != null ? 1 : 0;
 
@@ -436,7 +474,9 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
             ),
           );
         }
-        if (i < header) return _PendingReadingCard(reading: queue[i - 1]);
+        if (i < header) {
+          return _PendingReadingCard(reading: queue[i - 1]);
+        }
         final j = i - header;
         if (j == serverCount) {
           return Padding(
@@ -484,7 +524,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
         }
         return _ReadingCard(
           row: _rows[j],
-          canEdit: true,
+          canDelete: canDelete,
           onDeleted: () => setState(() => _rows = [..._rows]..removeAt(j)),
           onValueChanged: (v) => setState(() {
             final copy = [..._rows];
@@ -543,7 +583,6 @@ class _PendingReadingCard extends StatelessWidget {
     final status = SyncStatus.fromDb(reading.syncStatus);
     final fmt = DateFormat('d/M/yyyy · HH:mm', 'ar');
     final loggedAt = DateTime.parse(reading.loggedAt).toLocal();
-    final value = NumberFormat.decimalPattern('en').format(reading.value);
 
     return FutureBuilder<(Meter?, File?)>(
       future: _load(db),
@@ -579,13 +618,7 @@ class _PendingReadingCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 17,
-                    ),
-                  ),
+                  ValueText(reading.value, unit: type.unit),
                   const SizedBox(height: 2),
                   SyncStatusChip(status),
                 ],
@@ -600,7 +633,6 @@ class _PendingReadingCard extends StatelessWidget {
                         DetailRow(S.meterType, type.label),
                         DetailRow(S.meterArea, meter.area),
                         DetailRow(S.meterLocation, meter.location),
-                        DetailRow(S.meterFloor, '${meter.floorNumber}'),
                         if (meter.number?.isNotEmpty == true)
                           DetailRow(S.meterNumber, meter.number!),
                       ],
@@ -660,13 +692,13 @@ class _PendingReadingCard extends StatelessWidget {
 class _ReadingCard extends StatefulWidget {
   const _ReadingCard({
     required this.row,
-    required this.canEdit,
+    required this.canDelete,
     required this.onDeleted,
     required this.onValueChanged,
   });
 
   final Map<String, dynamic> row;
-  final bool canEdit;
+  final bool canDelete;
   final VoidCallback onDeleted;
   final ValueChanged<double> onValueChanged;
 
@@ -735,7 +767,9 @@ class _ReadingCardState extends State<_ReadingCard> {
       },
     );
     controller.dispose();
-    if (result == null || !mounted) return;
+    if (result == null || !mounted) {
+      return;
+    }
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -781,7 +815,9 @@ class _ReadingCardState extends State<_ReadingCard> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted) {
+      return;
+    }
     setState(() => _busy = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
@@ -796,7 +832,13 @@ class _ReadingCardState extends State<_ReadingCard> {
       if (e.isUnauthorized && mounted) {
         context.read<SessionController>().markTokenRejected();
       }
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            e.code == 'delete_disabled' ? S.deleteDisabledByAdmin : e.message,
+          ),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -812,8 +854,8 @@ class _ReadingCardState extends State<_ReadingCard> {
         ? DateTime.parse(row['synced_at'] as String).toLocal()
         : null;
     final fmt = DateFormat('d/M/yyyy · HH:mm', 'ar');
+    final numFmt = NumberFormat.decimalPattern('en');
     final api = context.read<ApiClient>();
-    final value = NumberFormat.decimalPattern('en').format(row['value'] as num);
     final photoKey = row['photo_key'] as String?;
     final image = photoKey == null
         ? null
@@ -822,6 +864,7 @@ class _ReadingCardState extends State<_ReadingCard> {
             headers: api.authHeaders,
           );
     final number = row['meter_number'] as String?;
+    final gain = row['gain'] as num?;
 
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -838,9 +881,13 @@ class _ReadingCardState extends State<_ReadingCard> {
             '${row['meter_area'] ?? ''} · ${row['logged_by_name']} · ${fmt.format(loggedAt)}',
             style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
           ),
-          trailing: Text(
-            value,
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17),
+          trailing: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              ValueText(row['value'] as num, unit: type.unit),
+              GainText(gain),
+            ],
           ),
           children: [
             Padding(
@@ -851,13 +898,21 @@ class _ReadingCardState extends State<_ReadingCard> {
                   DetailRow(S.meterType, type.label),
                   DetailRow(S.meterArea, (row['meter_area'] as String?) ?? ''),
                   DetailRow(S.meterLocation, row['meter_location'] as String),
-                  DetailRow(S.meterFloor, '${row['meter_floor']}'),
                   if (number?.isNotEmpty == true)
                     DetailRow(S.meterNumber, number!),
                   if ((row['meter_description'] as String?)?.isNotEmpty == true)
                     DetailRow(
                       S.meterDescription,
                       row['meter_description'] as String,
+                    ),
+                  DetailRow(
+                    S.colValue,
+                    '${numFmt.format(row['value'] as num)} ${type.unit}',
+                  ),
+                  if (gain != null)
+                    DetailRow(
+                      S.gainLabel,
+                      '${numFmt.format(gain)} ${type.unit}',
                     ),
                   DetailRow(S.loggedBy, row['logged_by_name'] as String),
                   DetailRow(S.loggedAt, fmt.format(loggedAt)),
@@ -866,17 +921,17 @@ class _ReadingCardState extends State<_ReadingCard> {
                   DetailRow(S.readingId, row['id'] as String, mono: true),
                   const SizedBox(height: 12),
                   ReadingPhoto(image: image),
-                  if (widget.canEdit) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: FilledButton.tonalIcon(
-                            onPressed: _busy ? null : _edit,
-                            icon: const Icon(Icons.edit_outlined),
-                            label: const Text(S.editReading),
-                          ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: _busy ? null : _edit,
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text(S.editReading),
                         ),
+                      ),
+                      if (widget.canDelete) ...[
                         const SizedBox(width: 10),
                         Expanded(
                           child: FilledButton.tonalIcon(
@@ -898,8 +953,8 @@ class _ReadingCardState extends State<_ReadingCard> {
                           ),
                         ),
                       ],
-                    ),
-                  ],
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -913,10 +968,10 @@ class _ReadingCardState extends State<_ReadingCard> {
 // ---- sort sheet ------------------------------------------------------------
 
 class _SortSheet extends StatefulWidget {
-  const _SortSheet({required this.initial, required this.showTechnician});
+  const _SortSheet({required this.initial, required this.showUser});
 
   final ReadingFilters initial;
-  final bool showTechnician;
+  final bool showUser;
 
   @override
   State<_SortSheet> createState() => _SortSheetState();
@@ -929,7 +984,7 @@ class _SortSheetState extends State<_SortSheet> {
   @override
   Widget build(BuildContext context) {
     final options = ReadingSort.values.where(
-      (s) => widget.showTechnician || s != ReadingSort.technician,
+      (s) => widget.showUser || s != ReadingSort.user,
     );
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
@@ -945,7 +1000,12 @@ class _SortSheetState extends State<_SortSheet> {
           const SizedBox(height: 8),
           RadioGroup<ReadingSort>(
             groupValue: _sort,
-            onChanged: (v) => setState(() => _sort = v!),
+            onChanged: (v) => setState(() {
+              _sort = v!;
+              // Sensible direction per field: default = ascending order
+              // numbers; everything else newest / highest first.
+              _desc = _sort != ReadingSort.byDefault;
+            }),
             child: Column(
               children: [
                 for (final s in options)
@@ -964,14 +1024,14 @@ class _SortSheetState extends State<_SortSheet> {
             child: SegmentedButton<bool>(
               segments: const [
                 ButtonSegment(
-                  value: true,
-                  label: Text(S.sortDesc),
-                  icon: Icon(Icons.arrow_downward_rounded, size: 16),
-                ),
-                ButtonSegment(
                   value: false,
                   label: Text(S.sortAsc),
                   icon: Icon(Icons.arrow_upward_rounded, size: 16),
+                ),
+                ButtonSegment(
+                  value: true,
+                  label: Text(S.sortDesc),
+                  icon: Icon(Icons.arrow_downward_rounded, size: 16),
                 ),
               ],
               selected: {_desc},
@@ -995,10 +1055,15 @@ class _SortSheetState extends State<_SortSheet> {
 // ---- filter sheet ----------------------------------------------------------
 
 class _FilterSheet extends StatefulWidget {
-  const _FilterSheet({required this.initial, required this.showTechnician});
+  const _FilterSheet({
+    required this.initial,
+    required this.showUser,
+    required this.users,
+  });
 
   final ReadingFilters initial;
-  final bool showTechnician;
+  final bool showUser;
+  final List<UserName> users;
 
   @override
   State<_FilterSheet> createState() => _FilterSheetState();
@@ -1006,15 +1071,15 @@ class _FilterSheet extends StatefulWidget {
 
 class _FilterSheetState extends State<_FilterSheet> {
   late ReadingFilters _f = widget.initial;
-  late final _floor = TextEditingController(
-    text: widget.initial.floor?.toString() ?? '',
-  );
-  late final _tech = TextEditingController(text: widget.initial.technician);
+  late Set<MeterType> _types = {...widget.initial.types};
+  late final _number = TextEditingController(text: widget.initial.number);
+  late String? _userId = widget.users.any((u) => u.id == widget.initial.userId)
+      ? widget.initial.userId
+      : null;
 
   @override
   void dispose() {
-    _floor.dispose();
-    _tech.dispose();
+    _number.dispose();
     super.dispose();
   }
 
@@ -1028,7 +1093,9 @@ class _FilterSheetState extends State<_FilterSheet> {
           ? DateTimeRange(start: _f.from!, end: _f.to!)
           : null,
     );
-    if (range == null) return;
+    if (range == null) {
+      return;
+    }
     setState(() => _f = _f.copyWith(from: range.start, to: range.end));
   }
 
@@ -1042,148 +1109,141 @@ class _FilterSheetState extends State<_FilterSheet> {
         20,
         20 + MediaQuery.viewInsetsOf(context).bottom,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            S.filters,
-            style: Theme.of(context).textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            S.filterType,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: [
-              ChoiceChip(
-                label: const Text(S.filterAllTypes),
-                selected: _f.type == null,
-                onSelected: (_) =>
-                    setState(() => _f = _f.copyWith(clearType: true)),
-              ),
-              for (final t in MeterType.values)
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              S.filters,
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              S.filterType,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
                 ChoiceChip(
-                  label: Text(t.label),
-                  avatar: Icon(
-                    t.icon,
-                    size: 18,
-                    color: _f.type == t ? Colors.white : t.color,
-                  ),
-                  selected: _f.type == t,
-                  selectedColor: t.color,
-                  labelStyle: TextStyle(
-                    color: _f.type == t ? Colors.white : null,
-                  ),
-                  onSelected: (_) => setState(() => _f = _f.copyWith(type: t)),
+                  label: const Text(S.filterAllTypes),
+                  selected: _types.isEmpty,
+                  onSelected: (_) => setState(() => _types = {}),
                 ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _floor,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    signed: true,
+                for (final t in MeterType.values)
+                  TypeChip(
+                    type: t,
+                    selected: _types.contains(t),
+                    onSelected: (on) => setState(() {
+                      _types = on ? {..._types, t} : ({..._types}..remove(t));
+                      // Every type selected is the same as "all".
+                      if (_types.length == MeterType.values.length) {
+                        _types = {};
+                      }
+                    }),
                   ),
-                  inputFormatters: [
-                    FilteringTextInputFormatter.allow(RegExp(r'[-0-9]')),
-                  ],
-                  decoration: const InputDecoration(
-                    labelText: S.filterFloor,
-                    isDense: true,
-                  ),
-                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _number,
+              textDirection: TextDirection.ltr,
+              contextMenuBuilder: appContextMenuBuilder,
+              decoration: const InputDecoration(
+                labelText: S.filterNumber,
+                isDense: true,
+                prefixIcon: Icon(Icons.tag_rounded),
               ),
-              if (widget.showTechnician) ...[
-                const SizedBox(width: 12),
+            ),
+            if (widget.showUser) ...[
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String?>(
+                initialValue: _userId,
+                isExpanded: true,
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text(S.filterAllUsers),
+                  ),
+                  for (final u in widget.users)
+                    DropdownMenuItem<String?>(
+                      value: u.id,
+                      child: Text(u.fullName),
+                    ),
+                ],
+                decoration: const InputDecoration(
+                  labelText: S.filterUser,
+                  isDense: true,
+                  prefixIcon: Icon(Icons.person_outline_rounded),
+                ),
+                onChanged: (v) => setState(() => _userId = v),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Text(
+              S.filterDateRange,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
                 Expanded(
-                  flex: 2,
-                  child: TextField(
-                    controller: _tech,
-                    decoration: const InputDecoration(
-                      labelText: S.filterTechnician,
-                      isDense: true,
+                  child: OutlinedButton.icon(
+                    onPressed: _pickDates,
+                    icon: const Icon(Icons.date_range_rounded),
+                    label: Text(
+                      _f.from == null
+                          ? S.pickDates
+                          : '${fmt.format(_f.from!)} – ${fmt.format(_f.to ?? _f.from!)}',
                     ),
                   ),
                 ),
+                if (_f.from != null)
+                  IconButton(
+                    onPressed: () =>
+                        setState(() => _f = _f.copyWith(clearDates: true)),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
               ],
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            S.filterDateRange,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _pickDates,
-                  icon: const Icon(Icons.date_range_rounded),
-                  label: Text(
-                    _f.from == null
-                        ? S.pickDates
-                        : '${fmt.format(_f.from!)} – ${fmt.format(_f.to ?? _f.from!)}',
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(
+                      context,
+                      ReadingFilters(sort: _f.sort, descending: _f.descending),
+                    ),
+                    child: const Text(S.clearFilters),
                   ),
                 ),
-              ),
-              if (_f.from != null)
-                IconButton(
-                  onPressed: () =>
-                      setState(() => _f = _f.copyWith(clearDates: true)),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(
-                    context,
-                    ReadingFilters(sort: _f.sort, descending: _f.descending),
-                  ),
-                  child: const Text(S.clearFilters),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: () {
-                    final floorText = _floor.text.trim();
-                    Navigator.pop(
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(
                       context,
                       ReadingFilters(
-                        type: _f.type,
-                        floor: floorText.isEmpty
-                            ? null
-                            : int.tryParse(floorText),
-                        technician: widget.showTechnician
-                            ? _tech.text.trim()
-                            : '',
+                        types: _types,
+                        number: _number.text.trim(),
+                        userId: widget.showUser ? _userId : null,
                         from: _f.from,
                         to: _f.to,
                         search: widget.initial.search,
                         sort: _f.sort,
                         descending: _f.descending,
                       ),
-                    );
-                  },
-                  child: const Text(S.applyFilters),
+                    ),
+                    child: const Text(S.applyFilters),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

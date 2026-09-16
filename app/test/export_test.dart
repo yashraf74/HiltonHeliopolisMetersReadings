@@ -1,6 +1,7 @@
 import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meters_app/data/export/excel_export.dart';
+import 'package:meters_app/data/models.dart';
 import 'package:meters_app/ui/screens/readings_screen.dart';
 
 void main() {
@@ -11,6 +12,7 @@ void main() {
         {
           'id': 'r1',
           'value': 12345.6,
+          'gain': 12.5,
           'photo_key': 'readings/x.jpg',
           'logged_by': 'u1',
           'logged_by_name': 'فني',
@@ -22,7 +24,6 @@ void main() {
           'meter_area': 'المبنى الرئيسي',
           'meter_number': 'SN-7',
           'meter_location': 'المطبخ',
-          'meter_floor': 2,
           'meter_description': null,
         },
       ];
@@ -34,29 +35,36 @@ void main() {
       expect(sheet.rows[1][1]?.value.toString(), 'عداد المسبح');
       expect(sheet.rows[1][3]?.value.toString(), 'المبنى الرئيسي');
       expect(sheet.rows[1][4]?.value.toString(), 'المطبخ');
-      expect(sheet.rows[1][6]?.value.toString(), 'SN-7');
+      expect(sheet.rows[1][5]?.value.toString(), 'SN-7');
+      expect(sheet.rows[1][6]?.value, isA<DoubleCellValue>());
       expect(sheet.rows[1][7]?.value, isA<DoubleCellValue>());
+      expect(sheet.rows[1][8]?.value.toString(), 'م³');
     },
   );
 
   test('filters map to API query params', () {
-    const f = ReadingFilters(floor: 3, technician: 'أحمد', search: 'مطبخ');
+    const f = ReadingFilters(
+      number: 'W-9',
+      userId: 'u1',
+      search: 'مطبخ',
+      types: {MeterType.water, MeterType.gas},
+    );
     final q = f.toQuery();
-    expect(q['floor'], '3');
-    expect(q['technician'], 'أحمد');
+    expect(q['number'], 'W-9');
+    expect(q['userId'], 'u1');
     expect(q['search'], 'مطبخ');
-    expect(q.containsKey('type'), isFalse);
-    expect(q['sort'], 'logged_at');
-    expect(q['dir'], 'desc');
+    expect(q['type'], 'water,gas');
+    expect(q['sort'], 'default');
+    expect(q['dir'], 'asc');
     expect(const ReadingFilters().isEmpty, isTrue);
-    expect(f.activeCount, 2);
-    expect(const ReadingFilters(floor: -1).toQuery()['floor'], '-1');
+    expect(const ReadingFilters().isDefaultSort, isTrue);
+    expect(f.hasActiveFilters, isTrue);
     expect(
       const ReadingFilters(
         sort: ReadingSort.value,
-        descending: false,
+        descending: true,
       ).toQuery()['dir'],
-      'asc',
+      'desc',
     );
   });
 }

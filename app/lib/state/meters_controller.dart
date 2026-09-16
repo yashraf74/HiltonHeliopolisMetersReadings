@@ -54,7 +54,7 @@ class MetersController extends ChangeNotifier {
     }
   }
 
-  // ---- engineer actions (online only) --------------------------------------
+  // ---- moderator actions (online only) -------------------------------------
 
   /// Returns null on success or an Arabic error message. The cache is
   /// refreshed from the server afterwards so the list reflects the change.
@@ -63,20 +63,22 @@ class MetersController extends ChangeNotifier {
     required String name,
     required String area,
     required String location,
-    required int floorNumber,
     String? number,
     String? description,
     String? photoKey,
+    int? todoOrder,
+    int? exportOrder,
   }) => _mutate(
     () => _api.createMeter(
       type: type,
       name: name,
       area: area,
       location: location,
-      floorNumber: floorNumber,
       number: number,
       description: description,
       photoKey: photoKey,
+      todoOrder: todoOrder,
+      exportOrder: exportOrder,
     ),
   );
 
@@ -86,11 +88,12 @@ class MetersController extends ChangeNotifier {
     required String name,
     required String area,
     required String location,
-    required int floorNumber,
     String? number,
     String? description,
     String? photoKey,
     bool clearPhoto = false,
+    int? todoOrder,
+    int? exportOrder,
   }) => _mutate(
     () => _api.updateMeter(
       id,
@@ -99,10 +102,11 @@ class MetersController extends ChangeNotifier {
       area: area,
       number: number ?? '',
       location: location,
-      floorNumber: floorNumber,
       description: description ?? '',
       photoKey: photoKey,
       clearPhoto: clearPhoto,
+      todoOrder: todoOrder,
+      exportOrder: exportOrder,
     ),
   );
 

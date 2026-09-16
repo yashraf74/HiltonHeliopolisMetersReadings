@@ -2,34 +2,32 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/strings.dart';
+import '../data/api/api_client.dart';
 import '../data/db/database.dart';
 import '../data/models.dart';
+import '../state/app_status_controller.dart';
 import '../state/connectivity_controller.dart';
 import '../state/meters_controller.dart';
 import '../state/session_controller.dart';
 import '../state/sync_controller.dart';
+import 'screens/dashboard_screen.dart';
 import 'screens/meters_screen.dart';
 import 'screens/new_reading_screen.dart';
 import 'screens/readings_screen.dart';
+import 'screens/settings_screen.dart';
 import 'screens/users_screen.dart';
 import 'widgets/status_widgets.dart';
 
 class _Tab {
-  const _Tab({
-    required this.label,
-    required this.icon,
-    required this.body,
-    this.enabled = true,
-  });
+  const _Tab({required this.label, required this.icon, required this.body});
 
   final String label;
   final IconData icon;
   final Widget body;
-  final bool enabled;
 }
 
-/// Role-based navigation. The dashboard entry is present for both roles but
-/// disabled, as a visible placeholder for phase 2.
+/// Role-based navigation. Moderator-only admin screens (settings, users)
+/// live in the account menu rather than the dock.
 class HomeShell extends StatefulWidget {
   const HomeShell({super.key});
 
@@ -44,11 +42,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // Warm the meter cache on entry; a failure just keeps the cached list.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<MetersController>().refresh();
-      context.read<SyncController>().sync();
-    });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshAll());
   }
 
   @override
@@ -57,14 +51,23 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
     super.dispose();
   }
 
+  void _refreshAll() {
+    final session = context.read<SessionController>();
+    context.read<MetersController>().refresh();
+    context.read<SyncController>().sync();
+    context.read<AppStatusController>().refresh(
+      context.read<ApiClient>(),
+      isModerator: session.user?.canManage ?? false,
+    );
+  }
+
   // Coming back to the foreground is the moment connectivity most often
   // changed without us hearing about it; re-check and drain the queue.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state != AppLifecycleState.resumed) return;
     context.read<ConnectivityController>().recheck();
-    context.read<SyncController>().sync();
-    context.read<MetersController>().refresh();
+    _refreshAll();
   }
 
   List<_Tab> _tabsFor(AuthUser user) => [
@@ -84,36 +87,20 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       icon: Icons.list_alt_rounded,
       body: ReadingsScreen(),
     ),
-    if (user.canManage)
-      const _Tab(
-        label: S.navUsers,
-        icon: Icons.group_outlined,
-        body: UsersScreen(),
-      ),
     if (user.canSeeDashboard)
       const _Tab(
         label: S.navDashboard,
         icon: Icons.dashboard_outlined,
-        body: SizedBox.shrink(),
-        enabled: false,
+        body: DashboardScreen(),
       ),
   ];
-
-  void _onSelect(List<_Tab> tabs, int i) {
-    if (!tabs[i].enabled) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text(S.dashboardComingSoon)));
-      return;
-    }
-    setState(() => _index = i);
-  }
 
   @override
   Widget build(BuildContext context) {
     final session = context.watch<SessionController>();
     final user = session.user!;
     final tabs = _tabsFor(user);
+    if (_index >= tabs.length) _index = 0;
     final isOnline = context.watch<ConnectivityController>().isOnline;
     final scheme = Theme.of(context).colorScheme;
 
@@ -207,7 +194,16 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           PopupMenuButton<String>(
             icon: const Icon(Icons.account_circle_outlined),
             onSelected: (v) {
-              if (v == 'logout') session.signOut();
+              switch (v) {
+                case 'settings':
+                  SettingsScreen.open(context);
+                case 'users':
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const UsersScreen()),
+                  );
+                case 'logout':
+                  session.signOut();
+              }
             },
             itemBuilder: (context) => [
               PopupMenuItem(
@@ -234,6 +230,25 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                 ),
               ),
               const PopupMenuDivider(),
+              if (user.canManage) ...[
+                const PopupMenuItem(
+                  value: 'settings',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.tune_rounded),
+                    title: Text(S.appSettings),
+                  ),
+                ),
+                const PopupMenuItem(
+                  value: 'users',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(Icons.group_outlined),
+                    title: Text(S.manageUsers),
+                  ),
+                ),
+                const PopupMenuDivider(),
+              ],
               const PopupMenuItem(
                 value: 'logout',
                 child: ListTile(
@@ -259,13 +274,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
-        onDestinationSelected: (i) => _onSelect(tabs, i),
+        onDestinationSelected: (i) => setState(() => _index = i),
         destinations: [
           for (final t in tabs)
-            NavigationDestination(
-              icon: Icon(t.icon, color: t.enabled ? null : scheme.outline),
-              label: t.enabled ? t.label : '${t.label} (${S.comingSoon})',
-            ),
+            NavigationDestination(icon: Icon(t.icon), label: t.label),
         ],
       ),
     );

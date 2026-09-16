@@ -24,9 +24,10 @@ Uint8List buildReadingsWorkbook(List<Map<String, dynamic>> readings) {
     S.colType,
     S.colMeterArea,
     S.colLocation,
-    S.colFloor,
     S.colMeterNumber,
     S.colValue,
+    S.gainLabel,
+    S.colUnit,
     S.colLoggedBy,
     S.colSyncedAt,
     S.colReadingId,
@@ -47,15 +48,18 @@ Uint8List buildReadingsWorkbook(List<Map<String, dynamic>> readings) {
   }
 
   for (final r in readings) {
+    final type = MeterType.fromApi(r['meter_type'] as String);
+    final gain = r['gain'] as num?;
     sheet.appendRow([
       TextCellValue(local(r['logged_at'] as String?)),
       TextCellValue(r['meter_name'] as String? ?? ''),
-      TextCellValue(MeterType.fromApi(r['meter_type'] as String).label),
+      TextCellValue(type.label),
       TextCellValue(r['meter_area'] as String? ?? ''),
       TextCellValue(r['meter_location'] as String? ?? ''),
-      IntCellValue(r['meter_floor'] as int? ?? 0),
       TextCellValue(r['meter_number'] as String? ?? ''),
       DoubleCellValue((r['value'] as num).toDouble()),
+      gain == null ? TextCellValue('') : DoubleCellValue(gain.toDouble()),
+      TextCellValue(type.unit),
       TextCellValue(r['logged_by_name'] as String? ?? ''),
       TextCellValue(local(r['synced_at'] as String?)),
       TextCellValue(r['id'] as String),
@@ -68,9 +72,10 @@ Uint8List buildReadingsWorkbook(List<Map<String, dynamic>> readings) {
     12.0,
     20.0,
     26.0,
-    8.0,
     16.0,
     14.0,
+    14.0,
+    10.0,
     20.0,
     18.0,
     38.0,

@@ -61,6 +61,7 @@ class _UsersScreenState extends State<UsersScreen> {
     final active = _users.where((u) => u.isActive).toList();
 
     return Scaffold(
+      appBar: AppBar(title: const Text(S.manageUsers)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _open(),
         icon: const Icon(Icons.person_add_alt_1_rounded),

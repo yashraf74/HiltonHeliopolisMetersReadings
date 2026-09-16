@@ -9,8 +9,8 @@ import '../../state/meters_controller.dart';
 import '../widgets/status_widgets.dart';
 import 'meter_form_screen.dart';
 
-/// Engineer's meter list from the local cache, filterable by type, with
-/// add / edit / retire. Reference photos show only here.
+/// Moderator's meter list from the local cache, filterable by type, with
+/// add / edit / retire. Reference photos show as thumbnails (tap to zoom).
 class MetersScreen extends StatefulWidget {
   const MetersScreen({super.key});
 
@@ -52,19 +52,9 @@ class _MetersScreenState extends State<MetersScreen> {
                 ),
                 for (final t in MeterType.values) ...[
                   const SizedBox(width: 8),
-                  ChoiceChip(
-                    label: Text(t.label),
-                    avatar: Icon(
-                      t.icon,
-                      size: 18,
-                      color: _filter == t ? Colors.white : t.color,
-                    ),
+                  TypeChip(
+                    type: t,
                     selected: _filter == t,
-                    selectedColor: t.color,
-                    labelStyle: TextStyle(
-                      color: _filter == t ? Colors.white : null,
-                      fontWeight: FontWeight.w600,
-                    ),
                     onSelected: (_) => setState(() => _filter = t),
                   ),
                 ],
@@ -117,8 +107,8 @@ class _MetersScreenState extends State<MetersScreen> {
 }
 
 /// Shared meter row: the reference photo (with the type icon in the
-/// corner) when the meter has one, otherwise the plain type badge.
-/// [doneToday] shows the daily to-do tick in the reading flow.
+/// corner, tap to zoom) when the meter has one, otherwise the plain type
+/// badge. [doneToday] shows the daily to-do tick in the reading flow.
 class MeterTile extends StatelessWidget {
   const MeterTile({super.key, required this.meter, this.onTap, this.doneToday});
 
@@ -145,6 +135,7 @@ class MeterTile extends StatelessWidget {
               PhotoThumb(
                 type: type,
                 size: 52,
+                zoomOnTap: true,
                 image: photoKey == null
                     ? null
                     : NetworkImage(
@@ -166,7 +157,7 @@ class MeterTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '${meter.area} · ${meter.location} · ${S.floorLabel} ${meter.floorNumber}'
+                      '${meter.area} · ${meter.location}'
                       '${number?.isNotEmpty == true ? ' · ${S.meterNumber} $number' : ''}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,

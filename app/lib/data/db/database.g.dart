@@ -66,17 +66,6 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
-  static const VerificationMeta _floorNumberMeta = const VerificationMeta(
-    'floorNumber',
-  );
-  @override
-  late final GeneratedColumn<int> floorNumber = GeneratedColumn<int>(
-    'floor_number',
-    aliasedName,
-    false,
-    type: DriftSqlType.int,
-    requiredDuringInsert: true,
-  );
   static const VerificationMeta _descriptionMeta = const VerificationMeta(
     'description',
   );
@@ -108,6 +97,28 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     aliasedName,
     true,
     type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _todoOrderMeta = const VerificationMeta(
+    'todoOrder',
+  );
+  @override
+  late final GeneratedColumn<int> todoOrder = GeneratedColumn<int>(
+    'todo_order',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _exportOrderMeta = const VerificationMeta(
+    'exportOrder',
+  );
+  @override
+  late final GeneratedColumn<int> exportOrder = GeneratedColumn<int>(
+    'export_order',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
@@ -144,10 +155,11 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     location,
     area,
     number,
-    floorNumber,
     description,
     photoKey,
     lastLoggedAt,
+    todoOrder,
+    exportOrder,
     isActive,
     updatedAt,
   ];
@@ -202,17 +214,6 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
         number.isAcceptableOrUnknown(data['number']!, _numberMeta),
       );
     }
-    if (data.containsKey('floor_number')) {
-      context.handle(
-        _floorNumberMeta,
-        floorNumber.isAcceptableOrUnknown(
-          data['floor_number']!,
-          _floorNumberMeta,
-        ),
-      );
-    } else if (isInserting) {
-      context.missing(_floorNumberMeta);
-    }
     if (data.containsKey('description')) {
       context.handle(
         _descriptionMeta,
@@ -234,6 +235,21 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
         lastLoggedAt.isAcceptableOrUnknown(
           data['last_logged_at']!,
           _lastLoggedAtMeta,
+        ),
+      );
+    }
+    if (data.containsKey('todo_order')) {
+      context.handle(
+        _todoOrderMeta,
+        todoOrder.isAcceptableOrUnknown(data['todo_order']!, _todoOrderMeta),
+      );
+    }
+    if (data.containsKey('export_order')) {
+      context.handle(
+        _exportOrderMeta,
+        exportOrder.isAcceptableOrUnknown(
+          data['export_order']!,
+          _exportOrderMeta,
         ),
       );
     }
@@ -284,10 +300,6 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
         DriftSqlType.string,
         data['${effectivePrefix}number'],
       ),
-      floorNumber: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}floor_number'],
-      )!,
       description: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}description'],
@@ -299,6 +311,14 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
       lastLoggedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}last_logged_at'],
+      ),
+      todoOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}todo_order'],
+      ),
+      exportOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}export_order'],
       ),
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
@@ -324,10 +344,11 @@ class Meter extends DataClass implements Insertable<Meter> {
   final String location;
   final String area;
   final String? number;
-  final int floorNumber;
   final String? description;
   final String? photoKey;
   final String? lastLoggedAt;
+  final int? todoOrder;
+  final int? exportOrder;
   final bool isActive;
   final String updatedAt;
   const Meter({
@@ -337,10 +358,11 @@ class Meter extends DataClass implements Insertable<Meter> {
     required this.location,
     required this.area,
     this.number,
-    required this.floorNumber,
     this.description,
     this.photoKey,
     this.lastLoggedAt,
+    this.todoOrder,
+    this.exportOrder,
     required this.isActive,
     required this.updatedAt,
   });
@@ -355,7 +377,6 @@ class Meter extends DataClass implements Insertable<Meter> {
     if (!nullToAbsent || number != null) {
       map['number'] = Variable<String>(number);
     }
-    map['floor_number'] = Variable<int>(floorNumber);
     if (!nullToAbsent || description != null) {
       map['description'] = Variable<String>(description);
     }
@@ -364,6 +385,12 @@ class Meter extends DataClass implements Insertable<Meter> {
     }
     if (!nullToAbsent || lastLoggedAt != null) {
       map['last_logged_at'] = Variable<String>(lastLoggedAt);
+    }
+    if (!nullToAbsent || todoOrder != null) {
+      map['todo_order'] = Variable<int>(todoOrder);
+    }
+    if (!nullToAbsent || exportOrder != null) {
+      map['export_order'] = Variable<int>(exportOrder);
     }
     map['is_active'] = Variable<bool>(isActive);
     map['updated_at'] = Variable<String>(updatedAt);
@@ -380,7 +407,6 @@ class Meter extends DataClass implements Insertable<Meter> {
       number: number == null && nullToAbsent
           ? const Value.absent()
           : Value(number),
-      floorNumber: Value(floorNumber),
       description: description == null && nullToAbsent
           ? const Value.absent()
           : Value(description),
@@ -390,6 +416,12 @@ class Meter extends DataClass implements Insertable<Meter> {
       lastLoggedAt: lastLoggedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(lastLoggedAt),
+      todoOrder: todoOrder == null && nullToAbsent
+          ? const Value.absent()
+          : Value(todoOrder),
+      exportOrder: exportOrder == null && nullToAbsent
+          ? const Value.absent()
+          : Value(exportOrder),
       isActive: Value(isActive),
       updatedAt: Value(updatedAt),
     );
@@ -407,10 +439,11 @@ class Meter extends DataClass implements Insertable<Meter> {
       location: serializer.fromJson<String>(json['location']),
       area: serializer.fromJson<String>(json['area']),
       number: serializer.fromJson<String?>(json['number']),
-      floorNumber: serializer.fromJson<int>(json['floorNumber']),
       description: serializer.fromJson<String?>(json['description']),
       photoKey: serializer.fromJson<String?>(json['photoKey']),
       lastLoggedAt: serializer.fromJson<String?>(json['lastLoggedAt']),
+      todoOrder: serializer.fromJson<int?>(json['todoOrder']),
+      exportOrder: serializer.fromJson<int?>(json['exportOrder']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
@@ -425,10 +458,11 @@ class Meter extends DataClass implements Insertable<Meter> {
       'location': serializer.toJson<String>(location),
       'area': serializer.toJson<String>(area),
       'number': serializer.toJson<String?>(number),
-      'floorNumber': serializer.toJson<int>(floorNumber),
       'description': serializer.toJson<String?>(description),
       'photoKey': serializer.toJson<String?>(photoKey),
       'lastLoggedAt': serializer.toJson<String?>(lastLoggedAt),
+      'todoOrder': serializer.toJson<int?>(todoOrder),
+      'exportOrder': serializer.toJson<int?>(exportOrder),
       'isActive': serializer.toJson<bool>(isActive),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
@@ -441,10 +475,11 @@ class Meter extends DataClass implements Insertable<Meter> {
     String? location,
     String? area,
     Value<String?> number = const Value.absent(),
-    int? floorNumber,
     Value<String?> description = const Value.absent(),
     Value<String?> photoKey = const Value.absent(),
     Value<String?> lastLoggedAt = const Value.absent(),
+    Value<int?> todoOrder = const Value.absent(),
+    Value<int?> exportOrder = const Value.absent(),
     bool? isActive,
     String? updatedAt,
   }) => Meter(
@@ -454,10 +489,11 @@ class Meter extends DataClass implements Insertable<Meter> {
     location: location ?? this.location,
     area: area ?? this.area,
     number: number.present ? number.value : this.number,
-    floorNumber: floorNumber ?? this.floorNumber,
     description: description.present ? description.value : this.description,
     photoKey: photoKey.present ? photoKey.value : this.photoKey,
     lastLoggedAt: lastLoggedAt.present ? lastLoggedAt.value : this.lastLoggedAt,
+    todoOrder: todoOrder.present ? todoOrder.value : this.todoOrder,
+    exportOrder: exportOrder.present ? exportOrder.value : this.exportOrder,
     isActive: isActive ?? this.isActive,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -469,9 +505,6 @@ class Meter extends DataClass implements Insertable<Meter> {
       location: data.location.present ? data.location.value : this.location,
       area: data.area.present ? data.area.value : this.area,
       number: data.number.present ? data.number.value : this.number,
-      floorNumber: data.floorNumber.present
-          ? data.floorNumber.value
-          : this.floorNumber,
       description: data.description.present
           ? data.description.value
           : this.description,
@@ -479,6 +512,10 @@ class Meter extends DataClass implements Insertable<Meter> {
       lastLoggedAt: data.lastLoggedAt.present
           ? data.lastLoggedAt.value
           : this.lastLoggedAt,
+      todoOrder: data.todoOrder.present ? data.todoOrder.value : this.todoOrder,
+      exportOrder: data.exportOrder.present
+          ? data.exportOrder.value
+          : this.exportOrder,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
@@ -493,10 +530,11 @@ class Meter extends DataClass implements Insertable<Meter> {
           ..write('location: $location, ')
           ..write('area: $area, ')
           ..write('number: $number, ')
-          ..write('floorNumber: $floorNumber, ')
           ..write('description: $description, ')
           ..write('photoKey: $photoKey, ')
           ..write('lastLoggedAt: $lastLoggedAt, ')
+          ..write('todoOrder: $todoOrder, ')
+          ..write('exportOrder: $exportOrder, ')
           ..write('isActive: $isActive, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
@@ -511,10 +549,11 @@ class Meter extends DataClass implements Insertable<Meter> {
     location,
     area,
     number,
-    floorNumber,
     description,
     photoKey,
     lastLoggedAt,
+    todoOrder,
+    exportOrder,
     isActive,
     updatedAt,
   );
@@ -528,10 +567,11 @@ class Meter extends DataClass implements Insertable<Meter> {
           other.location == this.location &&
           other.area == this.area &&
           other.number == this.number &&
-          other.floorNumber == this.floorNumber &&
           other.description == this.description &&
           other.photoKey == this.photoKey &&
           other.lastLoggedAt == this.lastLoggedAt &&
+          other.todoOrder == this.todoOrder &&
+          other.exportOrder == this.exportOrder &&
           other.isActive == this.isActive &&
           other.updatedAt == this.updatedAt);
 }
@@ -543,10 +583,11 @@ class MetersCompanion extends UpdateCompanion<Meter> {
   final Value<String> location;
   final Value<String> area;
   final Value<String?> number;
-  final Value<int> floorNumber;
   final Value<String?> description;
   final Value<String?> photoKey;
   final Value<String?> lastLoggedAt;
+  final Value<int?> todoOrder;
+  final Value<int?> exportOrder;
   final Value<bool> isActive;
   final Value<String> updatedAt;
   final Value<int> rowid;
@@ -557,10 +598,11 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     this.location = const Value.absent(),
     this.area = const Value.absent(),
     this.number = const Value.absent(),
-    this.floorNumber = const Value.absent(),
     this.description = const Value.absent(),
     this.photoKey = const Value.absent(),
     this.lastLoggedAt = const Value.absent(),
+    this.todoOrder = const Value.absent(),
+    this.exportOrder = const Value.absent(),
     this.isActive = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -572,17 +614,17 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     required String location,
     this.area = const Value.absent(),
     this.number = const Value.absent(),
-    required int floorNumber,
     this.description = const Value.absent(),
     this.photoKey = const Value.absent(),
     this.lastLoggedAt = const Value.absent(),
+    this.todoOrder = const Value.absent(),
+    this.exportOrder = const Value.absent(),
     this.isActive = const Value.absent(),
     required String updatedAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        type = Value(type),
        location = Value(location),
-       floorNumber = Value(floorNumber),
        updatedAt = Value(updatedAt);
   static Insertable<Meter> custom({
     Expression<String>? id,
@@ -591,10 +633,11 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     Expression<String>? location,
     Expression<String>? area,
     Expression<String>? number,
-    Expression<int>? floorNumber,
     Expression<String>? description,
     Expression<String>? photoKey,
     Expression<String>? lastLoggedAt,
+    Expression<int>? todoOrder,
+    Expression<int>? exportOrder,
     Expression<bool>? isActive,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
@@ -606,10 +649,11 @@ class MetersCompanion extends UpdateCompanion<Meter> {
       if (location != null) 'location': location,
       if (area != null) 'area': area,
       if (number != null) 'number': number,
-      if (floorNumber != null) 'floor_number': floorNumber,
       if (description != null) 'description': description,
       if (photoKey != null) 'photo_key': photoKey,
       if (lastLoggedAt != null) 'last_logged_at': lastLoggedAt,
+      if (todoOrder != null) 'todo_order': todoOrder,
+      if (exportOrder != null) 'export_order': exportOrder,
       if (isActive != null) 'is_active': isActive,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
@@ -623,10 +667,11 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     Value<String>? location,
     Value<String>? area,
     Value<String?>? number,
-    Value<int>? floorNumber,
     Value<String?>? description,
     Value<String?>? photoKey,
     Value<String?>? lastLoggedAt,
+    Value<int?>? todoOrder,
+    Value<int?>? exportOrder,
     Value<bool>? isActive,
     Value<String>? updatedAt,
     Value<int>? rowid,
@@ -638,10 +683,11 @@ class MetersCompanion extends UpdateCompanion<Meter> {
       location: location ?? this.location,
       area: area ?? this.area,
       number: number ?? this.number,
-      floorNumber: floorNumber ?? this.floorNumber,
       description: description ?? this.description,
       photoKey: photoKey ?? this.photoKey,
       lastLoggedAt: lastLoggedAt ?? this.lastLoggedAt,
+      todoOrder: todoOrder ?? this.todoOrder,
+      exportOrder: exportOrder ?? this.exportOrder,
       isActive: isActive ?? this.isActive,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
@@ -669,9 +715,6 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     if (number.present) {
       map['number'] = Variable<String>(number.value);
     }
-    if (floorNumber.present) {
-      map['floor_number'] = Variable<int>(floorNumber.value);
-    }
     if (description.present) {
       map['description'] = Variable<String>(description.value);
     }
@@ -680,6 +723,12 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     }
     if (lastLoggedAt.present) {
       map['last_logged_at'] = Variable<String>(lastLoggedAt.value);
+    }
+    if (todoOrder.present) {
+      map['todo_order'] = Variable<int>(todoOrder.value);
+    }
+    if (exportOrder.present) {
+      map['export_order'] = Variable<int>(exportOrder.value);
     }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
@@ -702,10 +751,11 @@ class MetersCompanion extends UpdateCompanion<Meter> {
           ..write('location: $location, ')
           ..write('area: $area, ')
           ..write('number: $number, ')
-          ..write('floorNumber: $floorNumber, ')
           ..write('description: $description, ')
           ..write('photoKey: $photoKey, ')
           ..write('lastLoggedAt: $lastLoggedAt, ')
+          ..write('todoOrder: $todoOrder, ')
+          ..write('exportOrder: $exportOrder, ')
           ..write('isActive: $isActive, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
@@ -1397,10 +1447,11 @@ typedef $$MetersTableCreateCompanionBuilder = MetersCompanion Function({
   required String location,
   Value<String> area,
   Value<String?> number,
-  required int floorNumber,
   Value<String?> description,
   Value<String?> photoKey,
   Value<String?> lastLoggedAt,
+  Value<int?> todoOrder,
+  Value<int?> exportOrder,
   Value<bool> isActive,
   required String updatedAt,
   Value<int> rowid,
@@ -1412,10 +1463,11 @@ typedef $$MetersTableUpdateCompanionBuilder = MetersCompanion Function({
   Value<String> location,
   Value<String> area,
   Value<String?> number,
-  Value<int> floorNumber,
   Value<String?> description,
   Value<String?> photoKey,
   Value<String?> lastLoggedAt,
+  Value<int?> todoOrder,
+  Value<int?> exportOrder,
   Value<bool> isActive,
   Value<String> updatedAt,
   Value<int> rowid,
@@ -1460,11 +1512,6 @@ class $$MetersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get floorNumber => $composableBuilder(
-    column: $table.floorNumber,
-    builder: (column) => ColumnFilters(column),
-  );
-
   ColumnFilters<String> get description => $composableBuilder(
     column: $table.description,
     builder: (column) => ColumnFilters(column),
@@ -1477,6 +1524,16 @@ class $$MetersTableFilterComposer
 
   ColumnFilters<String> get lastLoggedAt => $composableBuilder(
     column: $table.lastLoggedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get todoOrder => $composableBuilder(
+    column: $table.todoOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get exportOrder => $composableBuilder(
+    column: $table.exportOrder,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1530,11 +1587,6 @@ class $$MetersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get floorNumber => $composableBuilder(
-    column: $table.floorNumber,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get description => $composableBuilder(
     column: $table.description,
     builder: (column) => ColumnOrderings(column),
@@ -1547,6 +1599,16 @@ class $$MetersTableOrderingComposer
 
   ColumnOrderings<String> get lastLoggedAt => $composableBuilder(
     column: $table.lastLoggedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get todoOrder => $composableBuilder(
+    column: $table.todoOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get exportOrder => $composableBuilder(
+    column: $table.exportOrder,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -1588,11 +1650,6 @@ class $$MetersTableAnnotationComposer
   GeneratedColumn<String> get number =>
       $composableBuilder(column: $table.number, builder: (column) => column);
 
-  GeneratedColumn<int> get floorNumber => $composableBuilder(
-    column: $table.floorNumber,
-    builder: (column) => column,
-  );
-
   GeneratedColumn<String> get description => $composableBuilder(
     column: $table.description,
     builder: (column) => column,
@@ -1603,6 +1660,14 @@ class $$MetersTableAnnotationComposer
 
   GeneratedColumn<String> get lastLoggedAt => $composableBuilder(
     column: $table.lastLoggedAt,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get todoOrder =>
+      $composableBuilder(column: $table.todoOrder, builder: (column) => column);
+
+  GeneratedColumn<int> get exportOrder => $composableBuilder(
+    column: $table.exportOrder,
     builder: (column) => column,
   );
 
@@ -1647,10 +1712,11 @@ class $$MetersTableTableManager
                 Value<String> location = const Value.absent(),
                 Value<String> area = const Value.absent(),
                 Value<String?> number = const Value.absent(),
-                Value<int> floorNumber = const Value.absent(),
                 Value<String?> description = const Value.absent(),
                 Value<String?> photoKey = const Value.absent(),
                 Value<String?> lastLoggedAt = const Value.absent(),
+                Value<int?> todoOrder = const Value.absent(),
+                Value<int?> exportOrder = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
@@ -1661,10 +1727,11 @@ class $$MetersTableTableManager
                 location: location,
                 area: area,
                 number: number,
-                floorNumber: floorNumber,
                 description: description,
                 photoKey: photoKey,
                 lastLoggedAt: lastLoggedAt,
+                todoOrder: todoOrder,
+                exportOrder: exportOrder,
                 isActive: isActive,
                 updatedAt: updatedAt,
                 rowid: rowid,
@@ -1677,10 +1744,11 @@ class $$MetersTableTableManager
                 required String location,
                 Value<String> area = const Value.absent(),
                 Value<String?> number = const Value.absent(),
-                required int floorNumber,
                 Value<String?> description = const Value.absent(),
                 Value<String?> photoKey = const Value.absent(),
                 Value<String?> lastLoggedAt = const Value.absent(),
+                Value<int?> todoOrder = const Value.absent(),
+                Value<int?> exportOrder = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
@@ -1691,10 +1759,11 @@ class $$MetersTableTableManager
                 location: location,
                 area: area,
                 number: number,
-                floorNumber: floorNumber,
                 description: description,
                 photoKey: photoKey,
                 lastLoggedAt: lastLoggedAt,
+                todoOrder: todoOrder,
+                exportOrder: exportOrder,
                 isActive: isActive,
                 updatedAt: updatedAt,
                 rowid: rowid,

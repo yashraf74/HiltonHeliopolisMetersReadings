@@ -22,8 +22,9 @@ import 'meters_screen.dart';
 /// Daily to-do list of meters. A meter counts as "done today" when the
 /// server's newest reading for it (by anyone) or a reading still queued on
 /// this device falls on today's calendar day. Meters not yet done come
-/// first, then by type, then by name. Tapping a meter opens the photo +
-/// value step; the reading is saved locally the moment "save" is tapped.
+/// first, then by the moderator's to-do order (unset last), then by name.
+/// Tapping a meter opens the photo + value step; the reading is saved
+/// locally the moment "save" is tapped.
 class NewReadingScreen extends StatefulWidget {
   const NewReadingScreen({super.key});
 
@@ -101,6 +102,7 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
     final sync = context.read<SyncController>();
     final online = context.read<ConnectivityController>().isOnline;
     final meter = _meter!;
+    final type = MeterType.fromApi(meter.type);
 
     final id = const Uuid().v4();
     final storedPath = await PhotoStore.store(_photo!, id);
@@ -121,7 +123,7 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
     await _showSavedPopup(
       title: online ? S.readingSavedOnline : S.readingSaved,
       detail:
-          '${meter.name} · ${NumberFormat.decimalPattern('en').format(value)}',
+          '${meter.name} · ${NumberFormat.decimalPattern('en').format(value)} ${type.unit}',
     );
     _backToList();
   }
@@ -138,7 +140,9 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
       barrierDismissible: true,
       builder: (ctx) {
         timer = Timer(const Duration(seconds: 2), () {
-          if (!closed && Navigator.of(ctx).canPop()) Navigator.of(ctx).pop();
+          if (!closed && Navigator.of(ctx).canPop()) {
+            Navigator.of(ctx).pop();
+          }
         });
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
@@ -150,7 +154,11 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
               size: 44,
             ),
             title: Text(title, textAlign: TextAlign.center),
-            content: Text(detail, textAlign: TextAlign.center),
+            content: Text(
+              detail,
+              textAlign: TextAlign.center,
+              textDirection: TextDirection.rtl,
+            ),
           ),
         );
       },
@@ -192,19 +200,9 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
               ),
               for (final t in MeterType.values) ...[
                 const SizedBox(width: 8),
-                ChoiceChip(
-                  label: Text(t.label),
-                  avatar: Icon(
-                    t.icon,
-                    size: 18,
-                    color: _filter == t ? Colors.white : t.color,
-                  ),
+                TypeChip(
+                  type: t,
                   selected: _filter == t,
-                  selectedColor: t.color,
-                  labelStyle: TextStyle(
-                    color: _filter == t ? Colors.white : null,
-                    fontWeight: FontWeight.w600,
-                  ),
                   onSelected: (_) => setState(() => _filter = t),
                 ),
               ],
@@ -254,17 +252,15 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
                                 m.area.contains(q) ||
                                 (m.number ?? '').contains(q) ||
                                 m.location.contains(q) ||
-                                (m.description ?? '').contains(q) ||
-                                m.floorNumber.toString() == _toWesternDigits(q),
+                                (m.description ?? '').contains(q),
                           )
                           .toList()
                         ..sort((a, b) {
                           final d = (done(a) ? 1 : 0) - (done(b) ? 1 : 0);
                           if (d != 0) return d;
-                          final t =
-                              MeterType.fromApi(a.type).index -
-                              MeterType.fromApi(b.type).index;
-                          if (t != 0) return t;
+                          final oa = a.todoOrder ?? 1 << 30;
+                          final ob = b.todoOrder ?? 1 << 30;
+                          if (oa != ob) return oa - ob;
                           return a.name.toLowerCase().compareTo(
                             b.name.toLowerCase(),
                           );
@@ -428,6 +424,11 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
                   hintText: S.valueHint,
                   errorText: _valueError,
                   prefixIcon: Icon(type.icon, color: type.color),
+                  suffixText: type.unit,
+                  suffixStyle: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               const SizedBox(height: 12),

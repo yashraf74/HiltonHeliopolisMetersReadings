@@ -33,7 +33,7 @@ class S {
   static const navReadings = 'القراءات';
   static const navDashboard = 'لوحة التحكم';
   static const comingSoon = 'قريبًا';
-  static const dashboardComingSoon = 'لوحة التحكم قادمة في المرحلة الثانية';
+  static const dashboardComingSoon = 'لوحة التحكم قادمة قريبًا';
 
   // Connectivity / sync
   static const online = 'متصل';
@@ -53,18 +53,27 @@ class S {
   // Meters
   static const meterName = 'اسم العداد';
   static const meterNameHint = 'مثال: عداد المطبخ الرئيسي';
-  static const meterDuplicate = 'يوجد عداد بنفس الاسم والطابق والرقم والمنطقة';
+  static const meterDuplicate = 'يوجد عداد بنفس الاسم والرقم والمنطقة';
   static const meterArea = 'المنطقة';
   static const meterAreaHint = 'مثال: المبنى الرئيسي';
   static const meterNumber = 'رقم العداد';
+  static const todoOrder = 'ترتيب قائمة التسجيل';
+  static const todoOrderHint =
+      'رقم يحدد موضع العداد في قائمة التسجيل اليومية (الأصغر أولًا)';
+  static const exportOrder = 'ترتيب التصدير';
+  static const exportOrderHint =
+      'الترتيب الافتراضي لقائمة القراءات والتصدير (الأصغر أولًا)';
+  static const orderInvalid = 'أدخل رقمًا صحيحًا موجبًا';
+  static const moderatorOnlyFields = 'إعدادات الترتيب (للمشرف)';
+  static const unitKwh = 'كيلوواط·س';
+  static const unitCubicMeters = 'م³';
+  static const gainLabel = 'الزيادة عن القراءة السابقة';
   static const meterNumberHint = 'اختياري: الرقم التسلسلي';
   static const colMeterArea = 'المنطقة';
   static const colMeterNumber = 'رقم العداد';
   static const colMeterName = 'اسم العداد';
   static const meterLocation = 'الموقع';
-  static const meterFloor = 'الطابق';
   static const meterDescription = 'الوصف';
-  static const floorLabel = 'الطابق';
   static const noMeters = 'لا توجد عدادات بعد';
   static const noMetersHint = 'اضغط زر الإضافة لتسجيل أول عداد';
   static const noMetersHintTechnician = 'لم يضف المهندس أي عدادات بعد';
@@ -80,7 +89,6 @@ class S {
       'سيتم حذف العداد ولن يظهر للفنيين ولن يمكن تسجيل قراءات جديدة عليه. القراءات السابقة المسجلة عليه ستبقى محفوظة. هل تريد المتابعة؟';
   static const meterRetired = 'تم حذف العداد';
   static const fieldRequired = 'هذا الحقل مطلوب';
-  static const floorInvalid = 'أدخل رقم طابق صحيح';
   static const onlineRequired = 'هذا الإجراء يتطلب اتصالاً بالإنترنت';
   static const refreshMeters = 'تحديث العدادات';
   static const metersRefreshed = 'تم تحديث قائمة العدادات';
@@ -136,8 +144,9 @@ class S {
   static const sortDate = 'التاريخ';
   static const sortValue = 'القراءة';
   static const sortMeterName = 'اسم العداد';
-  static const sortFloor = 'الطابق';
-  static const sortTechnician = 'اسم الفني';
+  static const sortUser = 'اسم المستخدم';
+  static const sortDefault = 'الافتراضي';
+  static const sortType = 'نوع العداد';
   static const sortAsc = 'تصاعدي';
   static const sortDesc = 'تنازلي';
   static const editReading = 'تعديل القراءة';
@@ -153,11 +162,12 @@ class S {
   static const clearFilters = 'مسح التصفية';
   static const applyFilters = 'تطبيق';
   static const searchReadings =
-      'ابحث باسم العداد أو المنطقة أو الرقم أو اسم الفني';
+      'ابحث باسم العداد أو المنطقة أو الرقم أو اسم المستخدم';
   static const filterType = 'نوع العداد';
   static const filterAllTypes = 'كل الأنواع';
-  static const filterFloor = 'رقم الطابق';
-  static const filterTechnician = 'اسم الفني';
+  static const filterUser = 'اسم المستخدم';
+  static const filterAllUsers = 'كل المستخدمين';
+  static const filterNumber = 'رقم العداد';
   static const filterDateRange = 'الفترة الزمنية';
   static const filterDateFrom = 'من';
   static const filterDateTo = 'إلى';
@@ -181,12 +191,12 @@ class S {
   static const colDateTime = 'التاريخ والوقت';
   static const colType = 'نوع العداد';
   static const colLocation = 'الموقع';
-  static const colFloor = 'الطابق';
   static const colDescription = 'الوصف';
   static const colValue = 'القراءة';
   static const colLoggedBy = 'سجّلها';
   static const colSyncedAt = 'وقت المزامنة';
   static const colReadingId = 'معرف القراءة';
+  static const colUnit = 'الوحدة';
   static const sheetName = 'القراءات';
 
   // Users (engineer)
@@ -239,6 +249,50 @@ class S {
   static const removePhoto = 'إزالة الصورة';
   static const filterAll = 'الكل';
   static const noMetersForFilter = 'لا توجد عدادات من هذا النوع';
+
+  // Settings (moderator)
+  static const appSettings = 'إعدادات التطبيق';
+  static const manageUsers = 'إدارة المستخدمين';
+  static const settingMinVersion = 'الحد الأدنى لإصدار التطبيق';
+  static const settingMinVersionHint =
+      'الإصدارات الأقدم لا تستطيع تسجيل الدخول';
+  static const settingMaintenance = 'وضع الصيانة';
+  static const settingMaintenanceHint =
+      'يمنع الجميع عدا المشرفين من استخدام التطبيق';
+  static const settingDeleteEnabled = 'السماح بحذف القراءات';
+  static const settingExportEnabled = 'السماح بالتصدير إلى Excel';
+  static const settingRetention = 'مدة الاحتفاظ بالصور (أيام)';
+  static const settingRetentionHint =
+      'تُحذف صور القراءات الأقدم من هذه المدة أسبوعيًا';
+  static const settingsSaved = 'تم حفظ الإعدادات';
+  static const settingsNeedInternet = 'الإعدادات تتطلب اتصالاً بالإنترنت';
+  static const versionInvalid = 'أدخل إصدارًا بالشكل 2.0.0';
+  static const retentionInvalid = 'أدخل عددًا بين 7 و3650';
+  static const currentVersion = 'إصدار التطبيق الحالي';
+  static const updateRequiredTitle = 'يلزم تحديث التطبيق';
+  static const updateRequiredBody =
+      'هذا الإصدار لم يعد مدعومًا. يرجى تنزيل أحدث إصدار ثم تسجيل الدخول مرة أخرى.';
+  static const maintenanceTitle = 'التطبيق قيد الصيانة';
+  static const maintenanceBody =
+      'يقوم المشرف بأعمال صيانة حاليًا. يرجى المحاولة لاحقًا.';
+  static const checkAgain = 'إعادة المحاولة';
+  static const deleteDisabledByAdmin = 'حذف القراءات معطّل من قبل المشرف';
+  static const exportDisabledByAdmin = 'التصدير معطّل من قبل المشرف';
+
+  // Dashboard
+  static const dashboardTitle = 'لوحة التحكم';
+  static const rangeLastWeek = 'آخر 7 أيام';
+  static const rangeCustom = 'اختيار الفترة';
+  static const statReadings = 'قراءات مسجلة';
+  static const statMetersRead = 'عدادات تمت قراءتها';
+  static const mostReadMeter = 'الأكثر قراءةً';
+  static const leastReadMeter = 'الأقل قراءةً';
+  static const readingsSuffix = 'قراءة';
+  static const gainTrend = 'الاستهلاك اليومي حسب النوع';
+  static const gainTrendWeekly = 'الاستهلاك الأسبوعي حسب النوع';
+  static const totalConsumption = 'إجمالي الاستهلاك في الفترة';
+  static const noDataInRange = 'لا توجد بيانات في هذه الفترة';
+  static const dashboardNeedInternet = 'لوحة التحكم تتطلب اتصالاً بالإنترنت';
 
   // Generic
   static const retry = 'إعادة المحاولة';

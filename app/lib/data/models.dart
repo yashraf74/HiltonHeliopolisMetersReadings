@@ -51,6 +51,9 @@ enum MeterType {
     water => AppColors.water,
     gas => AppColors.gas,
   };
+
+  /// Unit shown beside every value of this meter type.
+  String get unit => this == electricity ? S.unitKwh : S.unitCubicMeters;
 }
 
 enum SyncStatus {
@@ -131,4 +134,66 @@ class AppUser {
     role: UserRole.fromApi(json['role'] as String),
     isActive: json['isActive'] as bool,
   );
+}
+
+/// Runtime switches from the server (GET /api/config), safe to show to any
+/// role. Moderators edit the full set on the settings screen.
+class AppConfig {
+  const AppConfig({
+    this.minAppVersion = '0.0.0',
+    this.maintenanceMode = false,
+    this.readingDeleteEnabled = true,
+    this.exportEnabled = true,
+  });
+
+  final String minAppVersion;
+  final bool maintenanceMode;
+  final bool readingDeleteEnabled;
+  final bool exportEnabled;
+
+  factory AppConfig.fromJson(Map<String, dynamic> j) => AppConfig(
+    minAppVersion: j['minAppVersion'] as String? ?? '0.0.0',
+    maintenanceMode: j['maintenanceMode'] as bool? ?? false,
+    readingDeleteEnabled: j['readingDeleteEnabled'] as bool? ?? true,
+    exportEnabled: j['exportEnabled'] as bool? ?? true,
+  );
+}
+
+class AppSettings {
+  const AppSettings({
+    required this.minAppVersion,
+    required this.maintenanceMode,
+    required this.readingDeleteEnabled,
+    required this.exportEnabled,
+    required this.photoRetentionDays,
+  });
+
+  final String minAppVersion;
+  final bool maintenanceMode;
+  final bool readingDeleteEnabled;
+  final bool exportEnabled;
+  final int photoRetentionDays;
+
+  factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
+    minAppVersion: j['minAppVersion'] as String,
+    maintenanceMode: j['maintenanceMode'] as bool,
+    readingDeleteEnabled: j['readingDeleteEnabled'] as bool,
+    exportEnabled: j['exportEnabled'] as bool,
+    photoRetentionDays: j['photoRetentionDays'] as int,
+  );
+
+  Map<String, dynamic> toJson() => {
+    'minAppVersion': minAppVersion,
+    'maintenanceMode': maintenanceMode,
+    'readingDeleteEnabled': readingDeleteEnabled,
+    'exportEnabled': exportEnabled,
+    'photoRetentionDays': photoRetentionDays,
+  };
+}
+
+class UserName {
+  const UserName({required this.id, required this.fullName});
+
+  final String id;
+  final String fullName;
 }

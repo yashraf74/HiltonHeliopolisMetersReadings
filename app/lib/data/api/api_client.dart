@@ -9,12 +9,15 @@ import '../db/database.dart';
 import '../models.dart';
 
 class ApiException implements Exception {
-  ApiException(this.statusCode, this.message);
+  ApiException(this.statusCode, this.message, {this.code});
 
   final int statusCode;
   final String message;
+  final String? code;
 
   bool get isUnauthorized => statusCode == 401;
+  bool get isUpgradeRequired => statusCode == 426;
+  bool get isMaintenance => statusCode == 503 && code == 'maintenance';
 
   @override
   String toString() => 'ApiException($statusCode): $message';
@@ -42,20 +45,26 @@ class LoginResult {
   final AuthUser user;
 }
 
-/// Thin typed wrapper over the Worker's REST API. Holds no state except a
-/// callback that supplies the current bearer token.
+/// Thin typed wrapper over the Worker's REST API. Holds no state except
+/// callbacks supplying the bearer token and reporting connectivity / gate
+/// events (upgrade required, maintenance).
 class ApiClient {
   ApiClient({
     required String Function() tokenProvider,
+    required String appVersion,
     http.Client? httpClient,
-    String baseUrl = AppConfig.apiBaseUrl,
+    String baseUrl = BuildConfig.apiBaseUrl,
     void Function(bool reachable)? onReachability,
+    void Function(ApiException e)? onGate,
   }) : _tokenProvider = tokenProvider,
+       _appVersion = appVersion,
        _http = httpClient ?? http.Client(),
        _baseUrl = baseUrl,
-       _onReachability = onReachability;
+       _onReachability = onReachability,
+       _onGate = onGate;
 
   final String Function() _tokenProvider;
+  final String _appVersion;
   final http.Client _http;
   final String _baseUrl;
 
@@ -63,10 +72,14 @@ class ApiClient {
   /// false when the server could not be reached at all.
   final void Function(bool reachable)? _onReachability;
 
+  /// Called on 426 (upgrade required) and 503 maintenance responses.
+  final void Function(ApiException e)? _onGate;
+
   Uri _uri(String path, [Map<String, String>? query]) =>
       Uri.parse('$_baseUrl/api$path').replace(queryParameters: query);
 
   Map<String, String> _headers({bool auth = true, String? contentType}) => {
+    'X-App-Version': _appVersion,
     'Content-Type': ?contentType,
     if (auth) 'Authorization': 'Bearer ${_tokenProvider()}',
   };
@@ -74,7 +87,7 @@ class ApiClient {
   Future<Map<String, dynamic>> _json(Future<http.Response> request) async {
     final http.Response response;
     try {
-      response = await request.timeout(AppConfig.requestTimeout);
+      response = await request.timeout(BuildConfig.requestTimeout);
     } on SocketException {
       _onReachability?.call(false);
       throw NetworkException();
@@ -102,13 +115,16 @@ class ApiClient {
       }
     }
     if (response.statusCode >= 200 && response.statusCode < 300) return body;
-    throw ApiException(
+    final error = ApiException(
       response.statusCode,
       body['error'] as String? ?? S.serverError,
+      code: body['code'] as String?,
     );
+    if (error.isUpgradeRequired || error.isMaintenance) _onGate?.call(error);
+    throw error;
   }
 
-  // ---- auth ---------------------------------------------------------------
+  // ---- auth & config ------------------------------------------------------
 
   Future<LoginResult> login(String username, String password) async {
     final body = await _json(
@@ -122,6 +138,29 @@ class ApiClient {
       token: body['token'] as String,
       user: AuthUser.fromJson(body['user'] as Map<String, dynamic>),
     );
+  }
+
+  Future<AppConfig> fetchConfig() async {
+    final body = await _json(
+      _http.get(_uri('/config'), headers: _headers(auth: false)),
+    );
+    return AppConfig.fromJson(body);
+  }
+
+  Future<AppSettings> fetchSettings() async {
+    final body = await _json(_http.get(_uri('/settings'), headers: _headers()));
+    return AppSettings.fromJson(body);
+  }
+
+  Future<AppSettings> saveSettings(AppSettings settings) async {
+    final body = await _json(
+      _http.put(
+        _uri('/settings'),
+        headers: _headers(contentType: 'application/json'),
+        body: jsonEncode(settings.toJson()),
+      ),
+    );
+    return AppSettings.fromJson(body);
   }
 
   // ---- meters -------------------------------------------------------------
@@ -142,10 +181,11 @@ class ApiClient {
     required String name,
     required String area,
     required String location,
-    required int floorNumber,
     String? number,
     String? description,
     String? photoKey,
+    int? todoOrder,
+    int? exportOrder,
   }) async {
     final body = await _json(
       _http.post(
@@ -157,9 +197,10 @@ class ApiClient {
           'area': area,
           'number': number ?? '',
           'location': location,
-          'floorNumber': floorNumber,
           'description': description,
           'photoKey': ?photoKey,
+          'todoOrder': todoOrder,
+          'exportOrder': exportOrder,
         }),
       ),
     );
@@ -167,7 +208,8 @@ class ApiClient {
   }
 
   /// [photoKey]: pass a key to set, `null` with [clearPhoto] to remove,
-  /// omit both to leave the photo unchanged.
+  /// omit both to leave the photo unchanged. Order numbers are always sent
+  /// (null clears).
   Future<void> updateMeter(
     String id, {
     MeterType? type,
@@ -175,10 +217,11 @@ class ApiClient {
     String? area,
     String? number,
     String? location,
-    int? floorNumber,
     String? description,
     String? photoKey,
     bool clearPhoto = false,
+    int? todoOrder,
+    int? exportOrder,
   }) async {
     await _json(
       _http.put(
@@ -190,9 +233,10 @@ class ApiClient {
           'area': ?area,
           'number': ?number,
           'location': ?location,
-          'floorNumber': ?floorNumber,
           'description': ?description,
           if (photoKey != null || clearPhoto) 'photoKey': photoKey,
+          'todoOrder': todoOrder,
+          'exportOrder': exportOrder,
         }),
       ),
     );
@@ -204,7 +248,7 @@ class ApiClient {
 
   // ---- photos & readings --------------------------------------------------
 
-  /// [forMeter] stores under meters/ (engineer-only reference photos).
+  /// [forMeter] stores under meters/ (moderator-only reference photos).
   Future<String> uploadPhoto(
     List<int> bytes, {
     String contentType = 'image/jpeg',
@@ -248,30 +292,22 @@ class ApiClient {
     return body['syncedAt'] as String;
   }
 
-  Future<void> updateReadingValue(String id, double value) async {
-    await _json(
-      _http.put(
-        _uri('/readings/$id'),
-        headers: _headers(contentType: 'application/json'),
-        body: jsonEncode({'value': value}),
-      ),
-    );
-  }
-
-  Future<void> deleteReading(String id) async {
-    await _json(_http.delete(_uri('/readings/$id'), headers: _headers()));
-  }
-
   static const readingsPageSize = 50;
 
   Future<ReadingsPage> fetchReadings(
     Map<String, String> filters, {
     String? cursor,
     int limit = readingsPageSize,
+    bool forExport = false,
   }) async {
     final body = await _json(
       _http.get(
-        _uri('/readings', {...filters, 'limit': '$limit', 'cursor': ?cursor}),
+        _uri('/readings', {
+          ...filters,
+          'limit': '$limit',
+          'cursor': ?cursor,
+          if (forExport) 'export': '1',
+        }),
         headers: _headers(),
       ),
     );
@@ -289,14 +325,47 @@ class ApiClient {
     final all = <Map<String, dynamic>>[];
     String? cursor;
     do {
-      final page = await fetchReadings(filters, cursor: cursor, limit: 200);
+      final page = await fetchReadings(
+        filters,
+        cursor: cursor,
+        limit: 200,
+        forExport: true,
+      );
       all.addAll(page.rows);
       cursor = page.nextCursor;
     } while (cursor != null && all.length < maxRows);
     return all;
   }
 
-  // ---- users (engineer) ---------------------------------------------------
+  Future<void> updateReadingValue(String id, double value) async {
+    await _json(
+      _http.put(
+        _uri('/readings/$id'),
+        headers: _headers(contentType: 'application/json'),
+        body: jsonEncode({'value': value}),
+      ),
+    );
+  }
+
+  Future<void> deleteReading(String id) async {
+    await _json(_http.delete(_uri('/readings/$id'), headers: _headers()));
+  }
+
+  // ---- users --------------------------------------------------------------
+
+  Future<List<UserName>> fetchUserNames() async {
+    final body = await _json(
+      _http.get(_uri('/users/names'), headers: _headers()),
+    );
+    return (body['users'] as List<dynamic>)
+        .map(
+          (u) => UserName(
+            id: u['id'] as String,
+            fullName: u['fullName'] as String,
+          ),
+        )
+        .toList();
+  }
 
   Future<List<AppUser>> fetchUsers() async {
     final body = await _json(_http.get(_uri('/users'), headers: _headers()));
@@ -347,6 +416,25 @@ class ApiClient {
     );
   }
 
+  // ---- dashboard ----------------------------------------------------------
+
+  Future<Map<String, dynamic>> fetchDashboard(
+    DateTime from,
+    DateTime to,
+  ) async {
+    final tz = DateTime.now().timeZoneOffset.inMinutes;
+    return _json(
+      _http.get(
+        _uri('/dashboard', {
+          'from': from.toUtc().toIso8601String(),
+          'to': to.toUtc().toIso8601String(),
+          'tz': '$tz',
+        }),
+        headers: _headers(),
+      ),
+    );
+  }
+
   Meter _meterFromJson(Map<String, dynamic> j) => Meter(
     id: j['id'] as String,
     name: j['name'] as String? ?? j['location'] as String,
@@ -354,10 +442,11 @@ class ApiClient {
     location: j['location'] as String,
     area: j['area'] as String? ?? '',
     number: j['number'] as String?,
-    lastLoggedAt: j['last_logged_at'] as String?,
-    floorNumber: j['floor_number'] as int,
     description: j['description'] as String?,
     photoKey: j['photo_key'] as String?,
+    lastLoggedAt: j['last_logged_at'] as String?,
+    todoOrder: j['todo_order'] as int?,
+    exportOrder: j['export_order'] as int?,
     isActive: (j['is_active'] as int) == 1,
     updatedAt: j['updated_at'] as String,
   );
