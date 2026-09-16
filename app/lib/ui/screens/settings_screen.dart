@@ -26,6 +26,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _minVersion = TextEditingController();
   final _retention = TextEditingController();
+  final _prices = {
+    for (final t in MeterType.values) t: TextEditingController(),
+  };
   bool _maintenance = false;
   bool _deleteEnabled = true;
   bool _exportEnabled = true;
@@ -45,6 +48,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _minVersion.dispose();
     _retention.dispose();
+    for (final c in _prices.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
@@ -54,6 +60,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _maintenance = s.maintenanceMode;
     _deleteEnabled = s.readingDeleteEnabled;
     _exportEnabled = s.exportEnabled;
+    for (final t in MeterType.values) {
+      final p = s.prices[t] ?? 0;
+      _prices[t]!.text = p == p.roundToDouble() ? '${p.toInt()}' : '$p';
+    }
   }
 
   Future<void> _load() async {
@@ -92,6 +102,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           readingDeleteEnabled: _deleteEnabled,
           exportEnabled: _exportEnabled,
           photoRetentionDays: int.parse(_retention.text.trim()),
+          prices: {
+            for (final t in MeterType.values)
+              t: double.parse(_prices[t]!.text.trim()),
+          },
         ),
       );
       if (!mounted) return;
@@ -208,7 +222,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           : null;
                     },
                   ),
-                  const SizedBox(height: 28),
+                  const Divider(height: 40),
+                  const Text(
+                    S.settingPrices,
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    S.settingPricesHint,
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 12.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  for (final t in MeterType.values) ...[
+                    TextFormField(
+                      controller: _prices[t],
+                      textDirection: TextDirection.ltr,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                      ],
+                      contextMenuBuilder: appContextMenuBuilder,
+                      decoration: InputDecoration(
+                        labelText: '${t.label} (${S.currency} / ${t.unit})',
+                        prefixIcon: Icon(t.icon, color: t.color),
+                      ),
+                      validator: (v) {
+                        final n = double.tryParse((v ?? '').trim());
+                        return n == null || n < 0 || n > 100000
+                            ? S.priceInvalid
+                            : null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                  ],
+                  const SizedBox(height: 16),
                   FilledButton(
                     onPressed: _saving ? null : _save,
                     child: _saving

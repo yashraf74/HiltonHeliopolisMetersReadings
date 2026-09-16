@@ -261,6 +261,10 @@ class S {
   static const settingsNeedInternet = 'الإعدادات تتطلب اتصالاً بالإنترنت';
   static const versionInvalid = 'أدخل إصدارًا بالشكل 2.0.0';
   static const retentionInvalid = 'أدخل عددًا بين 7 و3650';
+  static const settingPrices = 'أسعار الاستهلاك';
+  static const settingPricesHint =
+      'بالجنيه لكل وحدة، تُستخدم لحساب التكلفة في لوحة التحكم. اتركها 0 لإخفاء التكلفة.';
+  static const priceInvalid = 'أدخل رقمًا موجبًا';
   static const currentVersion = 'إصدار التطبيق الحالي';
   static const updateRequiredTitle = 'يلزم تحديث التطبيق';
   static const updateRequiredBody =
@@ -281,9 +285,34 @@ class S {
   static const mostReadMeter = 'الأكثر قراءةً';
   static const leastReadMeter = 'الأقل قراءةً';
   static const readingsSuffix = 'قراءة';
-  static const gainTrend = 'الاستهلاك اليومي حسب النوع';
-  static const gainTrendWeekly = 'الاستهلاك الأسبوعي حسب النوع';
-  static const totalConsumption = 'إجمالي الاستهلاك في الفترة';
+  static const consumption = 'الاستهلاك';
+  static const perDay = 'يوميًا';
+  static const perWeek = 'أسبوعيًا';
+  static const completion = 'نسبة إنجاز القراءات';
+  static const completionHint = 'العدادات التي قُرئت من إجمالي العدادات';
+  static const changeVsAverage = 'مقارنة بمتوسط الفترة';
+  static const changeVsAverageHint =
+      'كل نوع مقارنةً بمتوسطه، فتظهر الأنواع الثلاثة على مقياس واحد';
+  static const cost = 'التكلفة';
+  static const currency = 'ج.م';
+  static const costNoPrices = 'حدد أسعار الوحدات من الإعدادات لعرض التكلفة';
+  static const costNoPricesEngineer = 'لم يحدد المشرف أسعار الوحدات بعد';
+  static const topConsumers = 'الأعلى استهلاكًا';
+  static const byMeter = 'العدادات';
+  static const byArea = 'المناطق';
+  static const unusualReadings = 'قراءات غير معتادة';
+  static const unusualNegative = 'أقل من القراءة السابقة';
+  static const unusualHigh = 'أعلى من المعتاد';
+  static const timesUsual = 'ضعف المعتاد';
+  static const noUnusual = 'لا توجد قراءات غير معتادة';
+  static const overdueMeters = 'عدادات متأخرة';
+  static const overdueHint = 'لم تُقرأ أمس ولا اليوم';
+  static const neverRead = 'لم يُقرأ أبدًا';
+  static const lastReadDaysAgo = 'آخر قراءة منذ';
+  static const days = 'يوم';
+  static const noOverdue = 'كل العدادات مقروءة';
+  static const showAll = 'عرض الكل';
+  static const showLess = 'عرض أقل';
   static const noDataInRange = 'لا توجد بيانات في هذه الفترة';
   static const dashboardNeedInternet = 'لوحة التحكم تتطلب اتصالاً بالإنترنت';
 

@@ -166,6 +166,7 @@ class AppSettings {
     required this.readingDeleteEnabled,
     required this.exportEnabled,
     required this.photoRetentionDays,
+    required this.prices,
   });
 
   final String minAppVersion;
@@ -174,13 +175,21 @@ class AppSettings {
   final bool exportEnabled;
   final int photoRetentionDays;
 
+  /// EGP per unit for the dashboard cost chart; 0 = not set.
+  final Map<MeterType, double> prices;
+
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
     minAppVersion: j['minAppVersion'] as String,
     maintenanceMode: j['maintenanceMode'] as bool,
     readingDeleteEnabled: j['readingDeleteEnabled'] as bool,
     exportEnabled: j['exportEnabled'] as bool,
     photoRetentionDays: j['photoRetentionDays'] as int,
+    prices: pricesFromJson(j['prices'] as Map<String, dynamic>?),
   );
+
+  static Map<MeterType, double> pricesFromJson(Map<String, dynamic>? j) => {
+    for (final t in MeterType.values) t: (j?[t.name] as num?)?.toDouble() ?? 0,
+  };
 
   Map<String, dynamic> toJson() => {
     'minAppVersion': minAppVersion,
@@ -188,6 +197,7 @@ class AppSettings {
     'readingDeleteEnabled': readingDeleteEnabled,
     'exportEnabled': exportEnabled,
     'photoRetentionDays': photoRetentionDays,
+    'prices': {for (final e in prices.entries) e.key.name: e.value},
   };
 }
 
