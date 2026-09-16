@@ -30,7 +30,17 @@ function publicUser(u: UserRow) {
 
 export const userRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
-userRoutes.use("*", requireAuth, requireRole("moderator"));
+userRoutes.use("*", requireAuth);
+
+// Names only, for the readings "by user" filter (engineers too).
+userRoutes.get("/names", requireRole("moderator", "engineer"), async (c) => {
+  const { results } = await c.env.DB.prepare(
+    "SELECT id, full_name FROM users WHERE is_active = 1 ORDER BY full_name"
+  ).all<{ id: string; full_name: string }>();
+  return c.json({ users: results.map((u) => ({ id: u.id, fullName: u.full_name })) });
+});
+
+userRoutes.use("*", requireRole("moderator"));
 
 userRoutes.get("/", async (c) => {
   const { results } = await c.env.DB.prepare(

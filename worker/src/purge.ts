@@ -1,15 +1,17 @@
 import type { Env } from "./types";
+import { loadSettings } from "./settings";
 
-export const PHOTO_RETENTION_DAYS = 90;
 const BATCH = 500;
 
 /**
- * Deletes reading photos older than the retention period from R2 and nulls
+ * Deletes reading photos older than the retention period (a moderator
+ * setting, default 90 days) from R2 and nulls
  * their `photo_key`, so the app shows an "expired" placeholder instead.
  * Meter reference photos are never purged. Runs from the cron trigger.
  */
 export async function purgeExpiredPhotos(env: Env): Promise<{ purged: number }> {
-  const cutoff = new Date(Date.now() - PHOTO_RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const { photoRetentionDays } = await loadSettings(env);
+  const cutoff = new Date(Date.now() - photoRetentionDays * 24 * 60 * 60 * 1000).toISOString();
   let purged = 0;
 
   for (;;) {

@@ -14,3 +14,7 @@ bucket_name = "hilton-heliopolis-meter-photos"
 # Friday 10:00 UTC = 12:00/13:00 Cairo: purge reading photos older than 90 days.
 [triggers]
 crons = ["0 10 * * 5"]
+
+[[kv_namespaces]]
+binding = "SETTINGS"
+id = "2e5c7756eb6a4d27af36d35a1b464556"
