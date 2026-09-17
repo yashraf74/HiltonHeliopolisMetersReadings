@@ -35,6 +35,12 @@ jobs:
           distribution: temurin
           java-version: "21"
 
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.47.4"
+          cache: true
+
       - uses: shorebirdtech/setup-shorebird@v1
         with:
           cache: true
@@ -44,9 +50,11 @@ jobs:
           keystore-base64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           keystore-password: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
 
-      - run: shorebird flutter pub get
-      - run: shorebird flutter analyze
-      - run: shorebird flutter test
+      # `shorebird flutter` doesn't proxy these; the build itself runs
+      # through Shorebird's own Flutter 3.47.4 below.
+      - run: flutter pub get
+      - run: flutter analyze
+      - run: flutter test
       - run: shorebird release android --artifact apk --flutter-version=3.47.4
 
       - uses: ./.github/actions/verify-apk-signature
