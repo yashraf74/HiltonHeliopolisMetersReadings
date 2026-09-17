@@ -1,8 +1,9 @@
 name: Versioned release
 
-# Push a tag like v2.0.0 to build the APK on GitHub and publish it as a
-# full (non-prerelease) release named after the tag. The rolling "latest"
-# release keeps being updated by android-apk.yml on every push to main.
+# Push a tag like v2.1.1 (matching the version in app/pubspec.yaml) to build
+# a Shorebird release APK, signed with the permanent key, and publish it as a
+# GitHub release. Later Dart-only fixes for that version ship with patch.yml
+# instead of a new APK.
 on:
   push:
     tags: ["v*"]
@@ -13,27 +14,44 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
+    env:
+      SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
     defaults:
       run:
         working-directory: app
     steps:
       - uses: actions/checkout@v4
 
+      - name: Tag matches pubspec version
+        run: |
+          VERSION="$(sed -n 's/^version: \([^+]*\).*/\1/p' pubspec.yaml)"
+          if [ "v$VERSION" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match pubspec version $VERSION"
+            exit 1
+          fi
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "21"
 
-      - uses: subosito/flutter-action@v2
+      - uses: shorebirdtech/setup-shorebird@v1
         with:
-          channel: stable
-          flutter-version: "3.47.4"
           cache: true
 
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test
-      - run: flutter build apk --release --build-number=${{ github.run_number }}
+      - uses: ./.github/actions/android-signing
+        with:
+          keystore-base64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          keystore-password: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+
+      - run: shorebird flutter pub get
+      - run: shorebird flutter analyze
+      - run: shorebird flutter test
+      - run: shorebird release android --artifact apk --flutter-version=3.47.4
+
+      - uses: ./.github/actions/verify-apk-signature
+        with:
+          apk: app/build/app/outputs/flutter-apk/app-release.apk
 
       - name: Rename APK
         run: cp build/app/outputs/flutter-apk/app-release.apk "hilton-meters-${GITHUB_REF_NAME}.apk"

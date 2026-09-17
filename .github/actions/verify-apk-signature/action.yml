@@ -1,0 +1,22 @@
+name: Verify APK signature
+description: Fails unless the APK is signed with the permanent release key.
+inputs:
+  apk:
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        APK: ${{ inputs.apk }}
+        # SHA-256 of the release certificate in ~/.hilton-meters-signing/release.jks
+        EXPECTED: 5d3186cc43cdf8b00b7b89c56ec2dd3cef6677c840fdf3cc11e5067c04f337d5
+      run: |
+        set -e
+        APKSIGNER="$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner"
+        ACTUAL="$("$APKSIGNER" verify --print-certs "$APK" | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)"
+        if [ "$ACTUAL" != "$EXPECTED" ]; then
+          echo "::error::APK is signed with $ACTUAL, expected the release key $EXPECTED"
+          exit 1
+        fi
+        echo "Signed with the release key"

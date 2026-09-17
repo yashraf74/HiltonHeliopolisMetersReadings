@@ -1,0 +1,50 @@
+name: Shorebird patch
+
+# Ships Dart-only changes over the air to installs of the release whose
+# version is in app/pubspec.yaml (so don't bump the version for a patch).
+# Run from the Actions tab or: gh workflow run patch.yml
+# Native changes (plugins, permissions, Android/iOS config) need a new
+# release tag instead; Shorebird refuses those diffs here.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: shorebird-patch
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    env:
+      SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: shorebirdtech/setup-shorebird@v1
+        with:
+          cache: true
+
+      - uses: ./.github/actions/android-signing
+        with:
+          keystore-base64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          keystore-password: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+
+      - run: shorebird flutter pub get
+      - run: shorebird flutter analyze
+      - run: shorebird flutter test
+
+      - name: Patch the release in pubspec.yaml
+        run: |
+          RELEASE="$(sed -n 's/^version: //p' pubspec.yaml | tr -d '[:space:]')"
+          echo "Patching release $RELEASE"
+          shorebird patch android --release-version="$RELEASE"

@@ -1,0 +1,26 @@
+name: Android release signing
+description: >
+  Writes the permanent release keystore from repository secrets and points
+  app/android/key.properties at it. Fails when the secrets are missing so an
+  APK is never published with a throwaway debug key.
+inputs:
+  keystore-base64:
+    required: true
+  keystore-password:
+    required: true
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        KEYSTORE_BASE64: ${{ inputs.keystore-base64 }}
+        KEYSTORE_PASSWORD: ${{ inputs.keystore-password }}
+      run: |
+        set -e
+        if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+          echo "::error::ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD secrets are missing"
+          exit 1
+        fi
+        echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+        printf 'storePassword=%s\nkeyPassword=%s\nkeyAlias=hilton-meters\nstoreFile=%s\n' \
+          "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" "$RUNNER_TEMP/release.jks" > app/android/key.properties

@@ -51,8 +51,9 @@ class ReadingFilters {
   final String search;
   final ReadingSort sort;
 
-  /// The default sort is ascending by export order; the others default to
-  /// newest / highest first.
+  /// The default sort is newest day first, then export order: this flag
+  /// flips only the export order (ascending unless chosen otherwise). The
+  /// others default to newest / highest first.
   final bool descending;
 
   bool get isEmpty => !hasActiveFilters && search.isEmpty;
@@ -250,6 +251,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     final result = await showModalBottomSheet<ReadingFilters>(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
       builder: (_) => _FilterSheet(
         initial: _filters,
@@ -267,6 +269,10 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
   Future<void> _openSort(bool showUser) async {
     final result = await showModalBottomSheet<ReadingFilters>(
       context: context,
+      // Without this the sheet is capped at 9/16 of the screen, which cut
+      // off the apply button on shorter screens or with larger system text.
+      isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
       builder: (_) => _SortSheet(initial: _filters, showUser: showUser),
     );
@@ -979,8 +985,13 @@ class _SortSheetState extends State<_SortSheet> {
     final options = ReadingSort.values.where(
       (s) => widget.showUser || s != ReadingSort.user,
     );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        24 + MediaQuery.viewPaddingOf(context).bottom,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -995,8 +1006,8 @@ class _SortSheetState extends State<_SortSheet> {
             groupValue: _sort,
             onChanged: (v) => setState(() {
               _sort = v!;
-              // Sensible direction per field: default = ascending order
-              // numbers; everything else newest / highest first.
+              // Sensible direction per field: default = ascending export
+              // order within each day; everything else newest / highest first.
               _desc = _sort != ReadingSort.byDefault;
             }),
             child: Column(
@@ -1100,7 +1111,9 @@ class _FilterSheetState extends State<_FilterSheet> {
         20,
         0,
         20,
-        20 + MediaQuery.viewInsetsOf(context).bottom,
+        20 +
+            MediaQuery.viewInsetsOf(context).bottom +
+            MediaQuery.viewPaddingOf(context).bottom,
       ),
       child: SingleChildScrollView(
         child: Column(

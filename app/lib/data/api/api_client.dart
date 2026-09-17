@@ -296,6 +296,8 @@ class ApiClient {
       _http.get(
         _uri('/readings', {
           ...filters,
+          // Local offset so the default sort groups readings by local day.
+          'tz': '${DateTime.now().timeZoneOffset.inMinutes}',
           'limit': '$limit',
           'cursor': ?cursor,
           if (forExport) 'export': '1',

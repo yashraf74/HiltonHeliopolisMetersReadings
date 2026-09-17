@@ -99,7 +99,14 @@ class AppDatabase extends _$AppDatabase {
   /// deleted, because queued readings may still reference them.
   Future<void> replaceMeters(List<Meter> fromServer) async {
     await transaction(() async {
-      await batch((b) => b.insertAllOnConflictUpdate(meters, fromServer));
+      // Companions with nullToAbsent: false, so a field the server cleared
+      // (photo, number, order) is written as NULL instead of being skipped
+      // by the upsert.
+      await batch(
+        (b) => b.insertAllOnConflictUpdate(meters, [
+          for (final m in fromServer) m.toCompanion(false),
+        ]),
+      );
       final ids = fromServer.map((m) => m.id).toList();
       if (ids.isEmpty) {
         await update(meters)
