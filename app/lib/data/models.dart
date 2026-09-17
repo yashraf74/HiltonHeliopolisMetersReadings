@@ -167,6 +167,7 @@ class AppSettings {
     required this.exportEnabled,
     required this.photoRetentionDays,
     required this.prices,
+    this.latestAppVersion,
   });
 
   final String minAppVersion;
@@ -178,6 +179,9 @@ class AppSettings {
   /// EGP per unit for the dashboard cost chart; 0 = not set.
   final Map<MeterType, double> prices;
 
+  /// Newest published release, from the server (read-only; null if unknown).
+  final String? latestAppVersion;
+
   factory AppSettings.fromJson(Map<String, dynamic> j) => AppSettings(
     minAppVersion: j['minAppVersion'] as String,
     maintenanceMode: j['maintenanceMode'] as bool,
@@ -185,6 +189,7 @@ class AppSettings {
     exportEnabled: j['exportEnabled'] as bool,
     photoRetentionDays: j['photoRetentionDays'] as int,
     prices: pricesFromJson(j['prices'] as Map<String, dynamic>?),
+    latestAppVersion: j['latestAppVersion'] as String?,
   );
 
   static Map<MeterType, double> pricesFromJson(Map<String, dynamic>? j) => {

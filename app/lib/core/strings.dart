@@ -266,6 +266,8 @@ class S {
       'بالجنيه لكل وحدة، تُستخدم لحساب التكلفة في لوحة التحكم. اتركها 0 لإخفاء التكلفة.';
   static const priceInvalid = 'أدخل رقمًا موجبًا';
   static const currentVersion = 'إصدار التطبيق الحالي';
+  static const latestVersion = 'أحدث إصدار';
+  static const thisDeviceVersion = 'هذا الجهاز';
   static const updateRequiredTitle = 'يلزم تحديث التطبيق';
   static const updateRequiredBody =
       'هذا الإصدار لم يعد مدعومًا. يرجى تنزيل أحدث إصدار ثم تسجيل الدخول مرة أخرى.';

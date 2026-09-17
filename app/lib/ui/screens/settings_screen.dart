@@ -32,6 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _maintenance = false;
   bool _deleteEnabled = true;
   bool _exportEnabled = true;
+  String? _latestVersion;
   bool _loading = true;
   bool _saving = false;
   String? _error;
@@ -60,6 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _maintenance = s.maintenanceMode;
     _deleteEnabled = s.readingDeleteEnabled;
     _exportEnabled = s.exportEnabled;
+    _latestVersion = s.latestAppVersion ?? _latestVersion;
     for (final t in MeterType.values) {
       final p = s.prices[t] ?? 0;
       _prices[t]!.text = p == p.roundToDouble() ? '${p.toInt()}' : '$p';
@@ -198,8 +200,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     contextMenuBuilder: appContextMenuBuilder,
                     decoration: InputDecoration(
                       labelText: S.settingMinVersion,
-                      helperText:
-                          '${S.settingMinVersionHint} · ${S.currentVersion}: $version',
+                      helperText: [
+                        S.settingMinVersionHint,
+                        if (_latestVersion != null)
+                          '${S.latestVersion}: $_latestVersion',
+                        '${S.thisDeviceVersion}: $version',
+                      ].join(' · '),
+                      helperMaxLines: 2,
                     ),
                     validator: (v) => _versionRe.hasMatch((v ?? '').trim())
                         ? null

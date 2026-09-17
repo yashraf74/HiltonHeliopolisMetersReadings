@@ -17,7 +17,41 @@ settingsRoutes.get("/config", (c) => {
   });
 });
 
-settingsRoutes.get("/settings", requireAuth, requireRole("moderator"), (c) => c.json(c.get("settings")));
+const LATEST_RELEASE_URL = "https://api.github.com/repos/yashraf74/HiltonHeliopolisMetersReadings/releases/latest";
+const LATEST_CACHE_SECONDS = 600;
+
+/**
+ * Version of the newest published GitHub release ("v2.2.0" → "2.2.0"), or
+ * null when GitHub can't be reached. Cached at the edge for 10 minutes to
+ * stay well inside GitHub's unauthenticated rate limit.
+ */
+async function latestAppVersion(): Promise<string | null> {
+  const cache = caches.default;
+  const key = new Request(LATEST_RELEASE_URL);
+  let res = await cache.match(key);
+  if (!res) {
+    try {
+      const gh = await fetch(LATEST_RELEASE_URL, {
+        headers: { "User-Agent": "hilton-heliopolis-meters-api", Accept: "application/vnd.github+json" },
+      });
+      if (!gh.ok) return null;
+      const tag = ((await gh.json()) as { tag_name?: string }).tag_name ?? "";
+      res = new Response(JSON.stringify({ tag }), {
+        headers: { "Content-Type": "application/json", "Cache-Control": `max-age=${LATEST_CACHE_SECONDS}` },
+      });
+      await cache.put(key, res.clone());
+    } catch {
+      return null;
+    }
+  }
+  const { tag } = (await res.json()) as { tag: string };
+  const version = tag.replace(/^v/, "");
+  return /^\d+(\.\d+){0,2}$/.test(version) ? version : null;
+}
+
+settingsRoutes.get("/settings", requireAuth, requireRole("moderator"), async (c) =>
+  c.json({ ...c.get("settings"), latestAppVersion: await latestAppVersion() })
+);
 
 settingsRoutes.put("/settings", requireAuth, requireRole("moderator"), async (c) => {
   const body = await c.req.json().catch(() => null);
