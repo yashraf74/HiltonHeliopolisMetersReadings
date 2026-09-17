@@ -230,6 +230,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           : Icons.build_rounded,
                       size: 18,
                     ),
+                    // The avatar icon already marks the role; no tick over it.
+                    showCheckmark: false,
                     selected: _role == r,
                     onSelected: _busy || _isSelf
                         ? null
