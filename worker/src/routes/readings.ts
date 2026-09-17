@@ -59,7 +59,8 @@ const MAX_PAGE_SIZE = 200;
 // A sort is a list of keys; the cursor carries one value per key and the
 // keyset condition is the lexicographic tuple comparison. `dir` flips only
 // the keys marked `follows` (the primary sort); fixed-direction keys keep
-// their own order, e.g. "default" = export order asc, then newest first.
+// their own order, e.g. "default" = newest local day first, then export
+// order (follows `dir`, ascending by default), then newest first.
 interface SortKey {
   expr: string;
   nocase?: boolean;
@@ -67,8 +68,10 @@ interface SortKey {
   follows?: boolean; // direction follows `dir`
 }
 const ORDER_LAST = 2147483647;
-const SORTS: Record<string, SortKey[]> = {
+/** `tz` is the caller's offset in minutes east of UTC (an integer). */
+const sortsFor = (tz: number): Record<string, SortKey[]> => ({
   default: [
+    { expr: `date(r.logged_at, '${tz} minutes')`, desc: true },
     { expr: `COALESCE(m.export_order, ${ORDER_LAST})`, follows: true },
     { expr: "r.logged_at", desc: true },
   ],
@@ -77,7 +80,7 @@ const SORTS: Record<string, SortKey[]> = {
   meter_name: [{ expr: "m.name", nocase: true, follows: true }],
   meter_type: [{ expr: "m.type", follows: true }, { expr: "r.logged_at", desc: true }],
   technician: [{ expr: "u.full_name", nocase: true, follows: true }, { expr: "r.logged_at", desc: true }],
-};
+});
 
 type CursorValue = string | number;
 
@@ -117,8 +120,10 @@ readingRoutes.get("/", async (c) => {
   const limitParam = Number(c.req.query("limit") ?? DEFAULT_PAGE_SIZE);
   const limit = Number.isInteger(limitParam) ? Math.min(Math.max(limitParam, 1), MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
   const sortKey = c.req.query("sort") ?? "default";
-  const sort = SORTS[sortKey];
-  if (!sort) return c.json({ error: `sort must be one of: ${Object.keys(SORTS).join(", ")}` }, 400);
+  const tzRaw = Number(c.req.query("tz") ?? "0");
+  const sorts = sortsFor(Number.isInteger(tzRaw) && Math.abs(tzRaw) <= 24 * 60 ? tzRaw : 0);
+  const sort = sorts[sortKey];
+  if (!sort) return c.json({ error: `sort must be one of: ${Object.keys(sorts).join(", ")}` }, 400);
   const dirDesc = (c.req.query("dir") ?? (sortKey === "default" ? "asc" : "desc")) !== "asc";
   if (forExport && !settings.exportEnabled) return c.json({ error: "Export is disabled", code: "export_disabled" }, 403);
 
