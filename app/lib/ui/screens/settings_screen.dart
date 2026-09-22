@@ -26,6 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _formKey = GlobalKey<FormState>();
   final _minVersion = TextEditingController();
   final _retention = TextEditingController();
+  final _tokenDays = TextEditingController();
   final _prices = {
     for (final t in MeterType.values) t: TextEditingController(),
   };
@@ -49,6 +50,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _minVersion.dispose();
     _retention.dispose();
+    _tokenDays.dispose();
     for (final c in _prices.values) {
       c.dispose();
     }
@@ -58,6 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _apply(AppSettings s) {
     _minVersion.text = s.minAppVersion;
     _retention.text = '${s.photoRetentionDays}';
+    _tokenDays.text = '${s.tokenLifetimeDays}';
     _maintenance = s.maintenanceMode;
     _deleteEnabled = s.readingDeleteEnabled;
     _exportEnabled = s.exportEnabled;
@@ -104,6 +107,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           readingDeleteEnabled: _deleteEnabled,
           exportEnabled: _exportEnabled,
           photoRetentionDays: int.parse(_retention.text.trim()),
+          tokenLifetimeDays: int.parse(_tokenDays.text.trim()),
           prices: {
             for (final t in MeterType.values)
               t: double.parse(_prices[t]!.text.trim()),
@@ -226,6 +230,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       final n = int.tryParse((v ?? '').trim());
                       return n == null || n < 7 || n > 3650
                           ? S.retentionInvalid
+                          : null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _tokenDays,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    contextMenuBuilder: appContextMenuBuilder,
+                    decoration: const InputDecoration(
+                      labelText: S.settingTokenLifetime,
+                      helperText: S.settingTokenLifetimeHint,
+                      helperMaxLines: 2,
+                    ),
+                    validator: (v) {
+                      final n = int.tryParse((v ?? '').trim());
+                      return n == null || n < 1 || n > 365
+                          ? S.tokenLifetimeInvalid
                           : null;
                     },
                   ),

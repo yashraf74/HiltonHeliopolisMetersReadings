@@ -77,6 +77,17 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _lastValueMeta = const VerificationMeta(
+    'lastValue',
+  );
+  @override
+  late final GeneratedColumn<double> lastValue = GeneratedColumn<double>(
+    'last_value',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _todoOrderMeta = const VerificationMeta(
     'todoOrder',
   );
@@ -134,6 +145,7 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     number,
     photoKey,
     lastLoggedAt,
+    lastValue,
     todoOrder,
     exportOrder,
     isActive,
@@ -195,6 +207,12 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
           data['last_logged_at']!,
           _lastLoggedAtMeta,
         ),
+      );
+    }
+    if (data.containsKey('last_value')) {
+      context.handle(
+        _lastValueMeta,
+        lastValue.isAcceptableOrUnknown(data['last_value']!, _lastValueMeta),
       );
     }
     if (data.containsKey('todo_order')) {
@@ -263,6 +281,10 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
         DriftSqlType.string,
         data['${effectivePrefix}last_logged_at'],
       ),
+      lastValue: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}last_value'],
+      ),
       todoOrder: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}todo_order'],
@@ -296,6 +318,7 @@ class Meter extends DataClass implements Insertable<Meter> {
   final String? number;
   final String? photoKey;
   final String? lastLoggedAt;
+  final double? lastValue;
   final int? todoOrder;
   final int? exportOrder;
   final bool isActive;
@@ -308,6 +331,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     this.number,
     this.photoKey,
     this.lastLoggedAt,
+    this.lastValue,
     this.todoOrder,
     this.exportOrder,
     required this.isActive,
@@ -328,6 +352,9 @@ class Meter extends DataClass implements Insertable<Meter> {
     }
     if (!nullToAbsent || lastLoggedAt != null) {
       map['last_logged_at'] = Variable<String>(lastLoggedAt);
+    }
+    if (!nullToAbsent || lastValue != null) {
+      map['last_value'] = Variable<double>(lastValue);
     }
     if (!nullToAbsent || todoOrder != null) {
       map['todo_order'] = Variable<int>(todoOrder);
@@ -355,6 +382,9 @@ class Meter extends DataClass implements Insertable<Meter> {
       lastLoggedAt: lastLoggedAt == null && nullToAbsent
           ? const Value.absent()
           : Value(lastLoggedAt),
+      lastValue: lastValue == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastValue),
       todoOrder: todoOrder == null && nullToAbsent
           ? const Value.absent()
           : Value(todoOrder),
@@ -379,6 +409,7 @@ class Meter extends DataClass implements Insertable<Meter> {
       number: serializer.fromJson<String?>(json['number']),
       photoKey: serializer.fromJson<String?>(json['photoKey']),
       lastLoggedAt: serializer.fromJson<String?>(json['lastLoggedAt']),
+      lastValue: serializer.fromJson<double?>(json['lastValue']),
       todoOrder: serializer.fromJson<int?>(json['todoOrder']),
       exportOrder: serializer.fromJson<int?>(json['exportOrder']),
       isActive: serializer.fromJson<bool>(json['isActive']),
@@ -396,6 +427,7 @@ class Meter extends DataClass implements Insertable<Meter> {
       'number': serializer.toJson<String?>(number),
       'photoKey': serializer.toJson<String?>(photoKey),
       'lastLoggedAt': serializer.toJson<String?>(lastLoggedAt),
+      'lastValue': serializer.toJson<double?>(lastValue),
       'todoOrder': serializer.toJson<int?>(todoOrder),
       'exportOrder': serializer.toJson<int?>(exportOrder),
       'isActive': serializer.toJson<bool>(isActive),
@@ -411,6 +443,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     Value<String?> number = const Value.absent(),
     Value<String?> photoKey = const Value.absent(),
     Value<String?> lastLoggedAt = const Value.absent(),
+    Value<double?> lastValue = const Value.absent(),
     Value<int?> todoOrder = const Value.absent(),
     Value<int?> exportOrder = const Value.absent(),
     bool? isActive,
@@ -423,6 +456,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     number: number.present ? number.value : this.number,
     photoKey: photoKey.present ? photoKey.value : this.photoKey,
     lastLoggedAt: lastLoggedAt.present ? lastLoggedAt.value : this.lastLoggedAt,
+    lastValue: lastValue.present ? lastValue.value : this.lastValue,
     todoOrder: todoOrder.present ? todoOrder.value : this.todoOrder,
     exportOrder: exportOrder.present ? exportOrder.value : this.exportOrder,
     isActive: isActive ?? this.isActive,
@@ -439,6 +473,7 @@ class Meter extends DataClass implements Insertable<Meter> {
       lastLoggedAt: data.lastLoggedAt.present
           ? data.lastLoggedAt.value
           : this.lastLoggedAt,
+      lastValue: data.lastValue.present ? data.lastValue.value : this.lastValue,
       todoOrder: data.todoOrder.present ? data.todoOrder.value : this.todoOrder,
       exportOrder: data.exportOrder.present
           ? data.exportOrder.value
@@ -458,6 +493,7 @@ class Meter extends DataClass implements Insertable<Meter> {
           ..write('number: $number, ')
           ..write('photoKey: $photoKey, ')
           ..write('lastLoggedAt: $lastLoggedAt, ')
+          ..write('lastValue: $lastValue, ')
           ..write('todoOrder: $todoOrder, ')
           ..write('exportOrder: $exportOrder, ')
           ..write('isActive: $isActive, ')
@@ -475,6 +511,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     number,
     photoKey,
     lastLoggedAt,
+    lastValue,
     todoOrder,
     exportOrder,
     isActive,
@@ -491,6 +528,7 @@ class Meter extends DataClass implements Insertable<Meter> {
           other.number == this.number &&
           other.photoKey == this.photoKey &&
           other.lastLoggedAt == this.lastLoggedAt &&
+          other.lastValue == this.lastValue &&
           other.todoOrder == this.todoOrder &&
           other.exportOrder == this.exportOrder &&
           other.isActive == this.isActive &&
@@ -505,6 +543,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
   final Value<String?> number;
   final Value<String?> photoKey;
   final Value<String?> lastLoggedAt;
+  final Value<double?> lastValue;
   final Value<int?> todoOrder;
   final Value<int?> exportOrder;
   final Value<bool> isActive;
@@ -518,6 +557,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     this.number = const Value.absent(),
     this.photoKey = const Value.absent(),
     this.lastLoggedAt = const Value.absent(),
+    this.lastValue = const Value.absent(),
     this.todoOrder = const Value.absent(),
     this.exportOrder = const Value.absent(),
     this.isActive = const Value.absent(),
@@ -532,6 +572,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     this.number = const Value.absent(),
     this.photoKey = const Value.absent(),
     this.lastLoggedAt = const Value.absent(),
+    this.lastValue = const Value.absent(),
     this.todoOrder = const Value.absent(),
     this.exportOrder = const Value.absent(),
     this.isActive = const Value.absent(),
@@ -548,6 +589,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     Expression<String>? number,
     Expression<String>? photoKey,
     Expression<String>? lastLoggedAt,
+    Expression<double>? lastValue,
     Expression<int>? todoOrder,
     Expression<int>? exportOrder,
     Expression<bool>? isActive,
@@ -562,6 +604,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
       if (number != null) 'number': number,
       if (photoKey != null) 'photo_key': photoKey,
       if (lastLoggedAt != null) 'last_logged_at': lastLoggedAt,
+      if (lastValue != null) 'last_value': lastValue,
       if (todoOrder != null) 'todo_order': todoOrder,
       if (exportOrder != null) 'export_order': exportOrder,
       if (isActive != null) 'is_active': isActive,
@@ -578,6 +621,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     Value<String?>? number,
     Value<String?>? photoKey,
     Value<String?>? lastLoggedAt,
+    Value<double?>? lastValue,
     Value<int?>? todoOrder,
     Value<int?>? exportOrder,
     Value<bool>? isActive,
@@ -592,6 +636,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
       number: number ?? this.number,
       photoKey: photoKey ?? this.photoKey,
       lastLoggedAt: lastLoggedAt ?? this.lastLoggedAt,
+      lastValue: lastValue ?? this.lastValue,
       todoOrder: todoOrder ?? this.todoOrder,
       exportOrder: exportOrder ?? this.exportOrder,
       isActive: isActive ?? this.isActive,
@@ -624,6 +669,9 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     if (lastLoggedAt.present) {
       map['last_logged_at'] = Variable<String>(lastLoggedAt.value);
     }
+    if (lastValue.present) {
+      map['last_value'] = Variable<double>(lastValue.value);
+    }
     if (todoOrder.present) {
       map['todo_order'] = Variable<int>(todoOrder.value);
     }
@@ -652,6 +700,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
           ..write('number: $number, ')
           ..write('photoKey: $photoKey, ')
           ..write('lastLoggedAt: $lastLoggedAt, ')
+          ..write('lastValue: $lastValue, ')
           ..write('todoOrder: $todoOrder, ')
           ..write('exportOrder: $exportOrder, ')
           ..write('isActive: $isActive, ')
@@ -1346,6 +1395,7 @@ typedef $$MetersTableCreateCompanionBuilder = MetersCompanion Function({
   Value<String?> number,
   Value<String?> photoKey,
   Value<String?> lastLoggedAt,
+  Value<double?> lastValue,
   Value<int?> todoOrder,
   Value<int?> exportOrder,
   Value<bool> isActive,
@@ -1360,6 +1410,7 @@ typedef $$MetersTableUpdateCompanionBuilder = MetersCompanion Function({
   Value<String?> number,
   Value<String?> photoKey,
   Value<String?> lastLoggedAt,
+  Value<double?> lastValue,
   Value<int?> todoOrder,
   Value<int?> exportOrder,
   Value<bool> isActive,
@@ -1408,6 +1459,11 @@ class $$MetersTableFilterComposer
 
   ColumnFilters<String> get lastLoggedAt => $composableBuilder(
     column: $table.lastLoggedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get lastValue => $composableBuilder(
+    column: $table.lastValue,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1476,6 +1532,11 @@ class $$MetersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get lastValue => $composableBuilder(
+    column: $table.lastValue,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get todoOrder => $composableBuilder(
     column: $table.todoOrder,
     builder: (column) => ColumnOrderings(column),
@@ -1529,6 +1590,9 @@ class $$MetersTableAnnotationComposer
     builder: (column) => column,
   );
 
+  GeneratedColumn<double> get lastValue =>
+      $composableBuilder(column: $table.lastValue, builder: (column) => column);
+
   GeneratedColumn<int> get todoOrder =>
       $composableBuilder(column: $table.todoOrder, builder: (column) => column);
 
@@ -1579,6 +1643,7 @@ class $$MetersTableTableManager
                 Value<String?> number = const Value.absent(),
                 Value<String?> photoKey = const Value.absent(),
                 Value<String?> lastLoggedAt = const Value.absent(),
+                Value<double?> lastValue = const Value.absent(),
                 Value<int?> todoOrder = const Value.absent(),
                 Value<int?> exportOrder = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
@@ -1592,6 +1657,7 @@ class $$MetersTableTableManager
                 number: number,
                 photoKey: photoKey,
                 lastLoggedAt: lastLoggedAt,
+                lastValue: lastValue,
                 todoOrder: todoOrder,
                 exportOrder: exportOrder,
                 isActive: isActive,
@@ -1607,6 +1673,7 @@ class $$MetersTableTableManager
                 Value<String?> number = const Value.absent(),
                 Value<String?> photoKey = const Value.absent(),
                 Value<String?> lastLoggedAt = const Value.absent(),
+                Value<double?> lastValue = const Value.absent(),
                 Value<int?> todoOrder = const Value.absent(),
                 Value<int?> exportOrder = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
@@ -1620,6 +1687,7 @@ class $$MetersTableTableManager
                 number: number,
                 photoKey: photoKey,
                 lastLoggedAt: lastLoggedAt,
+                lastValue: lastValue,
                 todoOrder: todoOrder,
                 exportOrder: exportOrder,
                 isActive: isActive,

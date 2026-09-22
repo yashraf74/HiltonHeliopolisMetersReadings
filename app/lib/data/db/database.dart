@@ -5,8 +5,9 @@ part 'database.g.dart';
 
 /// Local cache of the server's meters so the technician can pick a meter
 /// with no connectivity. Refreshed from the API whenever it is reachable.
-/// `lastLoggedAt` is the newest reading on the server for that meter (by
-/// anyone), used with the local queue to mark meters done for today.
+/// `lastLoggedAt` / `lastValue` are the newest reading on the server for
+/// that meter (by anyone): used with the local queue to mark meters done for
+/// today and to show the previous reading while logging a new one.
 class Meters extends Table {
   TextColumn get id => text()();
   TextColumn get name => text().withDefault(const Constant(''))();
@@ -15,6 +16,7 @@ class Meters extends Table {
   TextColumn get number => text().nullable()();
   TextColumn get photoKey => text().nullable()();
   TextColumn get lastLoggedAt => text().nullable()();
+  RealColumn get lastValue => real().nullable()();
   IntColumn get todoOrder => integer().nullable()();
   IntColumn get exportOrder => integer().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
@@ -51,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'meters_app'));
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -87,7 +89,11 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 7) {
         // Drops location and description (the cache refills from the server).
+        // Rebuilding from the current class also creates lastValue.
         await m.alterTable(TableMigration(meters));
+      }
+      if (from == 7) {
+        await m.addColumn(meters, meters.lastValue);
       }
     },
   );
@@ -130,17 +136,30 @@ class AppDatabase extends _$AppDatabase {
   Future<Meter?> meterById(String id) =>
       (select(meters)..where((m) => m.id.equals(id))).getSingleOrNull();
 
-  /// Bumps the meter's last reading time after a successful upload so the
-  /// "done today" tick stays correct even before the next server refresh.
-  Future<void> touchMeterLastLogged(String meterId, String loggedAt) async {
+  /// Bumps the meter's last reading after a successful upload so the
+  /// "done today" tick and the previous-reading label stay correct even
+  /// before the next server refresh.
+  Future<void> touchMeterLastLogged(
+    String meterId,
+    String loggedAt,
+    double value,
+  ) async {
     final m = await meterById(meterId);
     if (m == null) return;
     final current = m.lastLoggedAt;
     if (current != null && current.compareTo(loggedAt) >= 0) return;
     await (update(meters)..where((r) => r.id.equals(meterId))).write(
-      MetersCompanion(lastLoggedAt: Value(loggedAt)),
+      MetersCompanion(lastLoggedAt: Value(loggedAt), lastValue: Value(value)),
     );
   }
+
+  /// Newest reading of [meterId] still queued on this device, if any.
+  Future<Reading?> latestQueuedReading(String meterId) =>
+      (select(readings)
+            ..where((r) => r.meterId.equals(meterId))
+            ..orderBy([(r) => OrderingTerm.desc(r.loggedAt)])
+            ..limit(1))
+          .getSingleOrNull();
 
   // ---- readings queue -----------------------------------------------------
 

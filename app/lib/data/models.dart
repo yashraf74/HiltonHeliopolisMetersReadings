@@ -117,20 +117,31 @@ class AppUser {
     required this.id,
     required this.username,
     required this.fullName,
+    required this.email,
     required this.role,
     required this.isActive,
   });
 
+  /// Stored for users created before emails existed.
+  static const placeholderEmail = 'null@hilton.com';
+
+  /// Same rule as the server: something@something.tld, no spaces.
+  static final emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+
   final String id;
   final String username;
   final String fullName;
+  final String email;
   final UserRole role;
   final bool isActive;
+
+  bool get hasEmail => email.isNotEmpty && email != placeholderEmail;
 
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
     id: json['id'] as String,
     username: json['username'] as String,
     fullName: json['fullName'] as String,
+    email: json['email'] as String? ?? '',
     role: UserRole.fromApi(json['role'] as String),
     isActive: json['isActive'] as bool,
   );
@@ -166,6 +177,7 @@ class AppSettings {
     required this.readingDeleteEnabled,
     required this.exportEnabled,
     required this.photoRetentionDays,
+    required this.tokenLifetimeDays,
     required this.prices,
     this.latestAppVersion,
   });
@@ -175,6 +187,9 @@ class AppSettings {
   final bool readingDeleteEnabled;
   final bool exportEnabled;
   final int photoRetentionDays;
+
+  /// How long a login stays valid; applies to logins after it is changed.
+  final int tokenLifetimeDays;
 
   /// EGP per unit for the dashboard cost chart; 0 = not set.
   final Map<MeterType, double> prices;
@@ -188,6 +203,7 @@ class AppSettings {
     readingDeleteEnabled: j['readingDeleteEnabled'] as bool,
     exportEnabled: j['exportEnabled'] as bool,
     photoRetentionDays: j['photoRetentionDays'] as int,
+    tokenLifetimeDays: j['tokenLifetimeDays'] as int? ?? 7,
     prices: pricesFromJson(j['prices'] as Map<String, dynamic>?),
     latestAppVersion: j['latestAppVersion'] as String?,
   );
@@ -202,6 +218,7 @@ class AppSettings {
     'readingDeleteEnabled': readingDeleteEnabled,
     'exportEnabled': exportEnabled,
     'photoRetentionDays': photoRetentionDays,
+    'tokenLifetimeDays': tokenLifetimeDays,
     'prices': {for (final e in prices.entries) e.key.name: e.value},
   };
 }

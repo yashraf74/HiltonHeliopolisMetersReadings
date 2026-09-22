@@ -283,52 +283,69 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     _load();
   }
 
-  /// Exports every reading matching the current filters, not just the pages
-  /// loaded so far.
+  /// Exports every reading matching the current filters (not just the pages
+  /// loaded so far), then saves the file on the device, emails it to the
+  /// user, or both, as they choose.
   Future<void> _export() async {
     if (_rows.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text(S.exportNothing)));
       return;
     }
+    final target = await showModalBottomSheet<_ExportTarget>(
+      context: context,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => const _ExportTargetSheet(),
+    );
+    if (target == null || !mounted) return;
+
     setState(() => _exporting = true);
     final messenger = ScaffoldMessenger.of(context);
     final api = context.read<ApiClient>();
+    final results = <String>[];
     try {
       final all = await api.fetchAllReadings(_filters.toQuery());
       final bytes = buildReadingsWorkbook(all);
       final stamp = DateFormat('yyyy-MM-dd_HHmm').format(DateTime.now());
-      final saved = await FilePicker.saveFile(
-        dialogTitle: S.exportExcel,
-        fileName: 'meter-readings-$stamp.xlsx',
-        mimeType:
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        type: FileType.custom,
-        allowedExtensions: const ['xlsx'],
-        bytes: bytes,
-      );
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(saved == null ? S.exportCancelled : S.exportDone),
-        ),
-      );
+      final fileName = 'meter-readings-$stamp.xlsx';
+
+      if (target != _ExportTarget.email) {
+        final saved = await FilePicker.saveFile(
+          dialogTitle: S.exportExcel,
+          fileName: fileName,
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          type: FileType.custom,
+          allowedExtensions: const ['xlsx'],
+          bytes: bytes,
+        );
+        results.add(saved == null ? S.exportCancelled : S.exportDone);
+      }
+      if (target != _ExportTarget.device) {
+        try {
+          final sentTo = await api.emailExport(fileName, bytes);
+          results.add('${S.exportEmailed} $sentTo');
+        } on ApiException catch (e) {
+          results.add(switch (e.code) {
+            'no_email' => S.exportNoEmail,
+            'email_not_configured' => S.exportEmailNotConfigured,
+            'export_disabled' => S.exportDisabledByAdmin,
+            _ => S.exportEmailFailed,
+          });
+        }
+      }
     } on NetworkException {
-      messenger.showSnackBar(
-        const SnackBar(content: Text(S.readingsNeedInternet)),
-      );
+      results.add(S.readingsNeedInternet);
     } on ApiException catch (e) {
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            e.code == 'export_disabled' ? S.exportDisabledByAdmin : e.message,
-          ),
-        ),
+      results.add(
+        e.code == 'export_disabled' ? S.exportDisabledByAdmin : e.message,
       );
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('${S.exportFailed}: $e')));
+      results.add('${S.exportFailed}: $e');
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
+    messenger.showSnackBar(SnackBar(content: Text(results.join('\n'))));
   }
 
   @override
@@ -1250,6 +1267,60 @@ class _FilterSheetState extends State<_FilterSheet> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ---- export target ---------------------------------------------------------
+
+enum _ExportTarget { device, email, both }
+
+class _ExportTargetSheet extends StatelessWidget {
+  const _ExportTargetSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    Widget option(_ExportTarget target, IconData icon, String title) =>
+        ListTile(
+          leading: Icon(icon, color: scheme.primary),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          subtitle: target == _ExportTarget.device
+              ? null
+              : const Text(S.exportEmailHint),
+          onTap: () => Navigator.pop(context, target),
+        );
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        12,
+        0,
+        12,
+        16 + MediaQuery.viewPaddingOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            child: Text(
+              S.exportHow,
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w800),
+            ),
+          ),
+          option(
+            _ExportTarget.device,
+            Icons.download_rounded,
+            S.exportToDevice,
+          ),
+          option(_ExportTarget.email, Icons.email_outlined, S.exportToEmail),
+          option(_ExportTarget.both, Icons.all_inbox_outlined, S.exportToBoth),
+        ],
       ),
     );
   }

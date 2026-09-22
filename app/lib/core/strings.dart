@@ -93,6 +93,8 @@ class S {
   // Readings
   static const noReadings = 'لا توجد قراءات بعد';
   static const readingValue = 'قراءة العداد';
+  static const previousReading = 'القراءة السابقة';
+  static const noPreviousReading = 'لا توجد قراءة سابقة لهذا العداد';
   static const loggedBy = 'سجّلها';
   static const loggedAt = 'التاريخ';
 
@@ -183,6 +185,17 @@ class S {
   static const exportCancelled = 'تم إلغاء التصدير';
   static const exportFailed = 'تعذر تصدير الملف';
   static const exportNothing = 'لا توجد قراءات لتصديرها';
+  static const exportHow = 'كيف تريد استلام الملف؟';
+  static const exportToDevice = 'حفظ على الجهاز';
+  static const exportToEmail = 'إرسال إلى بريدي الإلكتروني';
+  static const exportToBoth = 'الاثنان معًا';
+  static const exportEmailHint = 'يُرسل إلى البريد المسجل في حسابك';
+  static const exportEmailed = 'تم إرسال الملف إلى';
+  static const exportNoEmail =
+      'لا يوجد بريد إلكتروني مسجل لحسابك، اطلب من المشرف إضافته';
+  static const exportEmailNotConfigured =
+      'إرسال البريد غير مفعّل على الخادم بعد';
+  static const exportEmailFailed = 'تعذر إرسال البريد الإلكتروني';
   static const colDateTime = 'التاريخ والوقت';
   static const colType = 'نوع العداد';
   static const colValue = 'القراءة';
@@ -203,6 +216,10 @@ class S {
   static const userSaved = 'تم حفظ المستخدم';
   static const role = 'الدور';
   static const fullName = 'الاسم الكامل';
+  static const email = 'البريد الإلكتروني';
+  static const emailInvalid =
+      'أدخل بريدًا إلكترونيًا صحيحًا مثل name@example.com';
+  static const emailMissing = 'لا يوجد بريد إلكتروني';
   static const activeUsers = 'الحسابات النشطة';
   static const inactiveUsers = 'الحسابات الموقوفة';
   static const active = 'نشط';
@@ -261,6 +278,10 @@ class S {
   static const settingsNeedInternet = 'الإعدادات تتطلب اتصالاً بالإنترنت';
   static const versionInvalid = 'أدخل إصدارًا بالشكل 2.0.0';
   static const retentionInvalid = 'أدخل عددًا بين 7 و3650';
+  static const settingTokenLifetime = 'مدة صلاحية تسجيل الدخول (أيام)';
+  static const settingTokenLifetimeHint =
+      'بعدها يُطلب تسجيل الدخول مرة أخرى. تنطبق على عمليات الدخول الجديدة.';
+  static const tokenLifetimeInvalid = 'أدخل عددًا بين 1 و365';
   static const settingPrices = 'أسعار الاستهلاك';
   static const settingPricesHint =
       'بالجنيه لكل وحدة، تُستخدم لحساب التكلفة في لوحة التحكم. اتركها 0 لإخفاء التكلفة.';

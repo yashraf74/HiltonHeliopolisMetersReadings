@@ -29,6 +29,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _username;
   late final TextEditingController _fullName;
+  late final TextEditingController _email;
   final _password = TextEditingController();
   late UserRole _role;
   bool _obscure = true;
@@ -43,6 +44,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     super.initState();
     _username = TextEditingController(text: widget.existing?.username ?? '');
     _fullName = TextEditingController(text: widget.existing?.fullName ?? '');
+    _email = TextEditingController(text: widget.existing?.email ?? '');
     _role = widget.existing?.role ?? UserRole.technician;
   }
 
@@ -50,6 +52,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
   void dispose() {
     _username.dispose();
     _fullName.dispose();
+    _email.dispose();
     _password.dispose();
     super.dispose();
   }
@@ -58,6 +61,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     if (e.statusCode == 409) return S.usernameTaken;
     if (e.message.startsWith('username must')) return S.usernameRules;
     if (e.message.startsWith('password must')) return S.passwordRules;
+    if (e.message.startsWith('email must')) return S.emailInvalid;
     if (e.message.startsWith('You cannot deactivate')) {
       return S.cannotDeleteSelf;
     }
@@ -70,11 +74,13 @@ class _UserFormScreenState extends State<UserFormScreen> {
     final api = context.read<ApiClient>();
     final messenger = ScaffoldMessenger.of(context);
     final password = _password.text;
+    final email = _email.text.trim().toLowerCase();
     try {
       if (_isEdit) {
         await api.updateUser(
           widget.existing!.id,
           fullName: _fullName.text.trim(),
+          email: email,
           role: _role,
           password: password.isEmpty ? null : password,
         );
@@ -83,6 +89,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
           username: _username.text.trim().toLowerCase(),
           password: password,
           fullName: _fullName.text.trim(),
+          email: email,
           role: _role,
         );
       }
@@ -186,6 +193,30 @@ class _UserFormScreenState extends State<UserFormScreen> {
               ),
               validator: (v) =>
                   (v ?? '').trim().isEmpty ? S.fieldRequired : null,
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              textDirection: TextDirection.ltr,
+              autocorrect: false,
+              enableSuggestions: false,
+              textInputAction: TextInputAction.next,
+              // No spaces; the validator checks the name@domain.tld shape.
+              inputFormatters: [
+                FilteringTextInputFormatter.deny(RegExp(r'\s')),
+              ],
+              decoration: const InputDecoration(
+                labelText: S.email,
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+              validator: (v) {
+                final value = (v ?? '').trim();
+                if (value.isEmpty) return S.fieldRequired;
+                return AppUser.emailPattern.hasMatch(value)
+                    ? null
+                    : S.emailInvalid;
+              },
             ),
             const SizedBox(height: 14),
             TextFormField(

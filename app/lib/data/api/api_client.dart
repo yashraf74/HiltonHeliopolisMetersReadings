@@ -284,6 +284,22 @@ class ApiClient {
     return body['syncedAt'] as String;
   }
 
+  /// Emails an exported workbook to the signed-in user's own address and
+  /// returns that address.
+  Future<String> emailExport(String fileName, List<int> bytes) async {
+    final body = await _json(
+      _http.post(
+        _uri('/exports/email'),
+        headers: _headers(contentType: 'application/json'),
+        body: jsonEncode({
+          'fileName': fileName,
+          'content': base64Encode(bytes),
+        }),
+      ),
+    );
+    return body['sentTo'] as String;
+  }
+
   static const readingsPageSize = 50;
 
   Future<ReadingsPage> fetchReadings(
@@ -372,6 +388,7 @@ class ApiClient {
     required String username,
     required String password,
     required String fullName,
+    required String email,
     required UserRole role,
   }) async {
     final body = await _json(
@@ -382,6 +399,7 @@ class ApiClient {
           'username': username,
           'password': password,
           'fullName': fullName,
+          'email': email,
           'role': role.name,
         }),
       ),
@@ -392,6 +410,7 @@ class ApiClient {
   Future<void> updateUser(
     String id, {
     String? fullName,
+    String? email,
     UserRole? role,
     bool? isActive,
     String? password,
@@ -402,6 +421,7 @@ class ApiClient {
         headers: _headers(contentType: 'application/json'),
         body: jsonEncode({
           'fullName': ?fullName,
+          'email': ?email,
           'role': ?role?.name,
           'isActive': ?isActive,
           'password': ?password,
@@ -437,6 +457,7 @@ class ApiClient {
     number: j['number'] as String?,
     photoKey: j['photo_key'] as String?,
     lastLoggedAt: j['last_logged_at'] as String?,
+    lastValue: (j['last_value'] as num?)?.toDouble(),
     todoOrder: j['todo_order'] as int?,
     exportOrder: j['export_order'] as int?,
     isActive: (j['is_active'] as int) == 1,

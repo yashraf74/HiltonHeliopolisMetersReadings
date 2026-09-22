@@ -401,6 +401,8 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
               ] else
                 PhotoSourceButtons(onPicked: (f) => setState(() => _photo = f)),
               const SizedBox(height: 22),
+              _PreviousReading(meter: meter, type: type),
+              const SizedBox(height: 10),
               TextField(
                 controller: _value,
                 keyboardType: const TextInputType.numberWithOptions(
@@ -457,6 +459,84 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// "Previous reading: 35,694 kWh · 17/9 06:37" for the chosen meter: the
+/// newer of the server's last reading (cached with the meter list) and any
+/// reading of it still queued on this device.
+class _PreviousReading extends StatelessWidget {
+  const _PreviousReading({required this.meter, required this.type});
+
+  final Meter meter;
+  final MeterType type;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return FutureBuilder<Reading?>(
+      future: context.read<AppDatabase>().latestQueuedReading(meter.id),
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const SizedBox(height: 44);
+        }
+        var value = meter.lastValue;
+        var at = meter.lastLoggedAt;
+        final queued = snap.data;
+        if (queued != null &&
+            (at == null || queued.loggedAt.compareTo(at) > 0)) {
+          value = queued.value;
+          at = queued.loggedAt;
+        }
+        final when = at == null ? null : DateTime.tryParse(at)?.toLocal();
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: type.color.withValues(alpha: 0.07),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.history_rounded, size: 20, color: type.color),
+              const SizedBox(width: 8),
+              Expanded(
+                child: value == null
+                    ? Text(
+                        S.noPreviousReading,
+                        style: TextStyle(
+                          color: scheme.onSurfaceVariant,
+                          fontSize: 13,
+                        ),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            S.previousReading,
+                            style: TextStyle(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (when != null)
+                            Text(
+                              DateFormat('d/M/yyyy HH:mm', 'ar').format(when),
+                              style: TextStyle(
+                                color: scheme.onSurfaceVariant,
+                                fontSize: 12,
+                              ),
+                            ),
+                        ],
+                      ),
+              ),
+              if (value != null)
+                ValueText(value, unit: type.unit, fontSize: 18),
+            ],
+          ),
+        );
+      },
     );
   }
 }

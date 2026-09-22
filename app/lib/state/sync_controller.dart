@@ -126,7 +126,11 @@ class SyncController extends ChangeNotifier {
           photoKey: photoKey,
           loggedAt: reading.loggedAt,
         );
-        await _db.touchMeterLastLogged(reading.meterId, reading.loggedAt);
+        await _db.touchMeterLastLogged(
+          reading.meterId,
+          reading.loggedAt,
+          reading.value,
+        );
         await _db.deleteReading(reading.id);
         await PhotoStore.delete(reading.localPhotoPath);
         synced++;

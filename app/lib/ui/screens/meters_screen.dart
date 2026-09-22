@@ -18,8 +18,80 @@ class MetersScreen extends StatefulWidget {
   State<MetersScreen> createState() => _MetersScreenState();
 }
 
+/// Sort options for the meter management list. Meter numbers compare
+/// numerically when both are numbers.
+enum MeterSort {
+  todoOrder(S.todoOrder),
+  exportOrder(S.exportOrder),
+  name(S.meterName),
+  area(S.meterArea),
+  number(S.meterNumber);
+
+  const MeterSort(this.label);
+
+  final String label;
+
+  int compare(Meter a, Meter b) => switch (this) {
+    todoOrder => _compareNullable(a.todoOrder, b.todoOrder),
+    exportOrder => _compareNullable(a.exportOrder, b.exportOrder),
+    name => _compareText(a.name, b.name),
+    area => _compareText(a.area, b.area),
+    number => _compareNumber(a.number, b.number),
+  };
+
+  // Empty values are ranked separately (see _sorted), so these only order
+  // two present values.
+  static int _compareNullable(int? a, int? b) =>
+      a == null || b == null ? 0 : a.compareTo(b);
+
+  static int _compareText(String a, String b) =>
+      a.toLowerCase().compareTo(b.toLowerCase());
+
+  static int _compareNumber(String? a, String? b) {
+    final na = int.tryParse(a ?? '');
+    final nb = int.tryParse(b ?? '');
+    if (na != null && nb != null) return na.compareTo(nb);
+    return _compareText(a ?? '', b ?? '');
+  }
+}
+
 class _MetersScreenState extends State<MetersScreen> {
   MeterType? _filter;
+  MeterSort _sort = MeterSort.todoOrder;
+  bool _descending = false;
+
+  /// Empty values stay last in both directions; ties fall back to the name.
+  List<Meter> _sorted(List<Meter> meters) {
+    int emptyRank(Meter m) => switch (_sort) {
+      MeterSort.todoOrder => m.todoOrder == null ? 1 : 0,
+      MeterSort.exportOrder => m.exportOrder == null ? 1 : 0,
+      MeterSort.name => m.name.isEmpty ? 1 : 0,
+      MeterSort.area => m.area.isEmpty ? 1 : 0,
+      MeterSort.number => (m.number ?? '').isEmpty ? 1 : 0,
+    };
+    return [...meters]..sort((a, b) {
+      final empty = emptyRank(a) - emptyRank(b);
+      if (empty != 0) return empty;
+      final c = _sort.compare(a, b);
+      if (c != 0) return _descending ? -c : c;
+      return MeterSort.name.compare(a, b);
+    });
+  }
+
+  Future<void> _openSort() async {
+    final result = await showModalBottomSheet<(MeterSort, bool)>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => _MeterSortSheet(sort: _sort, descending: _descending),
+    );
+    if (result == null) return;
+    setState(() {
+      _sort = result.$1;
+      _descending = result.$2;
+    });
+  }
 
   Future<void> _refresh(BuildContext context) async {
     final ok = await context.read<MetersController>().refresh();
@@ -40,32 +112,46 @@ class _MetersScreenState extends State<MetersScreen> {
       ),
       body: Column(
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-            child: Row(
-              children: [
-                ChoiceChip(
-                  label: const Text(S.filterAll),
-                  selected: _filter == null,
-                  onSelected: (_) => setState(() => _filter = null),
-                ),
-                for (final t in MeterType.values) ...[
-                  const SizedBox(width: 8),
-                  TypeChip(
-                    type: t,
-                    selected: _filter == t,
-                    onSelected: (_) => setState(() => _filter = t),
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsetsDirectional.fromSTEB(16, 10, 8, 4),
+                  child: Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text(S.filterAll),
+                        selected: _filter == null,
+                        onSelected: (_) => setState(() => _filter = null),
+                      ),
+                      for (final t in MeterType.values) ...[
+                        const SizedBox(width: 8),
+                        TypeChip(
+                          type: t,
+                          selected: _filter == t,
+                          onSelected: (_) => setState(() => _filter = t),
+                        ),
+                      ],
+                    ],
                   ),
-                ],
-              ],
-            ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsetsDirectional.only(end: 8, top: 6),
+                child: IconButton.filledTonal(
+                  tooltip: S.sortBy,
+                  onPressed: _openSort,
+                  icon: const Icon(Icons.swap_vert_rounded),
+                ),
+              ),
+            ],
           ),
           Expanded(
             child: StreamBuilder<List<Meter>>(
               stream: db.watchActiveMeters(type: _filter?.name),
               builder: (context, snapshot) {
-                final meters = snapshot.data ?? const <Meter>[];
+                final meters = _sorted(snapshot.data ?? const <Meter>[]);
                 return RefreshIndicator(
                   onRefresh: () => _refresh(context),
                   child: meters.isEmpty
@@ -195,6 +281,86 @@ class MeterTile extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Field + direction picker for the meter list; pops `(sort, descending)`.
+class _MeterSortSheet extends StatefulWidget {
+  const _MeterSortSheet({required this.sort, required this.descending});
+
+  final MeterSort sort;
+  final bool descending;
+
+  @override
+  State<_MeterSortSheet> createState() => _MeterSortSheetState();
+}
+
+class _MeterSortSheetState extends State<_MeterSortSheet> {
+  late MeterSort _sort = widget.sort;
+  late bool _desc = widget.descending;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        20,
+        0,
+        20,
+        24 + MediaQuery.viewPaddingOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            S.sortBy,
+            style: Theme.of(context).textTheme.titleLarge
+                ?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 8),
+          RadioGroup<MeterSort>(
+            groupValue: _sort,
+            onChanged: (v) => setState(() => _sort = v!),
+            child: Column(
+              children: [
+                for (final s in MeterSort.values)
+                  RadioListTile<MeterSort>(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    title: Text(s.label),
+                    value: s,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(
+                  value: false,
+                  label: Text(S.sortAsc),
+                  icon: Icon(Icons.arrow_upward_rounded, size: 16),
+                ),
+                ButtonSegment(
+                  value: true,
+                  label: Text(S.sortDesc),
+                  icon: Icon(Icons.arrow_downward_rounded, size: 16),
+                ),
+              ],
+              selected: {_desc},
+              onSelectionChanged: (s) => setState(() => _desc = s.first),
+            ),
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, (_sort, _desc)),
+            child: const Text(S.applyFilters),
+          ),
+        ],
       ),
     );
   }

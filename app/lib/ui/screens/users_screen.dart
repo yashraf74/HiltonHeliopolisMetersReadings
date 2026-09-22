@@ -184,6 +184,21 @@ class _UserTile extends StatelessWidget {
                           fontSize: 13,
                         ),
                       ),
+                      Text(
+                        user.hasEmail ? user.email : S.emailMissing,
+                        textDirection: user.hasEmail
+                            ? TextDirection.ltr
+                            : TextDirection.rtl,
+                        textAlign: TextAlign.right,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: user.hasEmail
+                              ? scheme.onSurfaceVariant
+                              : scheme.error,
+                          fontSize: 12.5,
+                        ),
+                      ),
                     ],
                   ),
                 ),
