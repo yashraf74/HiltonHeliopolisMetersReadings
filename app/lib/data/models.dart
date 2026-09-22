@@ -87,12 +87,16 @@ class AuthUser {
     required this.fullName,
     required this.role,
     this.language,
+    this.email,
   });
 
   final String id;
   final String username;
   final String fullName;
   final UserRole role;
+
+  /// From sign-in (null in sessions from older app versions).
+  final String? email;
 
   /// Saved app language from the server (null in sessions from older app
   /// versions, which then keep the device's choice).
@@ -110,6 +114,7 @@ class AuthUser {
     language: json['language'] == null
         ? null
         : AppLanguage.fromCode(json['language'] as String),
+    email: json['email'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -118,6 +123,7 @@ class AuthUser {
     'fullName': fullName,
     'role': role.name,
     'language': ?language?.name,
+    'email': ?email,
   };
 }
 

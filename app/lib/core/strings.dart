@@ -301,9 +301,19 @@ class S {
   static String get exportToEmail =>
       _t('إرسال إلى بريدي الإلكتروني', 'Send to my email');
   static String get exportToBoth => _t('الاثنان معًا', 'Both');
-  static String get exportEmailHint => _t(
-    'يُرسل إلى البريد المسجل في حسابك',
-    'Sent to the email on your account',
+  static String get exportDeviceHint => _t(
+    'يُحفظ ملف Excel على هذا الجهاز',
+    'Saves the Excel file on this device',
+  );
+
+  /// [email] is the account's address, or null when unknown.
+  static String exportEmailHint(String? email) => _t(
+    'يُرسل الملف إلى بريدك الإلكتروني${email == null ? ' المسجل في حسابك' : ': \u2066$email\u2069'}',
+    'Sends the file to your email${email == null ? ' on your account' : ': $email'}',
+  );
+  static String exportBothHint(String? email) => _t(
+    'يُحفظ الملف على هذا الجهاز ويُرسل إلى بريدك الإلكتروني${email == null ? ' المسجل في حسابك' : ': \u2066$email\u2069'}',
+    'Saves the file on this device and sends it to your email${email == null ? ' on your account' : ': $email'}',
   );
   static String get exportEmailed => _t('تم إرسال الملف إلى', 'File sent to');
   static String get exportNoEmail => _t(
@@ -502,7 +512,18 @@ class S {
   static String get statMetersRead => _t('عدادات تمت قراءتها', 'Meters read');
   static String get mostReadMeter => _t('الأكثر قراءةً', 'Most read');
   static String get leastReadMeter => _t('الأقل قراءةً', 'Least read');
-  static String get readingsSuffix => _t('قراءة', 'readings');
+
+  /// "reading(s)" after a count, with Arabic dual and plural forms.
+  static String readingsUnit(int n) => _t(
+    n == 2 ? 'قراءتان' : (n >= 3 && n <= 10 ? 'قراءات' : 'قراءة'),
+    n == 1 ? 'reading' : 'readings',
+  );
+
+  /// "day(s)" after a count, with Arabic dual and plural forms.
+  static String daysUnit(int n) => _t(
+    n == 2 ? 'يومان' : (n >= 3 && n <= 10 ? 'أيام' : 'يوم'),
+    n == 1 ? 'day' : 'days',
+  );
   static String get consumption => _t('الاستهلاك', 'Consumption');
   static String get perDay => _t('يوميًا', 'Daily');
   static String get perWeek => _t('أسبوعيًا', 'Weekly');
@@ -545,7 +566,6 @@ class S {
   static String get neverRead => _t('لم يُقرأ أبدًا', 'Never read');
   static String get lastReadDaysAgo =>
       _t('آخر قراءة منذ', 'since last reading');
-  static String get days => _t('يوم', 'days');
   static String get noOverdue =>
       _t('كل العدادات مقروءة', 'All meters have been read');
   static String get showAll => _t('عرض الكل', 'Show all');

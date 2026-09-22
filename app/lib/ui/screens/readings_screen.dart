@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:provider/provider.dart';
 
@@ -16,6 +15,7 @@ import '../../state/app_status_controller.dart';
 import '../../state/session_controller.dart';
 import '../../state/sync_controller.dart';
 import '../popups.dart';
+import '../reading_actions.dart';
 import '../widgets/status_widgets.dart';
 
 enum ReadingSort {
@@ -746,134 +746,24 @@ class _ReadingCardState extends State<_ReadingCard> {
   bool _busy = false;
 
   Future<void> _edit() async {
-    final controller = TextEditingController(text: '${widget.row['value']}');
-    final result = await showDialog<double>(
-      context: context,
-      builder: (ctx) {
-        String? error;
-        return StatefulBuilder(
-          builder: (ctx, setLocal) => AlertDialog(
-            title: Text(S.editReading),
-            content: TextField(
-              controller: controller,
-              autofocus: true,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              textDirection: TextDirection.ltr,
-              textAlign: TextAlign.center,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9.,٠-٩٫]')),
-              ],
-              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-              decoration: InputDecoration(
-                hintText: S.editReadingHint,
-                errorText: error,
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(S.cancel),
-              ),
-              FilledButton(
-                style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
-                onPressed: () {
-                  final raw = controller.text
-                      .trim()
-                      .replaceAll('٫', '.')
-                      .replaceAll(',', '.');
-                  const arabic = '٠١٢٣٤٥٦٧٨٩';
-                  final western = raw.runes.map((c) {
-                    final i = arabic.indexOf(String.fromCharCode(c));
-                    return i >= 0 ? '$i' : String.fromCharCode(c);
-                  }).join();
-                  final v = double.tryParse(western);
-                  if (v == null) {
-                    setLocal(() => error = S.valueInvalid);
-                    return;
-                  }
-                  Navigator.pop(ctx, v);
-                },
-                child: Text(S.save),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-    controller.dispose();
-    if (result == null || !mounted) {
-      return;
-    }
     setState(() => _busy = true);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await context.read<ApiClient>().updateReadingValue(
-        widget.row['id'] as String,
-        result,
-      );
-      widget.onValueChanged(result);
-      messenger.showSnackBar(SnackBar(content: Text(S.readingUpdated)));
-    } on NetworkException {
-      messenger.showSnackBar(SnackBar(content: Text(S.editNeedsInternet)));
-    } on ApiException catch (e) {
-      if (e.isUnauthorized && mounted) {
-        context.read<SessionController>().markTokenRejected();
-      }
-      messenger.showSnackBar(SnackBar(content: Text(e.message)));
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final value = await editReadingValue(
+      context,
+      id: widget.row['id'] as String,
+      current: widget.row['value'] as num,
+    );
+    if (value != null) widget.onValueChanged(value);
+    if (mounted) setState(() => _busy = false);
   }
 
   Future<void> _delete() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(S.deleteReading),
-        content: Text(S.deleteReadingConfirm),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: Text(S.cancel),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Theme.of(ctx).colorScheme.error,
-              minimumSize: const Size(0, 44),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(S.deleteReading),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted) {
-      return;
-    }
     setState(() => _busy = true);
-    final messenger = ScaffoldMessenger.of(context);
-    try {
-      await context.read<ApiClient>().deleteReading(widget.row['id'] as String);
-      messenger.showSnackBar(SnackBar(content: Text(S.readingDeleted)));
-      widget.onDeleted();
-    } on NetworkException {
-      messenger.showSnackBar(SnackBar(content: Text(S.deleteNeedsInternet)));
-    } on ApiException catch (e) {
-      if (e.isUnauthorized && mounted) {
-        context.read<SessionController>().markTokenRejected();
-      }
-      messenger.showSnackBar(
-        SnackBar(
-          content: Text(
-            e.code == 'delete_disabled' ? S.deleteDisabledByAdmin : e.message,
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+    final deleted = await deleteReadingConfirmed(
+      context,
+      widget.row['id'] as String,
+    );
+    if (deleted) widget.onDeleted();
+    if (mounted) setState(() => _busy = false);
   }
 
   @override
@@ -1305,16 +1195,21 @@ class _ExportTargetSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    Widget option(
-      _ExportTarget target,
-      IconData icon,
-      String title,
-    ) => ListTile(
-      leading: Icon(icon, color: scheme.primary),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle: target == _ExportTarget.device ? null : Text(S.exportEmailHint),
-      onTap: () => Navigator.pop(context, target),
-    );
+    final email = context.read<SessionController>().user?.email;
+    Widget option(_ExportTarget target, IconData icon, String title) =>
+        ListTile(
+          leading: Icon(icon, color: scheme.primary),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+          subtitle: Text(switch (target) {
+            _ExportTarget.device => S.exportDeviceHint,
+            _ExportTarget.email => S.exportEmailHint(email),
+            _ExportTarget.both => S.exportBothHint(email),
+          }),
+          onTap: () => Navigator.pop(context, target),
+        );
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         12,

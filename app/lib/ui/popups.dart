@@ -6,7 +6,9 @@ import '../core/strings.dart';
 import '../data/api/api_client.dart';
 import '../data/db/database.dart';
 import '../data/models.dart';
+import '../state/app_status_controller.dart';
 import '../state/session_controller.dart';
+import 'reading_actions.dart';
 import 'screens/meter_form_screen.dart';
 import 'screens/user_form_screen.dart';
 import 'widgets/status_widgets.dart';
@@ -71,10 +73,15 @@ Future<void> showUserPopup(BuildContext context, String userId) {
   );
 }
 
-/// Reading popup from a dashboard / readings row that carries the reading's
-/// fields (value, gain, logged_at, logged_by, meter_id, photo keys...).
-Future<void> showReadingPopup(BuildContext context, Map<String, dynamic> row) =>
-    _openSheet(context, (_) => _ReadingSheet(row: row));
+/// Reading popup from a dashboard row that carries the reading's fields
+/// (id, value, gain, logged_at, logged_by, meter_id, photo keys...), with
+/// edit and delete. [onChanged] runs after either, once the sheet has
+/// closed (gains are recomputed on the server, so the caller reloads).
+Future<void> showReadingPopup(
+  BuildContext context,
+  Map<String, dynamic> row, {
+  VoidCallback? onChanged,
+}) => _openSheet(context, (_) => _ReadingSheet(row: row, onChanged: onChanged));
 
 /// Scrollable sheet body with the standard padding.
 class _SheetBody extends StatelessWidget {
@@ -215,6 +222,9 @@ class _MeterSheet extends StatelessWidget {
     final type = MeterType.fromApi(meter.type);
     final number = meter.number;
     final last = meter.lastValue;
+    // The to-do and export orders are moderator-only settings.
+    final isModerator =
+        context.read<SessionController>().user?.canManage ?? false;
     return _SheetBody(
       children: [
         _Title(
@@ -237,9 +247,9 @@ class _MeterSheet extends StatelessWidget {
             '${NumberFormat.decimalPattern('en').format(last)} ${type.unit}'
             ' · ${_dateTime(meter.lastLoggedAt)}',
           ),
-        if (meter.todoOrder != null)
+        if (isModerator && meter.todoOrder != null)
           DetailRow(S.todoOrder, '${meter.todoOrder}'),
-        if (meter.exportOrder != null)
+        if (isModerator && meter.exportOrder != null)
           DetailRow(S.exportOrder, '${meter.exportOrder}'),
         if (onEdit != null)
           _EditButton(
@@ -372,10 +382,33 @@ class UserAvatar extends StatelessWidget {
 
 // ---- reading ----------------------------------------------------------------
 
-class _ReadingSheet extends StatelessWidget {
-  const _ReadingSheet({required this.row});
+class _ReadingSheet extends StatefulWidget {
+  const _ReadingSheet({required this.row, this.onChanged});
 
   final Map<String, dynamic> row;
+  final VoidCallback? onChanged;
+
+  @override
+  State<_ReadingSheet> createState() => _ReadingSheetState();
+}
+
+class _ReadingSheetState extends State<_ReadingSheet> {
+  bool _busy = false;
+
+  Map<String, dynamic> get row => widget.row;
+
+  /// Runs [action]; when it changed the reading, closes the sheet and lets
+  /// the caller reload.
+  Future<void> _run(Future<bool> Function() action) async {
+    setState(() => _busy = true);
+    final changed = await action();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (changed) {
+      Navigator.of(context).pop();
+      widget.onChanged?.call();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -387,6 +420,10 @@ class _ReadingSheet extends StatelessWidget {
     final userName = row['logged_by_name'] as String? ?? '';
     final photoKey = row['reading_photo_key'] as String?;
     final area = row['area'] as String? ?? '';
+    final deleteEnabled = context
+        .watch<AppStatusController>()
+        .config
+        .readingDeleteEnabled;
     return _SheetBody(
       children: [
         _Title(
@@ -421,6 +458,49 @@ class _ReadingSheet extends StatelessWidget {
                 ? () => showUserPopup(context, userId)
                 : null,
           ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.tonalIcon(
+                onPressed: _busy
+                    ? null
+                    : () => _run(() async {
+                        final v = await editReadingValue(
+                          context,
+                          id: row['id'] as String,
+                          current: value,
+                        );
+                        return v != null;
+                      }),
+                icon: const Icon(Icons.edit_outlined),
+                label: Text(S.editReading),
+              ),
+            ),
+            if (deleteEnabled) ...[
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.error,
+                    // Same height as the filled edit button beside it.
+                    minimumSize: const Size.fromHeight(52),
+                  ),
+                  onPressed: _busy
+                      ? null
+                      : () => _run(
+                          () => deleteReadingConfirmed(
+                            context,
+                            row['id'] as String,
+                          ),
+                        ),
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  label: Text(S.deleteReading),
+                ),
+              ),
+            ],
+          ],
+        ),
       ],
     );
   }

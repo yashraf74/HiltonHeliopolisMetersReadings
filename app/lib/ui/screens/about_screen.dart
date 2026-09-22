@@ -21,9 +21,9 @@ class AboutScreen extends StatefulWidget {
 }
 
 class _AboutScreenState extends State<AboutScreen> {
-  late final Future<String> _title = context
+  late final Future<({String title, String? photoKey})> _about = context
       .read<ApiClient>()
-      .fetchDeveloperTitle();
+      .fetchAbout();
 
   static const _gold = Color(0xFFC9A227);
 
@@ -37,7 +37,7 @@ class _AboutScreenState extends State<AboutScreen> {
         children: [
           _Hero(version: version),
           const SizedBox(height: 16),
-          _DeveloperCard(title: _title, gold: _gold),
+          _DeveloperCard(about: _about, gold: _gold),
           const SizedBox(height: 16),
           _Section(
             icon: Icons.work_outline_rounded,
@@ -160,9 +160,21 @@ class _Hero extends StatelessWidget {
 /// "Designed and developed by": monogram with a gold ring, name, title from
 /// the server, hotel.
 class _DeveloperCard extends StatelessWidget {
-  const _DeveloperCard({required this.title, required this.gold});
+  const _DeveloperCard({required this.about, required this.gold});
 
-  final Future<String> title;
+  static const _monogram = Text(
+    'KA',
+    textDirection: TextDirection.ltr,
+    style: TextStyle(
+      color: Colors.white,
+      fontSize: 26,
+      fontWeight: FontWeight.w800,
+      letterSpacing: 1,
+    ),
+  );
+
+  /// Title and photo (of the account named in KV `developer_username`).
+  final Future<({String title, String? photoKey})> about;
   final Color gold;
 
   @override
@@ -191,19 +203,24 @@ class _DeveloperCard extends StatelessWidget {
                   colors: [gold, gold.withValues(alpha: 0.5), gold],
                 ),
               ),
-              child: const CircleAvatar(
-                radius: 38,
-                backgroundColor: AppColors.accent,
-                child: Text(
-                  'KA',
-                  textDirection: TextDirection.ltr,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 1,
-                  ),
-                ),
+              child: FutureBuilder(
+                future: about,
+                builder: (context, snap) {
+                  final key = snap.data?.photoKey;
+                  final api = context.read<ApiClient>();
+                  return CircleAvatar(
+                    radius: 38,
+                    backgroundColor: AppColors.accent,
+                    foregroundImage: key == null
+                        ? null
+                        : NetworkImage(
+                            api.photoUri(key).toString(),
+                            headers: api.authHeaders,
+                          ),
+                    onForegroundImageError: key == null ? null : (_, _) {},
+                    child: _monogram,
+                  );
+                },
               ),
             ),
             const SizedBox(height: 12),
@@ -213,10 +230,10 @@ class _DeveloperCard extends StatelessWidget {
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 4),
-            FutureBuilder<String>(
-              future: title,
+            FutureBuilder(
+              future: about,
               builder: (context, snap) {
-                final text = snap.data;
+                final text = snap.data?.title;
                 if (text == null || text.isEmpty) {
                   return const SizedBox(height: 20);
                 }

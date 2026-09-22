@@ -196,14 +196,23 @@ class _MetersScreenState extends State<MetersScreen> {
 
 /// Shared meter row: the reference photo (with the type icon in the
 /// corner) when the meter has one, otherwise the plain type badge. Tapping
-/// the photo opens the meter popup (full photo, pinch-zoom). [doneToday]
-/// shows the daily to-do tick in the reading flow.
+/// the photo opens the meter popup (full photo, pinch-zoom) unless
+/// [photoOpensPopup] is false, when it does the same as [onTap] (the daily
+/// reading list, where any tap starts a reading). [doneToday] shows the
+/// daily to-do tick in the reading flow.
 class MeterTile extends StatelessWidget {
-  const MeterTile({super.key, required this.meter, this.onTap, this.doneToday});
+  const MeterTile({
+    super.key,
+    required this.meter,
+    this.onTap,
+    this.doneToday,
+    this.photoOpensPopup = true,
+  });
 
   final Meter meter;
   final VoidCallback? onTap;
   final bool? doneToday;
+  final bool photoOpensPopup;
 
   @override
   Widget build(BuildContext context) {
@@ -222,7 +231,9 @@ class MeterTile extends StatelessWidget {
           child: Row(
             children: [
               GestureDetector(
-                onTap: () => showMeterPopup(context, meter.id),
+                onTap: photoOpensPopup
+                    ? () => showMeterPopup(context, meter.id)
+                    : onTap,
                 child: PhotoThumb(
                   type: type,
                   size: 52,

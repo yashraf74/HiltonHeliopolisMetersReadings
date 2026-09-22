@@ -53,11 +53,15 @@ class SessionController extends ChangeNotifier {
   }
 
   /// Returns null on success, otherwise an Arabic error message to display.
+  /// [beforeSignedIn] runs once the user is known but before listeners hear
+  /// about it (used to switch to the user's language first, so the home
+  /// screen never draws in the previous one).
   Future<String?> signIn(
     ApiClient api,
     String username,
-    String password,
-  ) async {
+    String password, {
+    Future<void> Function(AuthUser user)? beforeSignedIn,
+  }) async {
     try {
       final result = await api.login(username.trim(), password);
       _token = result.token;
@@ -65,6 +69,7 @@ class SessionController extends ChangeNotifier {
       _needsReauth = false;
       await _storage.write(key: _tokenKey, value: _token);
       await _storage.write(key: _userKey, value: jsonEncode(_user!.toJson()));
+      await beforeSignedIn?.call(_user!);
       _status = SessionStatus.signedIn;
       notifyListeners();
       return null;

@@ -215,7 +215,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _SectionHeader(S.unusualReadings, count: d.unusual.length),
       _ExpandableCard(
         empty: S.noUnusual,
-        children: [for (final u in d.unusual) _UnusualRow(u)],
+        children: [for (final u in d.unusual) _UnusualRow(u, onChanged: _load)],
       ),
       gap,
       _SectionHeader(
@@ -765,7 +765,7 @@ class _CountText extends StatelessWidget {
           ),
         ),
         Text(
-          S.readingsSuffix,
+          S.readingsUnit(count),
           style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 11.5),
         ),
       ],
@@ -1514,9 +1514,12 @@ class _ExpandableCardState extends State<_ExpandableCard> {
 }
 
 class _UnusualRow extends StatelessWidget {
-  const _UnusualRow(this.row);
+  const _UnusualRow(this.row, {required this.onChanged});
 
   final _Json row;
+
+  /// Reloads the dashboard after the reading was edited or deleted.
+  final VoidCallback onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1531,7 +1534,7 @@ class _UnusualRow extends StatelessWidget {
       S.localeCode,
     ).format(DateTime.parse(row['logged_at'] as String).toLocal());
     return _MeterRow(
-      onTap: () => showReadingPopup(context, row),
+      onTap: () => showReadingPopup(context, row, onChanged: onChanged),
       meter: meter,
       subtitle: '${meter.area.isEmpty ? meter.type.label : meter.area} · $when',
       trailing: Column(
@@ -1582,7 +1585,7 @@ class _OverdueRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
-                  '$days ${S.days}',
+                  '$days ${S.daysUnit(days)}',
                   style: TextStyle(
                     color: days >= 7 ? AppColors.failed : AppColors.pending,
                     fontSize: 15,

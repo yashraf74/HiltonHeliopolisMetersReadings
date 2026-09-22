@@ -54,10 +54,12 @@ class _LoginScreenState extends State<LoginScreen> {
     final api = context.read<ApiClient>();
     final status = context.read<AppStatusController>();
     final language = context.read<LanguageController>();
-    final error = await session.signIn(api, username, password);
-    if (!mounted) return;
-    final saved = session.user?.language;
-    if (error == null && saved != null) await language.apply(saved);
+    final error = await session.signIn(
+      api,
+      username,
+      password,
+      beforeSignedIn: (user) => language.signedIn(user),
+    );
     if (!mounted) return;
     if (error == null) {
       status.refresh(api, isModerator: session.user?.canManage ?? false);

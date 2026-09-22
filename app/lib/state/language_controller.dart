@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import '../core/strings.dart';
 import '../data/api/api_client.dart';
+import '../data/models.dart';
 
 /// The app language. Starts from this device's last choice (used on the
 /// login screen); after sign-in it follows the user's saved preference, and
@@ -12,6 +13,9 @@ class LanguageController extends ChangeNotifier {
     : _storage = storage;
 
   static const _key = 'app_language';
+
+  /// Set when a toggle couldn't be saved to the account (offline).
+  static const _pendingKey = 'app_language_unsaved';
 
   final FlutterSecureStorage _storage;
 
@@ -37,18 +41,52 @@ class LanguageController extends ChangeNotifier {
     }
   }
 
+  /// After sign-in: switch to the account's saved language. A toggle made
+  /// offline by an earlier session is dropped; the account's choice wins.
+  Future<void> signedIn(AuthUser user) async {
+    await _setPending(false);
+    final saved = user.language;
+    if (saved != null) await apply(saved);
+  }
+
   /// The user's toggle: applies it and, when signed in, saves it as their
-  /// preference. Offline, the device keeps it and the server keeps the
-  /// previous preference until the next toggle.
+  /// preference. If that fails (offline) it's retried at the next start.
   Future<void> choose(AppLanguage language, {ApiClient? api}) async {
     await apply(language);
     if (api == null) return;
+    await _save(api);
+  }
+
+  /// Saves a toggle that couldn't be saved earlier, if there is one.
+  Future<void> retryPendingSave(ApiClient api) async {
     try {
-      await api.saveLanguage(language);
+      if (await _storage.read(key: _pendingKey) == 'true') await _save(api);
+    } catch (_) {
+      // Storage unavailable: nothing to retry.
+    }
+  }
+
+  Future<void> _save(ApiClient api) async {
+    try {
+      await api.saveLanguage(S.language);
+      await _setPending(false);
     } on NetworkException {
-      // Stays local for now.
+      await _setPending(true);
     } on ApiException {
-      // Stays local for now.
+      // Rejected (e.g. signed out): the device keeps its choice.
+      await _setPending(false);
+    }
+  }
+
+  Future<void> _setPending(bool pending) async {
+    try {
+      if (pending) {
+        await _storage.write(key: _pendingKey, value: 'true');
+      } else {
+        await _storage.delete(key: _pendingKey);
+      }
+    } catch (_) {
+      // Best effort.
     }
   }
 }

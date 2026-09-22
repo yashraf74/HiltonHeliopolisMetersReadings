@@ -15,6 +15,7 @@ import '../../state/connectivity_controller.dart';
 import '../../state/meters_controller.dart';
 import '../../state/session_controller.dart';
 import '../../state/sync_controller.dart';
+import '../popups.dart';
 import '../widgets/photo_picker.dart';
 import '../widgets/status_widgets.dart';
 import 'meters_screen.dart';
@@ -327,9 +328,12 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
                                 );
                               }
                               final m = meters[i - 1];
+                              // Any tap here starts a reading; the popup is
+                              // on the next step.
                               return MeterTile(
                                 meter: m,
                                 doneToday: done(m),
+                                photoOpensPopup: false,
                                 onTap: () => setState(() => _meter = m),
                               );
                             },
@@ -375,7 +379,10 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 32),
             children: [
-              MeterTile(meter: meter),
+              MeterTile(
+                meter: meter,
+                onTap: () => showMeterPopup(context, meter.id),
+              ),
               const SizedBox(height: 20),
               Text(
                 S.photo,

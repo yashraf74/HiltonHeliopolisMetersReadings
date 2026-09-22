@@ -456,10 +456,14 @@ class ApiClient {
     return AppUser.fromJson(body['user'] as Map<String, dynamic>);
   }
 
-  /// The About page's developer title (moderators only; set in server KV).
-  Future<String> fetchDeveloperTitle() async {
+  /// The About page's developer title and photo (moderators only; set in
+  /// server KV).
+  Future<({String title, String? photoKey})> fetchAbout() async {
     final body = await _json(_http.get(_uri('/about'), headers: _headers()));
-    return body['developerTitle'] as String;
+    return (
+      title: body['developerTitle'] as String,
+      photoKey: body['developerPhotoKey'] as String?,
+    );
   }
 
   /// Saves the signed-in user's app language.

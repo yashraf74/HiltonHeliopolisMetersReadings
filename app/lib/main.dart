@@ -49,10 +49,9 @@ Future<void> main() async {
   );
 
   await session.restore();
-  // A restored session keeps the user's saved language (sessions from older
-  // app versions have none and keep the device's choice).
-  final saved = session.user?.language;
-  if (saved != null) await language.apply(saved);
+  // The device already holds this user's latest choice (applied at sign-in
+  // and on every toggle); only a toggle made offline may still need saving.
+  if (session.user != null) language.retryPendingSave(api);
 
   runApp(
     MetersApp(
