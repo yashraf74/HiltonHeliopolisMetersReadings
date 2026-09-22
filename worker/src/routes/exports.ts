@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import type { Env } from "../types";
+import type { Env, Language, Role } from "../types";
+import { defaultLanguage } from "../types";
 import type { AuthedVars } from "../middleware";
 import { requireAuth } from "../middleware";
 import { PLACEHOLDER_EMAIL } from "./users";
@@ -35,9 +36,9 @@ exportRoutes.post("/email", async (c) => {
     return c.json({ error: "content must be a base64 .xlsx under 10 MB" }, 400);
   }
 
-  const user = await c.env.DB.prepare("SELECT email, full_name FROM users WHERE id = ?")
+  const user = await c.env.DB.prepare("SELECT email, full_name, language, role FROM users WHERE id = ?")
     .bind(c.get("user").id)
-    .first<{ email: string; full_name: string }>();
+    .first<{ email: string; full_name: string; language: Language | null; role: Role }>();
   if (!user || user.email === PLACEHOLDER_EMAIL) {
     return c.json({ error: "No email address is set for your account", code: "no_email" }, 400);
   }
@@ -53,7 +54,8 @@ exportRoutes.post("/email", async (c) => {
         {
           From: { Email: MAIL_FROM, Name: SENDER_NAME },
           To: [{ Email: user.email, Name: user.full_name }],
-          Subject: `Meter readings export - ${fileName.replace(/\.xlsx$/, "")}`,
+          // Subject in the user's language; the body stays bilingual.
+          Subject: `${(user.language ?? defaultLanguage(user.role)) === "en" ? "Meter readings export" : "تصدير قراءات العدادات"} - ${fileName.replace(/\.xlsx$/, "")}`,
           TextPart: `مرفق ملف القراءات (${fileName}) الذي طلبته من تطبيق عدادات هيلتون.\n\nThe readings export you requested from the Hilton Heliopolis Meters app is attached.`,
           Attachments: [{ ContentType: XLSX_MIME, Filename: fileName, Base64Content: content }],
         },
