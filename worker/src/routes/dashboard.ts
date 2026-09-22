@@ -37,6 +37,9 @@ type Row = {
   gain: number | null;
   logged_at: string;
   prev_at: string | null;
+  reading_photo_key: string | null;
+  logged_by: string;
+  logged_by_name: string;
 };
 
 type MeterRow = {
@@ -89,8 +92,9 @@ dashboardRoutes.get("/", async (c) => {
       .prepare(
         `SELECT * FROM (
            SELECT r.id, r.meter_id, m.type, m.name, m.area, m.photo_key, r.value, r.gain, r.logged_at,
+                  r.photo_key AS reading_photo_key, r.logged_by, u.full_name AS logged_by_name,
                   LAG(r.logged_at) OVER (PARTITION BY r.meter_id ORDER BY r.logged_at, r.id) AS prev_at
-           FROM readings r JOIN meters m ON m.id = r.meter_id
+           FROM readings r JOIN meters m ON m.id = r.meter_id JOIN users u ON u.id = r.logged_by
            WHERE r.logged_at >= ? AND r.logged_at <= ?
          ) WHERE logged_at >= ?
          ORDER BY logged_at, id`
@@ -204,6 +208,9 @@ dashboardRoutes.get("/", async (c) => {
       daily: rate,
       usual,
       logged_at: r.logged_at,
+      reading_photo_key: r.reading_photo_key,
+      logged_by: r.logged_by,
+      logged_by_name: r.logged_by_name,
     });
   }
   unusual.sort((a, b) => (a.logged_at < b.logged_at ? 1 : -1));

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import type { Env } from "../types";
+import type { Env, Language } from "../types";
+import { defaultLanguage } from "../types";
 import type { AuthedVars } from "../middleware";
 import { verifyPassword, signJwt } from "../auth";
 import { MAINTENANCE_MESSAGE } from "../settings";
@@ -10,6 +11,7 @@ interface UserRow {
   password_hash: string;
   full_name: string;
   email: string;
+  language: Language | null;
   role: "moderator" | "engineer" | "technician";
 }
 
@@ -25,7 +27,7 @@ authRoutes.post("/login", async (c) => {
   }
 
   const user = await c.env.DB.prepare(
-    "SELECT id, username, password_hash, full_name, email, role FROM users WHERE username = ? AND is_active = 1"
+    "SELECT id, username, password_hash, full_name, email, language, role FROM users WHERE username = ? AND is_active = 1"
   )
     .bind(username)
     .first<UserRow>();
@@ -45,6 +47,13 @@ authRoutes.post("/login", async (c) => {
 
   return c.json({
     token,
-    user: { id: user.id, username: user.username, fullName: user.full_name, email: user.email, role: user.role },
+    user: {
+      id: user.id,
+      username: user.username,
+      fullName: user.full_name,
+      email: user.email,
+      role: user.role,
+      language: user.language ?? defaultLanguage(user.role),
+    },
   });
 });

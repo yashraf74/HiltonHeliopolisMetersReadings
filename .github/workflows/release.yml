@@ -3,7 +3,9 @@ name: Versioned release
 # Push a tag like v2.1.1 (matching the version in app/pubspec.yaml) to build
 # a Shorebird release APK, signed with the permanent key, and publish it as a
 # GitHub release. Later Dart-only fixes for that version ship with patch.yml
-# instead of a new APK.
+# instead of a new APK. If the tag's message contains "beta"
+# (git tag -a v2.4.0 -m "v2.4.0 beta"), the release is a pre-release and
+# does not become Latest (so the app's "latest version" hint ignores it).
 on:
   push:
     tags: ["v*"]
@@ -70,9 +72,21 @@ jobs:
         run: |
           set -e
           TAG="${GITHUB_REF_NAME}"
-          NOTES="$(git tag -l --format='%(contents)' "$TAG")"
+          # actions/checkout turns the tag into a lightweight one; fetch the
+          # annotated tag to read its message. Release notes stay the commit
+          # message, as before.
+          git fetch --force origin "refs/tags/$TAG:refs/tags/$TAG"
+          TAG_MESSAGE="$(git tag -l --format='%(contents)' "$TAG")"
+          NOTES="$(git log -1 --format=%B)"
+          if echo "$TAG_MESSAGE" | grep -qi beta; then
+            KIND=(--prerelease --latest=false)
+            TITLE="$TAG (beta)"
+          else
+            KIND=(--latest)
+            TITLE="$TAG"
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "hilton-meters-${TAG}.apk" --clobber
           else
-            gh release create "$TAG" "hilton-meters-${TAG}.apk" --title "$TAG" --latest --notes "${NOTES:-Release $TAG}"
+            gh release create "$TAG" "hilton-meters-${TAG}.apk" --title "$TITLE" "${KIND[@]}" --notes "${NOTES:-Release $TAG}"
           fi

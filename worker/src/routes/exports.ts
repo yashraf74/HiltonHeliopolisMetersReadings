@@ -53,7 +53,7 @@ exportRoutes.post("/email", async (c) => {
         {
           From: { Email: MAIL_FROM, Name: SENDER_NAME },
           To: [{ Email: user.email, Name: user.full_name }],
-          Subject: `تقرير القراءات - ${fileName.replace(/\.xlsx$/, "")}`,
+          Subject: `Meter readings export - ${fileName.replace(/\.xlsx$/, "")}`,
           TextPart: `مرفق ملف القراءات (${fileName}) الذي طلبته من تطبيق عدادات هيلتون.\n\nThe readings export you requested from the Hilton Heliopolis Meters app is attached.`,
           Attachments: [{ ContentType: XLSX_MIME, Filename: fileName, Base64Content: content }],
         },

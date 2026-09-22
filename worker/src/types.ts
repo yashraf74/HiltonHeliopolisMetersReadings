@@ -12,6 +12,11 @@ export interface Env {
   MAILJET_SECRET_KEY?: string;
 }
 
+export type Language = "ar" | "en";
+
+/** Language used until a user picks one: English for moderators. */
+export const defaultLanguage = (role: Role): Language => (role === "moderator" ? "en" : "ar");
+
 export interface AuthUser {
   id: string;
   username: string;

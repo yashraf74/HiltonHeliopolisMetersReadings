@@ -49,6 +49,14 @@ async function latestAppVersion(): Promise<string | null> {
   return /^\d+(\.\d+){0,2}$/.test(version) ? version : null;
 }
 
+/** Shown on the moderator-only About page; edited in KV only, not in the app. */
+const DEFAULT_DEVELOPER_TITLE = "Senior Shift Engineer";
+
+settingsRoutes.get("/about", requireAuth, requireRole("moderator"), async (c) => {
+  const title = (await c.env.SETTINGS.get("developer_title"))?.trim();
+  return c.json({ developerTitle: title || DEFAULT_DEVELOPER_TITLE });
+});
+
 settingsRoutes.get("/settings", requireAuth, requireRole("moderator"), async (c) =>
   c.json({ ...c.get("settings"), latestAppVersion: await latestAppVersion() })
 );
