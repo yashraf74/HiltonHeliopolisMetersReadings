@@ -26,11 +26,11 @@ class StatusBanners extends StatelessWidget {
             text: S.sessionExpired,
             action: TextButton(
               onPressed: () => context.read<SessionController>().signOut(),
-              child: const Text(S.login),
+              child: Text(S.login),
             ),
           ),
         if (!isOnline)
-          const _Banner(
+          _Banner(
             icon: Icons.wifi_off_rounded,
             color: AppColors.pending,
             text: S.offlineBanner,
@@ -177,11 +177,20 @@ Widget appContextMenuBuilder(BuildContext context, EditableTextState state) =>
 
 /// One label/value line in an expanded reading or meter card.
 class DetailRow extends StatelessWidget {
-  const DetailRow(this.label, this.value, {super.key, this.mono = false});
+  const DetailRow(
+    this.label,
+    this.value, {
+    super.key,
+    this.mono = false,
+    this.onTap,
+  });
 
   final String label;
   final String value;
   final bool mono;
+
+  /// Makes the value a [TapLink] (e.g. a meter or user name).
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -199,15 +208,27 @@ class DetailRow extends StatelessWidget {
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              textDirection: mono ? TextDirection.ltr : null,
-              style: TextStyle(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w600,
-                fontFamily: mono ? 'monospace' : null,
-              ),
-            ),
+            child: onTap != null
+                ? Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: TapLink(
+                      value,
+                      onTap: onTap!,
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  )
+                : Text(
+                    value,
+                    textDirection: mono ? TextDirection.ltr : null,
+                    style: TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: mono ? 'monospace' : null,
+                    ),
+                  ),
           ),
         ],
       ),
@@ -491,6 +512,52 @@ class TypeChip extends StatelessWidget {
         fontWeight: FontWeight.w600,
       ),
       onSelected: onSelected,
+    );
+  }
+}
+
+/// Tappable text for a meter, user or reading. It looks like the text around
+/// it (no link colour, no underline); a small chevron is the only cue.
+class TapLink extends StatelessWidget {
+  const TapLink(
+    this.text, {
+    super.key,
+    required this.onTap,
+    this.style,
+    this.maxLines = 1,
+  });
+
+  final String text;
+  final VoidCallback onTap;
+  final TextStyle? style;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final effective = DefaultTextStyle.of(context).style.merge(style);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              text,
+              style: style,
+              maxLines: maxLines,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          // chevron_right mirrors itself in right-to-left layouts.
+          Icon(
+            Icons.chevron_right_rounded,
+            size: (effective.fontSize ?? 14) + 2,
+            color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
+        ],
+      ),
     );
   }
 }

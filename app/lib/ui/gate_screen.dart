@@ -91,7 +91,7 @@ class GateScreen extends StatelessWidget {
                     );
                   },
                   icon: const Icon(Icons.refresh_rounded),
-                  label: const Text(S.checkAgain),
+                  label: Text(S.checkAgain),
                 ),
               ],
             ),

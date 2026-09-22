@@ -6,11 +6,12 @@ import '../../data/api/api_client.dart';
 import '../../data/db/database.dart';
 import '../../data/models.dart';
 import '../../state/meters_controller.dart';
+import '../popups.dart';
 import '../widgets/status_widgets.dart';
 import 'meter_form_screen.dart';
 
-/// Moderator's meter list from the local cache, filterable by type, with
-/// add / edit / retire. Reference photos show as thumbnails (tap to zoom).
+/// Moderator's meter list from the local cache, filterable by type and
+/// sortable. Tapping a meter opens its popup (with edit); add via the button.
 class MetersScreen extends StatefulWidget {
   const MetersScreen({super.key});
 
@@ -21,15 +22,19 @@ class MetersScreen extends StatefulWidget {
 /// Sort options for the meter management list. Meter numbers compare
 /// numerically when both are numbers.
 enum MeterSort {
-  todoOrder(S.todoOrder),
-  exportOrder(S.exportOrder),
-  name(S.meterName),
-  area(S.meterArea),
-  number(S.meterNumber);
+  todoOrder,
+  exportOrder,
+  name,
+  area,
+  number;
 
-  const MeterSort(this.label);
-
-  final String label;
+  String get label => switch (this) {
+    todoOrder => S.todoOrder,
+    exportOrder => S.exportOrder,
+    name => S.meterName,
+    area => S.meterArea,
+    number => S.meterNumber,
+  };
 
   int compare(Meter a, Meter b) => switch (this) {
     todoOrder => _compareNullable(a.todoOrder, b.todoOrder),
@@ -108,7 +113,7 @@ class _MetersScreenState extends State<MetersScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => MeterFormScreen.open(context),
         icon: const Icon(Icons.add_rounded),
-        label: const Text(S.addMeter),
+        label: Text(S.addMeter),
       ),
       body: Column(
         children: [
@@ -121,7 +126,7 @@ class _MetersScreenState extends State<MetersScreen> {
                   child: Row(
                     children: [
                       ChoiceChip(
-                        label: const Text(S.filterAll),
+                        label: Text(S.filterAll),
                         selected: _filter == null,
                         onSelected: (_) => setState(() => _filter = null),
                       ),
@@ -176,10 +181,7 @@ class _MetersScreenState extends State<MetersScreen> {
                               const SizedBox(height: 10),
                           itemBuilder: (context, i) => MeterTile(
                             meter: meters[i],
-                            onTap: () => MeterFormScreen.open(
-                              context,
-                              existing: meters[i],
-                            ),
+                            onTap: () => showMeterPopup(context, meters[i].id),
                           ),
                         ),
                 );
@@ -193,8 +195,9 @@ class _MetersScreenState extends State<MetersScreen> {
 }
 
 /// Shared meter row: the reference photo (with the type icon in the
-/// corner, tap to zoom) when the meter has one, otherwise the plain type
-/// badge. [doneToday] shows the daily to-do tick in the reading flow.
+/// corner) when the meter has one, otherwise the plain type badge. Tapping
+/// the photo opens the meter popup (full photo, pinch-zoom). [doneToday]
+/// shows the daily to-do tick in the reading flow.
 class MeterTile extends StatelessWidget {
   const MeterTile({super.key, required this.meter, this.onTap, this.doneToday});
 
@@ -218,16 +221,18 @@ class MeterTile extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           child: Row(
             children: [
-              PhotoThumb(
-                type: type,
-                size: 52,
-                zoomOnTap: true,
-                image: photoKey == null
-                    ? null
-                    : NetworkImage(
-                        api.photoUri(photoKey).toString(),
-                        headers: api.authHeaders,
-                      ),
+              GestureDetector(
+                onTap: () => showMeterPopup(context, meter.id),
+                child: PhotoThumb(
+                  type: type,
+                  size: 52,
+                  image: photoKey == null
+                      ? null
+                      : NetworkImage(
+                          api.photoUri(photoKey).toString(),
+                          headers: api.authHeaders,
+                        ),
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -339,7 +344,7 @@ class _MeterSortSheetState extends State<_MeterSortSheet> {
           SizedBox(
             width: double.infinity,
             child: SegmentedButton<bool>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: false,
                   label: Text(S.sortAsc),
@@ -358,7 +363,7 @@ class _MeterSortSheetState extends State<_MeterSortSheet> {
           const SizedBox(height: 20),
           FilledButton(
             onPressed: () => Navigator.pop(context, (_sort, _desc)),
-            child: const Text(S.applyFilters),
+            child: Text(S.applyFilters),
           ),
         ],
       ),

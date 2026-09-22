@@ -10,6 +10,8 @@ import '../state/connectivity_controller.dart';
 import '../state/meters_controller.dart';
 import '../state/session_controller.dart';
 import '../state/sync_controller.dart';
+import '../state/language_controller.dart';
+import 'screens/about_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/meters_screen.dart';
 import 'screens/new_reading_screen.dart';
@@ -71,24 +73,20 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   }
 
   List<_Tab> _tabsFor(AuthUser user) => [
-    const _Tab(
+    _Tab(
       label: S.navNewReading,
       icon: Icons.add_circle_outline_rounded,
       body: NewReadingScreen(),
     ),
     if (user.canManage)
-      const _Tab(
-        label: S.navMeters,
-        icon: Icons.speed_rounded,
-        body: MetersScreen(),
-      ),
-    const _Tab(
+      _Tab(label: S.navMeters, icon: Icons.speed_rounded, body: MetersScreen()),
+    _Tab(
       label: S.navReadings,
       icon: Icons.list_alt_rounded,
       body: ReadingsScreen(),
     ),
     if (user.canSeeDashboard)
-      const _Tab(
+      _Tab(
         label: S.navDashboard,
         icon: Icons.dashboard_outlined,
         body: DashboardScreen(),
@@ -122,21 +120,19 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                     final sync = context.read<SyncController>();
                     if (pending == 0) {
                       messenger.showSnackBar(
-                        const SnackBar(content: Text(S.syncAllDone)),
+                        SnackBar(content: Text(S.syncAllDone)),
                       );
                       return;
                     }
                     // Always try: the offline flag can be stale, and a real
                     // request is the only reliable test.
                     messenger.showSnackBar(
-                      const SnackBar(content: Text(S.syncStarted)),
+                      SnackBar(content: Text(S.syncStarted)),
                     );
                     final synced = await sync.sync();
                     if (synced == 0 && !sync.isRunning) {
                       messenger.showSnackBar(
-                        const SnackBar(
-                          content: Text(S.syncFailedCheckConnection),
-                        ),
+                        SnackBar(content: Text(S.syncFailedCheckConnection)),
                       );
                     }
                   },
@@ -201,6 +197,13 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const UsersScreen()),
                   );
+                case 'about':
+                  AboutScreen.open(context);
+                case 'language':
+                  context.read<LanguageController>().choose(
+                    S.isEnglish ? AppLanguage.ar : AppLanguage.en,
+                    api: context.read<ApiClient>(),
+                  );
                 case 'logout':
                   session.signOut();
               }
@@ -231,7 +234,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               ),
               const PopupMenuDivider(),
               if (user.canManage) ...[
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'settings',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -239,7 +242,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                     title: Text(S.appSettings),
                   ),
                 ),
-                const PopupMenuItem(
+                PopupMenuItem(
                   value: 'users',
                   child: ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -247,9 +250,25 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                     title: Text(S.manageUsers),
                   ),
                 ),
+                PopupMenuItem(
+                  value: 'about',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.info_outline_rounded),
+                    title: Text(S.aboutApp),
+                  ),
+                ),
                 const PopupMenuDivider(),
               ],
-              const PopupMenuItem(
+              PopupMenuItem(
+                value: 'language',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.translate_rounded),
+                  title: Text(S.switchLanguage),
+                ),
+              ),
+              PopupMenuItem(
                 value: 'logout',
                 child: ListTile(
                   contentPadding: EdgeInsets.zero,

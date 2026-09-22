@@ -11,6 +11,7 @@ import 'core/theme.dart';
 import 'data/api/api_client.dart';
 import 'data/db/database.dart';
 import 'state/app_status_controller.dart';
+import 'state/language_controller.dart';
 import 'state/connectivity_controller.dart';
 import 'state/meters_controller.dart';
 import 'state/session_controller.dart';
@@ -23,6 +24,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   await initializeDateFormatting('ar');
+  await initializeDateFormatting('en');
+  final language = LanguageController(storage: const FlutterSecureStorage());
+  await language.restore();
   final info = await PackageInfo.fromPlatform();
 
   final db = AppDatabase();
@@ -45,6 +49,10 @@ Future<void> main() async {
   );
 
   await session.restore();
+  // A restored session keeps the user's saved language (sessions from older
+  // app versions have none and keep the device's choice).
+  final saved = session.user?.language;
+  if (saved != null) await language.apply(saved);
 
   runApp(
     MetersApp(
@@ -55,6 +63,7 @@ Future<void> main() async {
       connectivity: connectivity,
       sync: sync,
       status: status,
+      language: language,
     ),
   );
 }
@@ -69,6 +78,7 @@ class MetersApp extends StatelessWidget {
     required this.connectivity,
     required this.sync,
     required this.status,
+    required this.language,
   });
 
   final AppDatabase db;
@@ -78,6 +88,7 @@ class MetersApp extends StatelessWidget {
   final ConnectivityController connectivity;
   final SyncController sync;
   final AppStatusController status;
+  final LanguageController language;
 
   @override
   Widget build(BuildContext context) {
@@ -92,41 +103,45 @@ class MetersApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<SyncController>.value(value: sync),
         ChangeNotifierProvider<AppStatusController>.value(value: status),
+        ChangeNotifierProvider<LanguageController>.value(value: language),
       ],
-      child: MaterialApp(
-        title: S.appNameShort,
-        debugShowCheckedModeBanner: false,
-        theme: buildAppTheme(),
-        locale: const Locale('ar'),
-        supportedLocales: const [Locale('ar')],
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        // Tapping anywhere that isn't a control (a text field, button, ...)
-        // closes the keyboard.
-        builder: (context, child) => GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: child,
-        ),
-        home: Consumer2<SessionController, AppStatusController>(
-          builder: (context, session, status, _) {
-            // Hard gates come first: an outdated build or maintenance mode
-            // replaces the whole app regardless of sign-in state.
-            if (status.upgradeRequired) return const GateScreen(upgrade: true);
-            if (status.maintenance) return const GateScreen(upgrade: false);
-            return switch (session.status) {
-              SessionStatus.restoring => const Scaffold(
-                body: Center(child: CircularProgressIndicator()),
-              ),
-              SessionStatus.signedOut => const LoginScreen(),
-              SessionStatus.signedIn => const HomeShell(),
-            };
-          },
-        ),
-      ),
+      child: LanguageRebuilder(controller: language, builder: (_) => _app()),
     );
   }
+
+  Widget _app() => MaterialApp(
+    title: S.appNameShort,
+    debugShowCheckedModeBanner: false,
+    theme: buildAppTheme(),
+    // Arabic lays out right-to-left, English left-to-right.
+    locale: Locale(S.localeCode),
+    supportedLocales: const [Locale('ar'), Locale('en')],
+    localizationsDelegates: const [
+      GlobalMaterialLocalizations.delegate,
+      GlobalWidgetsLocalizations.delegate,
+      GlobalCupertinoLocalizations.delegate,
+    ],
+    // Tapping anywhere that isn't a control (a text field, button, ...)
+    // closes the keyboard.
+    builder: (context, child) => GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: child,
+    ),
+    home: Consumer2<SessionController, AppStatusController>(
+      builder: (context, session, status, _) {
+        // Hard gates come first: an outdated build or maintenance mode
+        // replaces the whole app regardless of sign-in state.
+        if (status.upgradeRequired) return const GateScreen(upgrade: true);
+        if (status.maintenance) return const GateScreen(upgrade: false);
+        return switch (session.status) {
+          SessionStatus.restoring => const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          ),
+          SessionStatus.signedOut => const LoginScreen(),
+          SessionStatus.signedIn => const HomeShell(),
+        };
+      },
+    ),
+  );
 }

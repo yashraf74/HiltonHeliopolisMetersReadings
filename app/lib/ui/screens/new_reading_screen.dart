@@ -80,7 +80,7 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
     final value = double.tryParse(_toWesternDigits(raw));
     if (_photo == null) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.photoRequired)));
+          .showSnackBar(SnackBar(content: Text(S.photoRequired)));
       return;
     }
     if (raw.isEmpty) {
@@ -154,11 +154,7 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
               size: 44,
             ),
             title: Text(title, textAlign: TextAlign.center),
-            content: Text(
-              detail,
-              textAlign: TextAlign.center,
-              textDirection: TextDirection.rtl,
-            ),
+            content: Text(detail, textAlign: TextAlign.center),
           ),
         );
       },
@@ -194,7 +190,7 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
           child: Row(
             children: [
               ChoiceChip(
-                label: const Text(S.filterAll),
+                label: Text(S.filterAll),
                 selected: _filter == null,
                 onSelected: (_) => setState(() => _filter = null),
               ),
@@ -357,15 +353,16 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(12, 6, 16, 0),
+          padding: const EdgeInsetsDirectional.fromSTEB(16, 6, 12, 0),
           child: Row(
             children: [
               IconButton(
                 onPressed: _backToList,
-                icon: const Icon(Icons.arrow_forward_rounded),
+                // Points the right way in both directions.
+                icon: const BackButtonIcon(),
                 tooltip: S.back,
               ),
-              const Expanded(
+              Expanded(
                 child: Text(
                   S.stepDetails,
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
@@ -433,7 +430,7 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                '${S.willBeLoggedAs} ${user.fullName} · ${DateFormat('d/M/yyyy HH:mm', 'ar').format(DateTime.now())}',
+                '${S.willBeLoggedAs} ${user.fullName} · ${DateFormat('d/M/yyyy HH:mm', S.localeCode).format(DateTime.now())}',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: scheme.onSurfaceVariant,
@@ -453,7 +450,7 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
                         ),
                       )
                     : const Icon(Icons.save_rounded),
-                label: const Text(S.saveReading),
+                label: Text(S.saveReading),
               ),
             ],
           ),
@@ -522,7 +519,10 @@ class _PreviousReading extends StatelessWidget {
                           ),
                           if (when != null)
                             Text(
-                              DateFormat('d/M/yyyy HH:mm', 'ar').format(when),
+                              DateFormat(
+                                'd/M/yyyy HH:mm',
+                                S.localeCode,
+                              ).format(when),
                               style: TextStyle(
                                 color: scheme.onSurfaceVariant,
                                 fontSize: 12,

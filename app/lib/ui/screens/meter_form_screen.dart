@@ -132,12 +132,12 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text(S.retireMeter),
-        content: const Text(S.retireMeterConfirm),
+        title: Text(S.retireMeter),
+        content: Text(S.retireMeterConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(S.cancel),
+            child: Text(S.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -145,7 +145,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
               minimumSize: const Size(0, 44),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(S.retireMeter),
+            child: Text(S.retireMeter),
           ),
         ],
       ),
@@ -274,7 +274,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
               textInputAction: TextInputAction.next,
               maxLength: 80,
               contextMenuBuilder: appContextMenuBuilder,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: S.meterName,
                 hintText: S.meterNameHint,
                 counterText: '',
@@ -288,7 +288,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
               textInputAction: TextInputAction.next,
               maxLength: 80,
               contextMenuBuilder: appContextMenuBuilder,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: S.meterArea,
                 hintText: S.meterAreaHint,
                 counterText: '',
@@ -303,7 +303,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
               maxLength: 80,
               textDirection: TextDirection.ltr,
               contextMenuBuilder: appContextMenuBuilder,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: S.meterNumber,
                 hintText: S.meterNumberHint,
                 counterText: '',
@@ -323,7 +323,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     contextMenuBuilder: appContextMenuBuilder,
-                    decoration: const InputDecoration(labelText: S.todoOrder),
+                    decoration: InputDecoration(labelText: S.todoOrder),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -333,7 +333,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     contextMenuBuilder: appContextMenuBuilder,
-                    decoration: const InputDecoration(labelText: S.exportOrder),
+                    decoration: InputDecoration(labelText: S.exportOrder),
                   ),
                 ),
               ],
@@ -357,7 +357,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
                         color: Colors.white,
                       ),
                     )
-                  : const Text(S.save),
+                  : Text(S.save),
             ),
           ],
         ),

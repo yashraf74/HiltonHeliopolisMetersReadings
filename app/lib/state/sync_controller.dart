@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../core/strings.dart';
 import '../data/api/api_client.dart';
 import '../data/db/database.dart';
 import '../data/photo_store.dart';
@@ -102,7 +103,7 @@ class SyncController extends ChangeNotifier {
             await _db.updateReadingSync(
               reading.id,
               status: 'failed',
-              lastError: 'الصورة غير موجودة على الجهاز',
+              lastError: S.photoMissingOnDevice,
               retryCount: reading.retryCount + 1,
             );
             continue;

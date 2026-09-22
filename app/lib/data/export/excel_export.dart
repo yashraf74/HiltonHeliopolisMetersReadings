@@ -15,7 +15,9 @@ Uint8List buildReadingsWorkbook(List<Map<String, dynamic>> readings) {
   for (final name in excel.sheets.keys.toList()) {
     if (name != S.sheetName) excel.delete(name);
   }
-  sheet.isRTL = true;
+  // Header cells (and type / unit labels) follow the exporter's language;
+  // the column order is the same in both.
+  sheet.isRTL = !S.isEnglish;
 
   final headerStyle = CellStyle(bold: true);
   final headers = [

@@ -7,6 +7,7 @@ import 'package:meters_app/data/db/database.dart';
 import 'package:meters_app/main.dart';
 import 'package:meters_app/state/app_status_controller.dart';
 import 'package:meters_app/state/connectivity_controller.dart';
+import 'package:meters_app/state/language_controller.dart';
 import 'package:meters_app/state/meters_controller.dart';
 import 'package:meters_app/state/session_controller.dart';
 import 'package:meters_app/state/sync_controller.dart';
@@ -44,6 +45,7 @@ void main() {
         connectivity: connectivity,
         sync: sync,
         status: AppStatusController(appVersion: '2.0.0'),
+        language: LanguageController(storage: const FlutterSecureStorage()),
       ),
     );
     await tester.pump();
@@ -89,6 +91,7 @@ void main() {
         connectivity: connectivity,
         sync: sync,
         status: AppStatusController(appVersion: '2.0.0'),
+        language: LanguageController(storage: const FlutterSecureStorage()),
       ),
     );
     await tester.pump();

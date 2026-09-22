@@ -117,11 +117,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (!mounted) return;
       setState(() => _apply(saved));
       await status.refresh(api, isModerator: true);
-      messenger.showSnackBar(const SnackBar(content: Text(S.settingsSaved)));
+      messenger.showSnackBar(SnackBar(content: Text(S.settingsSaved)));
     } on NetworkException {
-      messenger.showSnackBar(
-        const SnackBar(content: Text(S.settingsNeedInternet)),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(S.settingsNeedInternet)));
     } on ApiException catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.message)));
     } finally {
@@ -134,7 +132,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final scheme = Theme.of(context).colorScheme;
     final version = context.read<AppStatusController>().appVersion;
     return Scaffold(
-      appBar: AppBar(title: const Text(S.appSettings)),
+      appBar: AppBar(title: Text(S.appSettings)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -142,7 +140,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 const SizedBox(height: 80),
                 EmptyState(icon: Icons.cloud_off_rounded, title: _error!),
-                TextButton(onPressed: _load, child: const Text(S.retry)),
+                TextButton(onPressed: _load, child: Text(S.retry)),
               ],
             )
           : Form(
@@ -152,7 +150,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text(
+                    title: Text(
                       S.settingMaintenance,
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
@@ -171,7 +169,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text(
+                    title: Text(
                       S.settingDeleteEnabled,
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
@@ -182,7 +180,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text(
+                    title: Text(
                       S.settingExportEnabled,
                       style: TextStyle(fontWeight: FontWeight.w700),
                     ),
@@ -222,7 +220,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     contextMenuBuilder: appContextMenuBuilder,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: S.settingRetention,
                       helperText: S.settingRetentionHint,
                     ),
@@ -239,7 +237,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     contextMenuBuilder: appContextMenuBuilder,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: S.settingTokenLifetime,
                       helperText: S.settingTokenLifetimeHint,
                       helperMaxLines: 2,
@@ -252,7 +250,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     },
                   ),
                   const Divider(height: 40),
-                  const Text(
+                  Text(
                     S.settingPrices,
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
@@ -301,7 +299,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               color: Colors.white,
                             ),
                           )
-                        : const Text(S.save),
+                        : Text(S.save),
                   ),
                 ],
               ),

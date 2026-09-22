@@ -15,20 +15,29 @@ import '../../data/photo_store.dart';
 import '../../state/app_status_controller.dart';
 import '../../state/session_controller.dart';
 import '../../state/sync_controller.dart';
+import '../popups.dart';
 import '../widgets/status_widgets.dart';
 
 enum ReadingSort {
-  byDefault('default', S.sortDefault),
-  loggedAt('logged_at', S.sortDate),
-  value('value', S.sortValue),
-  meterName('meter_name', S.sortMeterName),
-  meterType('meter_type', S.sortType),
-  user('technician', S.sortUser);
+  byDefault('default'),
+  loggedAt('logged_at'),
+  value('value'),
+  meterName('meter_name'),
+  meterType('meter_type'),
+  user('technician');
 
-  const ReadingSort(this.apiName, this.label);
+  const ReadingSort(this.apiName);
 
   final String apiName;
-  final String label;
+
+  String get label => switch (this) {
+    byDefault => S.sortDefault,
+    loggedAt => S.sortDate,
+    value => S.sortValue,
+    meterName => S.sortMeterName,
+    meterType => S.sortType,
+    user => S.sortUser,
+  };
 }
 
 class ReadingFilters {
@@ -289,7 +298,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
   Future<void> _export() async {
     if (_rows.isEmpty) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text(S.exportNothing)));
+          .showSnackBar(SnackBar(content: Text(S.exportNothing)));
       return;
     }
     final target = await showModalBottomSheet<_ExportTarget>(
@@ -447,7 +456,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
                     _load();
                   },
                   icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
-                  label: const Text(S.clearFilters),
+                  label: Text(S.clearFilters),
                 ),
               ],
             ),
@@ -532,12 +541,12 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
             children: [
               const SizedBox(height: 40),
               EmptyState(icon: Icons.cloud_off_rounded, title: _error!),
-              TextButton(onPressed: _load, child: const Text(S.retry)),
+              TextButton(onPressed: _load, child: Text(S.retry)),
             ],
           );
         }
         if (showEmpty) {
-          return const Padding(
+          return Padding(
             padding: EdgeInsets.only(top: 40),
             child: EmptyState(
               icon: Icons.list_alt_rounded,
@@ -576,12 +585,12 @@ class _PendingReadingCard extends StatelessWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text(S.deleteLocalReading),
-        content: const Text(S.deleteLocalReadingConfirm),
+        title: Text(S.deleteLocalReading),
+        content: Text(S.deleteLocalReadingConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(S.cancel),
+            child: Text(S.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -589,7 +598,7 @@ class _PendingReadingCard extends StatelessWidget {
               minimumSize: const Size(0, 44),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(S.deleteReading),
+            child: Text(S.deleteReading),
           ),
         ],
       ),
@@ -604,7 +613,7 @@ class _PendingReadingCard extends StatelessWidget {
     final db = context.read<AppDatabase>();
     final scheme = Theme.of(context).colorScheme;
     final status = SyncStatus.fromDb(reading.syncStatus);
-    final fmt = DateFormat('d/M/yyyy · HH:mm', 'ar');
+    final fmt = DateFormat('d/M/yyyy · HH:mm', S.localeCode);
     final loggedAt = DateTime.parse(reading.loggedAt).toLocal();
 
     return FutureBuilder<(Meter?, File?)>(
@@ -653,6 +662,11 @@ class _PendingReadingCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (meter != null) ...[
+                        DetailRow(
+                          S.meterName,
+                          meter.name,
+                          onTap: () => showMeterPopup(context, meter.id),
+                        ),
                         DetailRow(S.meterType, type.label),
                         DetailRow(S.meterArea, meter.area),
                         if (meter.number?.isNotEmpty == true)
@@ -679,7 +693,7 @@ class _PendingReadingCard extends StatelessWidget {
                                     .read<SyncController>()
                                     .retry(reading.id),
                                 icon: const Icon(Icons.refresh_rounded),
-                                label: const Text(S.retrySync),
+                                label: Text(S.retrySync),
                               ),
                             ),
                           if (status == SyncStatus.failed)
@@ -692,7 +706,7 @@ class _PendingReadingCard extends StatelessWidget {
                               ),
                               onPressed: () => _discard(context),
                               icon: const Icon(Icons.delete_outline_rounded),
-                              label: const Text(S.deleteReading),
+                              label: Text(S.deleteReading),
                             ),
                           ),
                         ],
@@ -739,7 +753,7 @@ class _ReadingCardState extends State<_ReadingCard> {
         String? error;
         return StatefulBuilder(
           builder: (ctx, setLocal) => AlertDialog(
-            title: const Text(S.editReading),
+            title: Text(S.editReading),
             content: TextField(
               controller: controller,
               autofocus: true,
@@ -760,7 +774,7 @@ class _ReadingCardState extends State<_ReadingCard> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text(S.cancel),
+                child: Text(S.cancel),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
@@ -781,7 +795,7 @@ class _ReadingCardState extends State<_ReadingCard> {
                   }
                   Navigator.pop(ctx, v);
                 },
-                child: const Text(S.save),
+                child: Text(S.save),
               ),
             ],
           ),
@@ -800,11 +814,9 @@ class _ReadingCardState extends State<_ReadingCard> {
         result,
       );
       widget.onValueChanged(result);
-      messenger.showSnackBar(const SnackBar(content: Text(S.readingUpdated)));
+      messenger.showSnackBar(SnackBar(content: Text(S.readingUpdated)));
     } on NetworkException {
-      messenger.showSnackBar(
-        const SnackBar(content: Text(S.editNeedsInternet)),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(S.editNeedsInternet)));
     } on ApiException catch (e) {
       if (e.isUnauthorized && mounted) {
         context.read<SessionController>().markTokenRejected();
@@ -819,12 +831,12 @@ class _ReadingCardState extends State<_ReadingCard> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text(S.deleteReading),
-        content: const Text(S.deleteReadingConfirm),
+        title: Text(S.deleteReading),
+        content: Text(S.deleteReadingConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text(S.cancel),
+            child: Text(S.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -832,7 +844,7 @@ class _ReadingCardState extends State<_ReadingCard> {
               minimumSize: const Size(0, 44),
             ),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text(S.deleteReading),
+            child: Text(S.deleteReading),
           ),
         ],
       ),
@@ -844,12 +856,10 @@ class _ReadingCardState extends State<_ReadingCard> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       await context.read<ApiClient>().deleteReading(widget.row['id'] as String);
-      messenger.showSnackBar(const SnackBar(content: Text(S.readingDeleted)));
+      messenger.showSnackBar(SnackBar(content: Text(S.readingDeleted)));
       widget.onDeleted();
     } on NetworkException {
-      messenger.showSnackBar(
-        const SnackBar(content: Text(S.deleteNeedsInternet)),
-      );
+      messenger.showSnackBar(SnackBar(content: Text(S.deleteNeedsInternet)));
     } on ApiException catch (e) {
       if (e.isUnauthorized && mounted) {
         context.read<SessionController>().markTokenRejected();
@@ -875,7 +885,7 @@ class _ReadingCardState extends State<_ReadingCard> {
     final syncedAt = row['synced_at'] != null
         ? DateTime.parse(row['synced_at'] as String).toLocal()
         : null;
-    final fmt = DateFormat('d/M/yyyy · HH:mm', 'ar');
+    final fmt = DateFormat('d/M/yyyy · HH:mm', S.localeCode);
     final numFmt = NumberFormat.decimalPattern('en');
     final api = context.read<ApiClient>();
     final photoKey = row['photo_key'] as String?;
@@ -917,6 +927,12 @@ class _ReadingCardState extends State<_ReadingCard> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  DetailRow(
+                    S.meterName,
+                    (row['meter_name'] as String?) ?? '',
+                    onTap: () =>
+                        showMeterPopup(context, row['meter_id'] as String),
+                  ),
                   DetailRow(S.meterType, type.label),
                   DetailRow(S.meterArea, (row['meter_area'] as String?) ?? ''),
                   if (number?.isNotEmpty == true)
@@ -930,7 +946,14 @@ class _ReadingCardState extends State<_ReadingCard> {
                       S.gainLabel,
                       '${numFmt.format(gain)} ${type.unit}',
                     ),
-                  DetailRow(S.loggedBy, row['logged_by_name'] as String),
+                  DetailRow(
+                    S.loggedBy,
+                    row['logged_by_name'] as String,
+                    onTap: canViewUsers(context)
+                        ? () =>
+                              showUserPopup(context, row['logged_by'] as String)
+                        : null,
+                  ),
                   DetailRow(S.loggedAt, fmt.format(loggedAt)),
                   if (syncedAt != null)
                     DetailRow(S.syncedAtLabel, fmt.format(syncedAt)),
@@ -944,7 +967,7 @@ class _ReadingCardState extends State<_ReadingCard> {
                         child: FilledButton.tonalIcon(
                           onPressed: _busy ? null : _edit,
                           icon: const Icon(Icons.edit_outlined),
-                          label: const Text(S.editReading),
+                          label: Text(S.editReading),
                         ),
                       ),
                       if (widget.canDelete) ...[
@@ -965,7 +988,7 @@ class _ReadingCardState extends State<_ReadingCard> {
                                     ),
                                   )
                                 : const Icon(Icons.delete_outline_rounded),
-                            label: const Text(S.deleteReading),
+                            label: Text(S.deleteReading),
                           ),
                         ),
                       ],
@@ -1043,7 +1066,7 @@ class _SortSheetState extends State<_SortSheet> {
           SizedBox(
             width: double.infinity,
             child: SegmentedButton<bool>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: false,
                   label: Text(S.sortAsc),
@@ -1065,7 +1088,7 @@ class _SortSheetState extends State<_SortSheet> {
               context,
               widget.initial.copyWith(sort: _sort, descending: _desc),
             ),
-            child: const Text(S.applyFilters),
+            child: Text(S.applyFilters),
           ),
         ],
       ),
@@ -1122,7 +1145,7 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final fmt = DateFormat('d/M/yyyy', 'ar');
+    final fmt = DateFormat('d/M/yyyy', S.localeCode);
     return Padding(
       padding: EdgeInsets.fromLTRB(
         20,
@@ -1152,7 +1175,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               spacing: 8,
               children: [
                 ChoiceChip(
-                  label: const Text(S.filterAllTypes),
+                  label: Text(S.filterAllTypes),
                   selected: _types.isEmpty,
                   onSelected: (_) => setState(() => _types = {}),
                 ),
@@ -1175,7 +1198,7 @@ class _FilterSheetState extends State<_FilterSheet> {
               controller: _number,
               textDirection: TextDirection.ltr,
               contextMenuBuilder: appContextMenuBuilder,
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 labelText: S.filterNumber,
                 isDense: true,
                 prefixIcon: Icon(Icons.tag_rounded),
@@ -1187,7 +1210,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                 initialValue: _userId,
                 isExpanded: true,
                 items: [
-                  const DropdownMenuItem<String?>(
+                  DropdownMenuItem<String?>(
                     value: null,
                     child: Text(S.filterAllUsers),
                   ),
@@ -1197,7 +1220,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                       child: Text(u.fullName),
                     ),
                 ],
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: S.filterUser,
                   isDense: true,
                   prefixIcon: Icon(Icons.person_outline_rounded),
@@ -1241,7 +1264,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                       context,
                       ReadingFilters(sort: _f.sort, descending: _f.descending),
                     ),
-                    child: const Text(S.clearFilters),
+                    child: Text(S.clearFilters),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1260,7 +1283,7 @@ class _FilterSheetState extends State<_FilterSheet> {
                         descending: _f.descending,
                       ),
                     ),
-                    child: const Text(S.applyFilters),
+                    child: Text(S.applyFilters),
                   ),
                 ),
               ],
@@ -1282,18 +1305,16 @@ class _ExportTargetSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    Widget option(_ExportTarget target, IconData icon, String title) =>
-        ListTile(
-          leading: Icon(icon, color: scheme.primary),
-          title: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          subtitle: target == _ExportTarget.device
-              ? null
-              : const Text(S.exportEmailHint),
-          onTap: () => Navigator.pop(context, target),
-        );
+    Widget option(
+      _ExportTarget target,
+      IconData icon,
+      String title,
+    ) => ListTile(
+      leading: Icon(icon, color: scheme.primary),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: target == _ExportTarget.device ? null : Text(S.exportEmailHint),
+      onTap: () => Navigator.pop(context, target),
+    );
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         12,

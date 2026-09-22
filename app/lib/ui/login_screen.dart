@@ -9,6 +9,7 @@ import '../core/theme.dart';
 import '../data/api/api_client.dart';
 import '../state/app_status_controller.dart';
 import '../state/connectivity_controller.dart';
+import '../state/language_controller.dart';
 import '../state/session_controller.dart';
 import 'widgets/status_widgets.dart';
 
@@ -52,7 +53,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final session = context.read<SessionController>();
     final api = context.read<ApiClient>();
     final status = context.read<AppStatusController>();
+    final language = context.read<LanguageController>();
     final error = await session.signIn(api, username, password);
+    if (!mounted) return;
+    final saved = session.user?.language;
+    if (error == null && saved != null) await language.apply(saved);
     if (!mounted) return;
     if (error == null) {
       status.refresh(api, isModerator: session.user?.canManage ?? false);
@@ -143,7 +148,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 18),
-                        const Text(
+                        Text(
                           S.appName,
                           textAlign: TextAlign.center,
                           style: TextStyle(
@@ -154,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
+                        Text(
                           S.login,
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Colors.white70, fontSize: 15),
@@ -229,11 +234,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                     color: Colors.white,
                                   ),
                                 )
-                              : const Text(S.loginButton),
+                              : Text(S.loginButton),
                         ),
                         if (!isOnline) ...[
                           const SizedBox(height: 18),
-                          const Row(
+                          Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
@@ -253,6 +258,26 @@ class _LoginScreenState extends State<LoginScreen> {
                       ],
                     ),
                   ),
+                ),
+              ),
+            ),
+          ),
+          // Language toggle: last in the stack so it sits above the form.
+          // Remembered on this device; after sign-in the account's saved
+          // language takes over.
+          PositionedDirectional(
+            top: 0,
+            end: 0,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: TextButton.icon(
+                  style: TextButton.styleFrom(foregroundColor: Colors.white),
+                  onPressed: () => context.read<LanguageController>().choose(
+                    S.isEnglish ? AppLanguage.ar : AppLanguage.en,
+                  ),
+                  icon: const Icon(Icons.translate_rounded, size: 18),
+                  label: Text(S.switchLanguage),
                 ),
               ),
             ),

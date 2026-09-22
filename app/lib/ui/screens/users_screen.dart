@@ -5,6 +5,7 @@ import '../../core/strings.dart';
 import '../../data/api/api_client.dart';
 import '../../data/models.dart';
 import '../../state/session_controller.dart';
+import '../popups.dart';
 import '../widgets/status_widgets.dart';
 import 'user_form_screen.dart';
 
@@ -61,11 +62,11 @@ class _UsersScreenState extends State<UsersScreen> {
     final active = _users.where((u) => u.isActive).toList();
 
     return Scaffold(
-      appBar: AppBar(title: const Text(S.manageUsers)),
+      appBar: AppBar(title: Text(S.manageUsers)),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _open(),
         icon: const Icon(Icons.person_add_alt_1_rounded),
-        label: const Text(S.addUser),
+        label: Text(S.addUser),
       ),
       body: RefreshIndicator(
         onRefresh: _load,
@@ -78,17 +79,14 @@ class _UsersScreenState extends State<UsersScreen> {
                   const SizedBox(height: 100),
                   EmptyState(icon: Icons.cloud_off_rounded, title: _error!),
                   Center(
-                    child: TextButton(
-                      onPressed: _load,
-                      child: const Text(S.retry),
-                    ),
+                    child: TextButton(onPressed: _load, child: Text(S.retry)),
                   ),
                 ],
               )
             : _users.isEmpty
             ? ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                children: const [
+                children: [
                   SizedBox(height: 100),
                   EmptyState(icon: Icons.group_outlined, title: S.noUsers),
                 ],
@@ -135,18 +133,23 @@ class _UserTile extends StatelessWidget {
             padding: const EdgeInsets.all(14),
             child: Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: (isStaff ? scheme.primary : scheme.tertiary)
-                      .withValues(alpha: 0.14),
-                  foregroundColor: isStaff ? scheme.primary : scheme.tertiary,
-                  child: Icon(
-                    user.role == UserRole.moderator
-                        ? Icons.admin_panel_settings_rounded
-                        : isStaff
-                        ? Icons.engineering_rounded
-                        : Icons.build_rounded,
+                if (user.photoKey != null)
+                  UserAvatar(user: user, size: 40, zoomOnTap: true)
+                else
+                  CircleAvatar(
+                    backgroundColor:
+                        (isStaff ? scheme.primary : scheme.tertiary).withValues(
+                          alpha: 0.14,
+                        ),
+                    foregroundColor: isStaff ? scheme.primary : scheme.tertiary,
+                    child: Icon(
+                      user.role == UserRole.moderator
+                          ? Icons.admin_panel_settings_rounded
+                          : isStaff
+                          ? Icons.engineering_rounded
+                          : Icons.build_rounded,
+                    ),
                   ),
-                ),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(
@@ -178,7 +181,10 @@ class _UserTile extends StatelessWidget {
                       Text(
                         '@${user.username} · ${user.role.label}',
                         textDirection: TextDirection.ltr,
-                        textAlign: TextAlign.right,
+                        // Line up with the name at the reading start edge.
+                        textAlign: S.isEnglish
+                            ? TextAlign.left
+                            : TextAlign.right,
                         style: TextStyle(
                           color: scheme.onSurfaceVariant,
                           fontSize: 13,
@@ -186,10 +192,10 @@ class _UserTile extends StatelessWidget {
                       ),
                       Text(
                         user.hasEmail ? user.email : S.emailMissing,
-                        textDirection: user.hasEmail
-                            ? TextDirection.ltr
-                            : TextDirection.rtl,
-                        textAlign: TextAlign.right,
+                        textDirection: user.hasEmail ? TextDirection.ltr : null,
+                        textAlign: S.isEnglish
+                            ? TextAlign.left
+                            : TextAlign.right,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(

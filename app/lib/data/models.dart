@@ -86,12 +86,17 @@ class AuthUser {
     required this.username,
     required this.fullName,
     required this.role,
+    this.language,
   });
 
   final String id;
   final String username;
   final String fullName;
   final UserRole role;
+
+  /// Saved app language from the server (null in sessions from older app
+  /// versions, which then keep the device's choice).
+  final AppLanguage? language;
 
   bool get canManage => role.canManage;
   bool get canSeeAllReadings => role.canSeeAllReadings;
@@ -102,6 +107,9 @@ class AuthUser {
     username: json['username'] as String,
     fullName: json['fullName'] as String,
     role: UserRole.fromApi(json['role'] as String),
+    language: json['language'] == null
+        ? null
+        : AppLanguage.fromCode(json['language'] as String),
   );
 
   Map<String, dynamic> toJson() => {
@@ -109,6 +117,7 @@ class AuthUser {
     'username': username,
     'fullName': fullName,
     'role': role.name,
+    'language': ?language?.name,
   };
 }
 
@@ -120,6 +129,8 @@ class AppUser {
     required this.email,
     required this.role,
     required this.isActive,
+    this.phone,
+    this.photoKey,
   });
 
   /// Stored for users created before emails existed.
@@ -128,12 +139,17 @@ class AppUser {
   /// Same rule as the server: something@something.tld, no spaces.
   static final emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 
+  /// Egyptian mobile, same rule as the server: 01xxxxxxxxx or +20xxxxxxxxxx.
+  static final phonePattern = RegExp(r'^(01\d{9}|\+20\d{10})$');
+
   final String id;
   final String username;
   final String fullName;
   final String email;
   final UserRole role;
   final bool isActive;
+  final String? phone;
+  final String? photoKey;
 
   bool get hasEmail => email.isNotEmpty && email != placeholderEmail;
 
@@ -144,6 +160,8 @@ class AppUser {
     email: json['email'] as String? ?? '',
     role: UserRole.fromApi(json['role'] as String),
     isActive: json['isActive'] as bool,
+    phone: json['phone'] as String?,
+    photoKey: json['photoKey'] as String?,
   );
 }
 

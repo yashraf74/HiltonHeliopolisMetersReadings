@@ -245,10 +245,18 @@ class ApiClient {
     List<int> bytes, {
     String contentType = 'image/jpeg',
     bool forMeter = false,
+    bool forUser = false,
   }) async {
     final body = await _json(
       _http.post(
-        _uri('/photos', forMeter ? {'kind': 'meter'} : null),
+        _uri(
+          '/photos',
+          forMeter
+              ? {'kind': 'meter'}
+              : forUser
+              ? {'kind': 'user'}
+              : null,
+        ),
         headers: _headers(contentType: contentType),
         body: bytes,
       ),
@@ -390,6 +398,8 @@ class ApiClient {
     required String fullName,
     required String email,
     required UserRole role,
+    String? phone,
+    String? photoKey,
   }) async {
     final body = await _json(
       _http.post(
@@ -401,6 +411,8 @@ class ApiClient {
           'fullName': fullName,
           'email': email,
           'role': role.name,
+          'phone': ?phone,
+          'photoKey': ?photoKey,
         }),
       ),
     );
@@ -414,6 +426,10 @@ class ApiClient {
     UserRole? role,
     bool? isActive,
     String? password,
+    String? phone,
+    bool clearPhone = false,
+    String? photoKey,
+    bool clearPhoto = false,
   }) async {
     await _json(
       _http.put(
@@ -422,10 +438,37 @@ class ApiClient {
         body: jsonEncode({
           'fullName': ?fullName,
           'email': ?email,
+          if (phone != null || clearPhone) 'phone': phone,
+          if (photoKey != null || clearPhoto) 'photoKey': photoKey,
           'role': ?role?.name,
           'isActive': ?isActive,
           'password': ?password,
         }),
+      ),
+    );
+  }
+
+  /// One user's details for the user popup (moderators and engineers).
+  Future<AppUser> fetchUser(String id) async {
+    final body = await _json(
+      _http.get(_uri('/users/$id'), headers: _headers()),
+    );
+    return AppUser.fromJson(body['user'] as Map<String, dynamic>);
+  }
+
+  /// The About page's developer title (moderators only; set in server KV).
+  Future<String> fetchDeveloperTitle() async {
+    final body = await _json(_http.get(_uri('/about'), headers: _headers()));
+    return body['developerTitle'] as String;
+  }
+
+  /// Saves the signed-in user's app language.
+  Future<void> saveLanguage(AppLanguage language) async {
+    await _json(
+      _http.put(
+        _uri('/users/me/language'),
+        headers: _headers(contentType: 'application/json'),
+        body: jsonEncode({'language': language.name}),
       ),
     );
   }

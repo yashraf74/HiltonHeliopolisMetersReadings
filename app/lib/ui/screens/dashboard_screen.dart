@@ -10,6 +10,7 @@ import '../../core/theme.dart';
 import '../../data/api/api_client.dart';
 import '../../data/models.dart';
 import '../../state/session_controller.dart';
+import '../popups.dart';
 import '../widgets/status_widgets.dart';
 
 /// Moderator / engineer overview for a date range (default: last 7 days).
@@ -110,7 +111,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final fmt = DateFormat('d/M', 'ar');
+    final fmt = DateFormat('d/M', S.localeCode);
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
@@ -120,7 +121,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           Row(
             children: [
               ChoiceChip(
-                label: const Text(S.rangeLastWeek),
+                label: Text(S.rangeLastWeek),
                 selected: _isLastWeek,
                 onSelected: (_) {
                   setState(_setLastWeek);
@@ -152,7 +153,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             const SizedBox(height: 60),
             EmptyState(icon: Icons.cloud_off_rounded, title: _error!),
             Center(
-              child: TextButton(onPressed: _load, child: const Text(S.retry)),
+              child: TextButton(onPressed: _load, child: Text(S.retry)),
             ),
           ] else
             ..._buildContent(_data!),
@@ -349,7 +350,7 @@ class _Series {
 
 final _numFmt = NumberFormat('#,##0.#', 'en');
 final _compactFmt = NumberFormat.compact(locale: 'en');
-final _dayFmt = DateFormat('d/M', 'ar');
+DateFormat get _dayFmt => DateFormat('d/M', S.localeCode);
 
 TextStyle _axisStyle(ColorScheme scheme) =>
     TextStyle(fontSize: 10, color: scheme.onSurfaceVariant);
@@ -608,20 +609,22 @@ class _StatTile extends StatelessWidget {
 }
 
 /// Meter photo thumbnail (tap to zoom), or the type badge without one.
+/// Meter thumbnail; tapping it does the same as tapping its row (the meter
+/// or reading popup, where the photo opens full size).
 class _MeterPhoto extends StatelessWidget {
-  const _MeterPhoto(this.meter, {this.size = 40});
+  const _MeterPhoto(this.meter, {this.size = 40, this.onTap});
 
   final _MeterRef meter;
   final double size;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final api = context.read<ApiClient>();
     final key = meter.photoKey;
-    return PhotoThumb(
+    final thumb = PhotoThumb(
       type: meter.type,
       size: size,
-      zoomOnTap: true,
       image: key == null
           ? null
           : NetworkImage(
@@ -629,65 +632,87 @@ class _MeterPhoto extends StatelessWidget {
               headers: api.authHeaders,
             ),
     );
+    if (onTap == null) return thumb;
+    return GestureDetector(onTap: onTap, child: thumb);
   }
 }
 
-/// Name + "type · area" beside a meter photo, with a trailing widget.
+/// Name + "type · area" beside a meter photo, with a trailing widget. The
+/// whole row is tappable: [onTap] defaults to the meter popup; the chevron
+/// after the name is the only cue.
 class _MeterRow extends StatelessWidget {
   const _MeterRow({
     required this.meter,
     required this.trailing,
     this.caption,
     this.subtitle,
+    this.onTap,
   });
 
   final _MeterRef meter;
   final Widget trailing;
   final String? caption;
   final String? subtitle;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final muted = TextStyle(color: scheme.onSurfaceVariant, fontSize: 12);
-    return Row(
-      children: [
-        _MeterPhoto(meter),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (caption != null)
+    final open = onTap ?? () => showMeterPopup(context, meter.id);
+    return InkWell(
+      onTap: open,
+      borderRadius: BorderRadius.circular(10),
+      child: Row(
+        children: [
+          _MeterPhoto(meter, onTap: open),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (caption != null)
+                  Text(
+                    caption!,
+                    style: muted.copyWith(fontWeight: FontWeight.w700),
+                  ),
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        meter.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 16,
+                      color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+                    ),
+                  ],
+                ),
                 Text(
-                  caption!,
-                  style: muted.copyWith(fontWeight: FontWeight.w700),
+                  subtitle ??
+                      (meter.area.isEmpty
+                          ? meter.type.label
+                          : '${meter.type.label} · ${meter.area}'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: muted,
                 ),
-              Text(
-                meter.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  height: 1.35,
-                ),
-              ),
-              Text(
-                subtitle ??
-                    (meter.area.isEmpty
-                        ? meter.type.label
-                        : '${meter.type.label} · ${meter.area}'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: muted,
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        const SizedBox(width: 8),
-        trailing,
-      ],
+          const SizedBox(width: 8),
+          trailing,
+        ],
+      ),
     );
   }
 }
@@ -749,9 +774,10 @@ class _CountText extends StatelessWidget {
 }
 
 class _NoData extends StatelessWidget {
-  const _NoData({this.text = S.noDataInRange, this.height = 72});
+  const _NoData({this.text, this.height = 72});
 
-  final String text;
+  /// Defaults to "no data in this period".
+  final String? text;
   final double height;
 
   @override
@@ -759,7 +785,7 @@ class _NoData extends StatelessWidget {
     height: height,
     child: Center(
       child: Text(
-        text,
+        text ?? S.noDataInRange,
         textAlign: TextAlign.center,
         style: TextStyle(
           color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -847,7 +873,6 @@ class _Legend extends StatelessWidget {
               const SizedBox(width: 5),
               Text(
                 label,
-                textDirection: TextDirection.rtl,
                 style: TextStyle(
                   fontSize: 11.5,
                   color: scheme.onSurfaceVariant,
@@ -1320,7 +1345,7 @@ class _TopConsumersSectionState extends State<_TopConsumersSection> {
                 TextStyle(fontSize: 12.5, fontFamily: 'Cairo'),
               ),
             ),
-            segments: const [
+            segments: [
               ButtonSegment(value: false, label: Text(S.byMeter)),
               ButtonSegment(value: true, label: Text(S.byArea)),
             ],
@@ -1353,65 +1378,82 @@ class _TopConsumersSectionState extends State<_TopConsumersSection> {
                   const _NoData(height: 56)
                 else
                   for (final (label, subtitle, amount, meter) in rows)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: Row(
-                        children: [
-                          if (meter != null) ...[
-                            _MeterPhoto(meter, size: 36),
-                            const SizedBox(width: 10),
-                          ],
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        label.isEmpty ? '—' : label,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          fontSize: 13.5,
+                    InkWell(
+                      onTap: meter == null
+                          ? null
+                          : () => showMeterPopup(context, meter.id),
+                      borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 10),
+                        child: Row(
+                          children: [
+                            if (meter != null) ...[
+                              _MeterPhoto(
+                                meter,
+                                size: 36,
+                                onTap: () => showMeterPopup(context, meter.id),
+                              ),
+                              const SizedBox(width: 10),
+                            ],
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          label.isEmpty ? '—' : label,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13.5,
+                                          ),
                                         ),
                                       ),
+                                      if (meter != null)
+                                        Icon(
+                                          Icons.chevron_right_rounded,
+                                          size: 16,
+                                          color: scheme.onSurfaceVariant
+                                              .withValues(alpha: 0.6),
+                                        ),
+                                      const SizedBox(width: 8),
+                                      ValueText(
+                                        double.parse(amount.toStringAsFixed(1)),
+                                        unit: _type.unit,
+                                        fontSize: 13.5,
+                                      ),
+                                    ],
+                                  ),
+                                  if (subtitle.isNotEmpty)
+                                    Text(
+                                      subtitle,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: scheme.onSurfaceVariant,
+                                        fontSize: 11.5,
+                                      ),
                                     ),
-                                    const SizedBox(width: 8),
-                                    ValueText(
-                                      double.parse(amount.toStringAsFixed(1)),
-                                      unit: _type.unit,
-                                      fontSize: 13.5,
-                                    ),
-                                  ],
-                                ),
-                                if (subtitle.isNotEmpty)
-                                  Text(
-                                    subtitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: scheme.onSurfaceVariant,
-                                      fontSize: 11.5,
+                                  const SizedBox(height: 5),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(3),
+                                    child: LinearProgressIndicator(
+                                      value: amount / top,
+                                      minHeight: 5,
+                                      color: _type.color,
+                                      backgroundColor: _type.color.withValues(
+                                        alpha: 0.1,
+                                      ),
                                     ),
                                   ),
-                                const SizedBox(height: 5),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(3),
-                                  child: LinearProgressIndicator(
-                                    value: amount / top,
-                                    minHeight: 5,
-                                    color: _type.color,
-                                    backgroundColor: _type.color.withValues(
-                                      alpha: 0.1,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
               ],
@@ -1486,9 +1528,10 @@ class _UnusualRow extends StatelessWidget {
     final color = negative ? AppColors.failed : AppColors.pending;
     final when = DateFormat(
       'd/M HH:mm',
-      'ar',
+      S.localeCode,
     ).format(DateTime.parse(row['logged_at'] as String).toLocal());
     return _MeterRow(
+      onTap: () => showReadingPopup(context, row),
       meter: meter,
       subtitle: '${meter.area.isEmpty ? meter.type.label : meter.area} · $when',
       trailing: Column(

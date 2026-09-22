@@ -23,12 +23,12 @@ Future<File?> pickAppPhoto(BuildContext context, ImageSource source) async {
     if (picked == null) return null;
     final file = File(picked.path);
     if (await file.length() > maxPhotoBytes) {
-      messenger.showSnackBar(const SnackBar(content: Text(S.photoTooLarge)));
+      messenger.showSnackBar(SnackBar(content: Text(S.photoTooLarge)));
       return null;
     }
     return file;
   } on PlatformException {
-    messenger.showSnackBar(const SnackBar(content: Text(S.photoUnavailable)));
+    messenger.showSnackBar(SnackBar(content: Text(S.photoUnavailable)));
     return null;
   }
 }
@@ -65,7 +65,7 @@ class PhotoSourceButtons extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: () => _pick(context, ImageSource.camera),
               icon: const Icon(Icons.photo_camera_outlined),
-              label: const Text(S.takePhoto),
+              label: Text(S.takePhoto),
             ),
           ),
           const SizedBox(width: 10),
@@ -73,7 +73,7 @@ class PhotoSourceButtons extends StatelessWidget {
             child: OutlinedButton.icon(
               onPressed: () => _pick(context, ImageSource.gallery),
               icon: const Icon(Icons.photo_library_outlined),
-              label: const Text(S.pickFromGallery),
+              label: Text(S.pickFromGallery),
             ),
           ),
         ],
