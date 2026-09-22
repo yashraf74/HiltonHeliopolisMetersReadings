@@ -6,9 +6,10 @@ import '../../core/theme.dart';
 import '../../data/api/api_client.dart';
 import '../../state/app_status_controller.dart';
 
-/// Moderator-only page about the app and its developer. The developer's job
-/// title comes from the server (KV key `developer_title`), so it can change
-/// without an app update and isn't editable from the app.
+/// Page about the app and its developer, for every role. The developer's
+/// job title and photo come from the server (KV keys `developer_title` and
+/// `developer_username`), so they change without an app update and aren't
+/// editable from the app.
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
 
@@ -214,7 +215,7 @@ class _DeveloperCard extends StatelessWidget {
                     foregroundImage: key == null
                         ? null
                         : NetworkImage(
-                            api.photoUri(key).toString(),
+                            api.aboutPhotoUri(key).toString(),
                             headers: api.authHeaders,
                           ),
                     onForegroundImageError: key == null ? null : (_, _) {},

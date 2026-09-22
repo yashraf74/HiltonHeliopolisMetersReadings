@@ -266,6 +266,10 @@ class ApiClient {
 
   Uri photoUri(String key) => _uri('/photos', {'key': key});
 
+  /// The developer's photo; [key] only makes the URL change with the photo
+  /// so image caching doesn't show an old one.
+  Uri aboutPhotoUri(String key) => _uri('/about/photo', {'v': key});
+
   Map<String, String> get authHeaders => _headers();
 
   /// Idempotent on the server by [id]; safe to retry.
@@ -456,8 +460,8 @@ class ApiClient {
     return AppUser.fromJson(body['user'] as Map<String, dynamic>);
   }
 
-  /// The About page's developer title and photo (moderators only; set in
-  /// server KV).
+  /// The About page's developer title and photo key (set in server KV).
+  /// Load the photo from [aboutPhotoUri], which every role may read.
   Future<({String title, String? photoKey})> fetchAbout() async {
     final body = await _json(_http.get(_uri('/about'), headers: _headers()));
     return (

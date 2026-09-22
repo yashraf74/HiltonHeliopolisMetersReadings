@@ -250,16 +250,16 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                     title: Text(S.manageUsers),
                   ),
                 ),
-                PopupMenuItem(
-                  value: 'about',
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.info_outline_rounded),
-                    title: Text(S.aboutApp),
-                  ),
-                ),
                 const PopupMenuDivider(),
               ],
+              PopupMenuItem(
+                value: 'about',
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.info_outline_rounded),
+                  title: Text(S.aboutApp),
+                ),
+              ),
               PopupMenuItem(
                 value: 'language',
                 child: ListTile(

@@ -49,23 +49,36 @@ async function latestAppVersion(): Promise<string | null> {
   return /^\d+(\.\d+){0,2}$/.test(version) ? version : null;
 }
 
-// Shown on the moderator-only About page; edited in KV only, not in the app:
+// Shown on the About page (every role); edited in KV only, not in the app:
 // `developer_title`, and `developer_username` (the account whose photo is
 // shown as the developer's).
 const DEFAULT_DEVELOPER_TITLE = "Senior Shift Engineer";
 const DEFAULT_DEVELOPER_USERNAME = "khalidabdoo";
 
-settingsRoutes.get("/about", requireAuth, requireRole("moderator"), async (c) => {
-  const [title, username] = await Promise.all([
-    c.env.SETTINGS.get("developer_title"),
-    c.env.SETTINGS.get("developer_username"),
-  ]);
-  const developer = await c.env.DB.prepare("SELECT photo_key FROM users WHERE username = ?")
-    .bind(username?.trim() || DEFAULT_DEVELOPER_USERNAME)
+async function developerPhotoKey(env: Env): Promise<string | null> {
+  const username = (await env.SETTINGS.get("developer_username"))?.trim() || DEFAULT_DEVELOPER_USERNAME;
+  const developer = await env.DB.prepare("SELECT photo_key FROM users WHERE username = ?")
+    .bind(username)
     .first<{ photo_key: string | null }>();
+  return developer?.photo_key ?? null;
+}
+
+settingsRoutes.get("/about", requireAuth, async (c) => {
+  const [title, photoKey] = await Promise.all([c.env.SETTINGS.get("developer_title"), developerPhotoKey(c.env)]);
   return c.json({
     developerTitle: title?.trim() || DEFAULT_DEVELOPER_TITLE,
-    developerPhotoKey: developer?.photo_key ?? null,
+    developerPhotoKey: photoKey,
+  });
+});
+
+// The developer's photo for everyone. User photos are otherwise hidden from
+// technicians (see photos.ts), so the About page loads it from here.
+settingsRoutes.get("/about/photo", requireAuth, async (c) => {
+  const key = await developerPhotoKey(c.env);
+  const object = key ? await c.env.PHOTOS.get(key) : null;
+  if (!object) return c.json({ error: "Photo not found" }, 404);
+  return new Response(object.body, {
+    headers: { "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream" },
   });
 });
 
