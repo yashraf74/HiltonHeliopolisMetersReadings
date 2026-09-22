@@ -5,10 +5,11 @@ export interface Env {
   PHOTOS: R2Bucket;
   SETTINGS: KVNamespace;
   JWT_SECRET: string;
-  /** Gmail account exports are emailed from ([vars] in wrangler.toml). */
-  GMAIL_USER?: string;
-  /** Its app password (wrangler secret). Email is disabled without both. */
-  GMAIL_APP_PASSWORD?: string;
+  /** Mailjet-verified sender exports are emailed from ([vars] in wrangler.toml). */
+  MAIL_FROM?: string;
+  /** Mailjet API key pair (wrangler secrets). Email is disabled without them. */
+  MAILJET_API_KEY?: string;
+  MAILJET_SECRET_KEY?: string;
 }
 
 export interface AuthUser {

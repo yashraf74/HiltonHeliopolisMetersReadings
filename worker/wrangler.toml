@@ -1,13 +1,11 @@
 name = "hilton-heliopolis-meters-api"
 main = "src/index.ts"
 compatibility_date = "2024-09-23"
-# worker-mailer (export emails over SMTP) needs the Node.js compatibility layer.
-compatibility_flags = ["nodejs_compat"]
 
-# Gmail account export emails are sent from. Its app password is the
-# GMAIL_APP_PASSWORD secret (`npx wrangler secret put GMAIL_APP_PASSWORD`).
+# Sender for emailed exports; must be a verified sender in Mailjet. The API
+# key pair is in the MAILJET_API_KEY / MAILJET_SECRET_KEY secrets.
 [vars]
-GMAIL_USER = ""
+MAIL_FROM = "hiltonheliopolismeters@gmail.com"
 
 [[d1_databases]]
 binding = "DB"
