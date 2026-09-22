@@ -9,6 +9,7 @@ import { photoRoutes } from "./routes/photos";
 import { userRoutes } from "./routes/users";
 import { dashboardRoutes } from "./routes/dashboard";
 import { settingsRoutes } from "./routes/settings";
+import { exportRoutes } from "./routes/exports";
 import { appGate } from "./middleware";
 import { purgeExpiredPhotos } from "./purge";
 
@@ -27,6 +28,7 @@ app.route("/api/readings", readingRoutes);
 app.route("/api/photos", photoRoutes);
 app.route("/api/users", userRoutes);
 app.route("/api/dashboard", dashboardRoutes);
+app.route("/api/exports", exportRoutes);
 app.route("/api", settingsRoutes);
 
 app.notFound((c) => c.json({ error: "Not found" }, 404));

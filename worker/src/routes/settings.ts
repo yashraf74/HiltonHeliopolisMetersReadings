@@ -76,6 +76,13 @@ settingsRoutes.put("/settings", requireAuth, requireRole("moderator"), async (c)
     }
     next.photoRetentionDays = n;
   }
+  if (body?.tokenLifetimeDays !== undefined) {
+    const n = Number(body.tokenLifetimeDays);
+    if (!Number.isInteger(n) || n < 1 || n > 365) {
+      return c.json({ error: "tokenLifetimeDays must be an integer between 1 and 365" }, 400);
+    }
+    next.tokenLifetimeDays = n;
+  }
   if (body?.prices !== undefined) {
     const prices = { ...current.prices };
     for (const type of ["electricity", "water", "gas"] as const) {

@@ -5,6 +5,10 @@ export interface Env {
   PHOTOS: R2Bucket;
   SETTINGS: KVNamespace;
   JWT_SECRET: string;
+  /** Gmail account exports are emailed from ([vars] in wrangler.toml). */
+  GMAIL_USER?: string;
+  /** Its app password (wrangler secret). Email is disabled without both. */
+  GMAIL_APP_PASSWORD?: string;
 }
 
 export interface AuthUser {
@@ -24,6 +28,8 @@ export interface Settings {
   readingDeleteEnabled: boolean;
   exportEnabled: boolean;
   photoRetentionDays: number;
+  /** How long a login stays valid, in days. */
+  tokenLifetimeDays: number;
   /** EGP per kWh / m³ for the dashboard cost chart; 0 = not set. */
   prices: Prices;
 }

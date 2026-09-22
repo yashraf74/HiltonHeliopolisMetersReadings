@@ -20,14 +20,17 @@ export const meterRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 meterRoutes.use("*", requireAuth);
 
 // Every role reads meters (the reading flow needs them). `last_logged_at`
-// lets the app show which meters already have a reading today. Order is
+// lets the app show which meters already have a reading today, and
+// `last_value` is shown as the previous reading while logging a new one. Order is
 // the to-do order (unset last), then name.
 meterRoutes.get("/", async (c) => {
   const isModerator = c.get("user").role === "moderator";
   const includeInactive = c.req.query("includeInactive") === "1" && isModerator;
   const where = includeInactive ? "" : "WHERE m.is_active = 1";
   const { results } = await c.env.DB.prepare(
-    `SELECT ${METER_COLUMNS}, l.last_logged_at
+    `SELECT ${METER_COLUMNS}, l.last_logged_at,
+            (SELECT r.value FROM readings r WHERE r.meter_id = m.id
+             ORDER BY r.logged_at DESC, r.id DESC LIMIT 1) AS last_value
      FROM meters m
      LEFT JOIN (SELECT meter_id, MAX(logged_at) AS last_logged_at FROM readings GROUP BY meter_id) l
        ON l.meter_id = m.id

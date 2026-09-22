@@ -87,11 +87,14 @@ export interface JwtPayload {
   exp?: number;
 }
 
-const TOKEN_LIFETIME_SECONDS = 60 * 60 * 12; // 12h — a technician's shift
-
-export async function signJwt(payload: Omit<JwtPayload, "iat" | "exp" | "ver">, secret: string): Promise<string> {
+/** [lifetimeDays] comes from the tokenLifetimeDays setting (default 7). */
+export async function signJwt(
+  payload: Omit<JwtPayload, "iat" | "exp" | "ver">,
+  secret: string,
+  lifetimeDays: number
+): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
-  const fullPayload: JwtPayload = { ...payload, ver: TOKEN_VERSION, iat: now, exp: now + TOKEN_LIFETIME_SECONDS };
+  const fullPayload: JwtPayload = { ...payload, ver: TOKEN_VERSION, iat: now, exp: now + lifetimeDays * 86_400 };
 
   const encHeader = toBase64Url(new TextEncoder().encode(JSON.stringify({ alg: "HS256", typ: "JWT" })));
   const encPayload = toBase64Url(new TextEncoder().encode(JSON.stringify(fullPayload)));

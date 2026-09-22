@@ -11,7 +11,8 @@
     "create-user": "node scripts/create-user.mjs"
   },
   "dependencies": {
-    "hono": "4.13.7"
+    "hono": "4.13.7",
+    "worker-mailer": "1.2.1"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260911.1",

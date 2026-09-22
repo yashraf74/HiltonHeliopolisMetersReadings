@@ -9,6 +9,7 @@ interface UserRow {
   username: string;
   password_hash: string;
   full_name: string;
+  email: string;
   role: "moderator" | "engineer" | "technician";
 }
 
@@ -24,7 +25,7 @@ authRoutes.post("/login", async (c) => {
   }
 
   const user = await c.env.DB.prepare(
-    "SELECT id, username, password_hash, full_name, role FROM users WHERE username = ? AND is_active = 1"
+    "SELECT id, username, password_hash, full_name, email, role FROM users WHERE username = ? AND is_active = 1"
   )
     .bind(username)
     .first<UserRow>();
@@ -38,11 +39,12 @@ authRoutes.post("/login", async (c) => {
 
   const token = await signJwt(
     { sub: user.id, username: user.username, fullName: user.full_name, role: user.role },
-    c.env.JWT_SECRET
+    c.env.JWT_SECRET,
+    c.get("settings").tokenLifetimeDays
   );
 
   return c.json({
     token,
-    user: { id: user.id, username: user.username, fullName: user.full_name, role: user.role },
+    user: { id: user.id, username: user.username, fullName: user.full_name, email: user.email, role: user.role },
   });
 });
