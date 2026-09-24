@@ -46,6 +46,13 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
 
   bool get _isEdit => widget.existing != null;
 
+  /// Everything the form holds, to spot edits when leaving.
+  String get _current =>
+      '${_type.name}|${_name.text}|${_area.text}|${_number.text}|'
+      '${_todoOrder.text}|${_exportOrder.text}|$_photoKey|'
+      '${_newPhoto?.path}|$_removePhoto';
+  String _saved = '';
+
   @override
   void initState() {
     super.initState();
@@ -59,6 +66,10 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
       text: m?.exportOrder?.toString() ?? '',
     );
     _photoKey = m?.photoKey;
+    for (final c in [_name, _area, _number, _todoOrder, _exportOrder]) {
+      c.addListener(() => setState(() {}));
+    }
+    _saved = _current;
   }
 
   @override
@@ -235,131 +246,123 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEdit ? S.editMeter : S.addMeter),
-        actions: [
-          if (_isEdit)
-            IconButton(
-              tooltip: S.retireMeter,
-              icon: Icon(Icons.delete_outline_rounded, color: scheme.error),
-              onPressed: _busy ? null : _retire,
-            ),
-        ],
-      ),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            Text(
-              S.meterType,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final t in MeterType.values)
-                  TypeChip(
-                    type: t,
-                    selected: _type == t,
-                    onSelected: (_) => _busy ? null : setState(() => _type = t),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            TextFormField(
-              controller: _name,
-              textInputAction: TextInputAction.next,
-              maxLength: 80,
-              contextMenuBuilder: appContextMenuBuilder,
-              decoration: InputDecoration(
-                labelText: S.meterName,
-                hintText: S.meterNameHint,
-                counterText: '',
+    return UnsavedChangesGuard(
+      dirty: _current != _saved,
+      onSave: _save,
+      child: Scaffold(
+        bottomNavigationBar: StickySaveBar(saving: _busy, onSave: _save),
+        appBar: AppBar(
+          title: Text(_isEdit ? S.editMeter : S.addMeter),
+          actions: [
+            if (_isEdit)
+              IconButton(
+                tooltip: S.retireMeter,
+                icon: Icon(Icons.delete_outline_rounded, color: scheme.error),
+                onPressed: _busy ? null : _retire,
               ),
-              validator: (v) =>
-                  (v ?? '').trim().isEmpty ? S.fieldRequired : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _area,
-              textInputAction: TextInputAction.next,
-              maxLength: 80,
-              contextMenuBuilder: appContextMenuBuilder,
-              decoration: InputDecoration(
-                labelText: S.meterArea,
-                hintText: S.meterAreaHint,
-                counterText: '',
-              ),
-              validator: (v) =>
-                  (v ?? '').trim().isEmpty ? S.fieldRequired : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _number,
-              textInputAction: TextInputAction.next,
-              maxLength: 80,
-              textDirection: TextDirection.ltr,
-              contextMenuBuilder: appContextMenuBuilder,
-              decoration: InputDecoration(
-                labelText: S.meterNumber,
-                hintText: S.meterNumberHint,
-                counterText: '',
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              S.moderatorOnlyFields,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _todoOrder,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    contextMenuBuilder: appContextMenuBuilder,
-                    decoration: InputDecoration(labelText: S.todoOrder),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextFormField(
-                    controller: _exportOrder,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    contextMenuBuilder: appContextMenuBuilder,
-                    decoration: InputDecoration(labelText: S.exportOrder),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${S.todoOrderHint}\n${S.exportOrderHint}',
-              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
-            ),
-            const SizedBox(height: 20),
-            _buildPhotoSection(context),
-            const SizedBox(height: 28),
-            FilledButton(
-              onPressed: _busy ? null : _save,
-              child: _busy
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text(S.save),
-            ),
           ],
+        ),
+        body: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              Text(
+                S.meterType,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final t in MeterType.values)
+                    TypeChip(
+                      type: t,
+                      selected: _type == t,
+                      onSelected: (_) =>
+                          _busy ? null : setState(() => _type = t),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: _name,
+                textInputAction: TextInputAction.next,
+                maxLength: 80,
+                contextMenuBuilder: appContextMenuBuilder,
+                decoration: InputDecoration(
+                  labelText: S.meterName,
+                  hintText: S.meterNameHint,
+                  counterText: '',
+                ),
+                validator: (v) =>
+                    (v ?? '').trim().isEmpty ? S.fieldRequired : null,
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _area,
+                textInputAction: TextInputAction.next,
+                maxLength: 80,
+                contextMenuBuilder: appContextMenuBuilder,
+                decoration: InputDecoration(
+                  labelText: S.meterArea,
+                  hintText: S.meterAreaHint,
+                  counterText: '',
+                ),
+                validator: (v) =>
+                    (v ?? '').trim().isEmpty ? S.fieldRequired : null,
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _number,
+                textInputAction: TextInputAction.next,
+                maxLength: 80,
+                textDirection: TextDirection.ltr,
+                contextMenuBuilder: appContextMenuBuilder,
+                decoration: InputDecoration(
+                  labelText: S.meterNumber,
+                  hintText: S.meterNumberHint,
+                  counterText: '',
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                S.moderatorOnlyFields,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _todoOrder,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      contextMenuBuilder: appContextMenuBuilder,
+                      decoration: InputDecoration(labelText: S.todoOrder),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _exportOrder,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                      contextMenuBuilder: appContextMenuBuilder,
+                      decoration: InputDecoration(labelText: S.exportOrder),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${S.todoOrderHint}\n${S.exportOrderHint}',
+                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+              ),
+              const SizedBox(height: 20),
+              _buildPhotoSection(context),
+            ],
+          ),
         ),
       ),
     );

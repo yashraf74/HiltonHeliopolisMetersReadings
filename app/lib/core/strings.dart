@@ -714,6 +714,15 @@ class S {
   static String get changingLanguage =>
       _t('جارٍ تغيير اللغة…', 'Changing language…');
 
+  // Leaving a form with edits
+  static String get unsavedChanges =>
+      _t('تغييرات غير محفوظة', 'Unsaved changes');
+  static String get unsavedChangesBody => _t(
+    'هل تريد حفظ التغييرات قبل الخروج؟',
+    'Do you want to save your changes before leaving?',
+  );
+  static String get discardChanges => _t('تجاهل', 'Discard');
+
   // Generic
   static String get retry => _t('إعادة المحاولة', 'Retry');
   static String get cancel => _t('إلغاء', 'Cancel');

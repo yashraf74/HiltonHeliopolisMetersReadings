@@ -9,6 +9,7 @@ import '../../data/api/api_client.dart';
 import '../../data/models.dart';
 import '../../state/session_controller.dart';
 import '../widgets/photo_picker.dart';
+import '../widgets/status_widgets.dart';
 
 /// Create a user, or edit name / email / phone / photo / role and reset the
 /// password of an existing one. Pops with `true` when something was saved.
@@ -46,6 +47,13 @@ class _UserFormScreenState extends State<UserFormScreen> {
   bool _busy = false;
 
   bool get _isEdit => widget.existing != null;
+
+  /// Everything the form holds, to spot edits when leaving.
+  String get _current =>
+      '${_username.text}|${_fullName.text}|${_email.text}|${_phone.text}|'
+      '${_password.text}|${_role.name}|$_photoKey|${_newPhoto?.path}|'
+      '$_removePhoto';
+  String _saved = '';
   bool get _isSelf =>
       widget.existing?.id == context.read<SessionController>().user?.id;
 
@@ -57,6 +65,10 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _email = TextEditingController(text: widget.existing?.email ?? '');
     _phone = TextEditingController(text: widget.existing?.phone ?? '');
     _photoKey = widget.existing?.photoKey;
+    for (final c in [_username, _fullName, _email, _phone, _password]) {
+      c.addListener(() => setState(() {}));
+    }
+    _saved = _current;
     _role = widget.existing?.role ?? UserRole.technician;
   }
 
@@ -207,172 +219,179 @@ class _UserFormScreenState extends State<UserFormScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      appBar: AppBar(title: Text(_isEdit ? S.editUser : S.addUser)),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(20),
-          children: [
-            _buildPhoto(),
-            const SizedBox(height: 18),
-            TextFormField(
-              controller: _username,
-              enabled: !_isEdit,
-              textDirection: TextDirection.ltr,
-              autocorrect: false,
-              enableSuggestions: false,
-              textInputAction: TextInputAction.next,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9_.]')),
-              ],
-              decoration: InputDecoration(
-                labelText: S.username,
-                prefixIcon: Icon(Icons.alternate_email_rounded),
-              ),
-              validator: (v) =>
-                  _usernameRe.hasMatch((v ?? '').trim().toLowerCase())
-                  ? null
-                  : S.usernameRules,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _fullName,
-              textInputAction: TextInputAction.next,
-              decoration: InputDecoration(
-                labelText: S.fullName,
-                prefixIcon: Icon(Icons.badge_outlined),
-              ),
-              validator: (v) =>
-                  (v ?? '').trim().isEmpty ? S.fieldRequired : null,
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _email,
-              keyboardType: TextInputType.emailAddress,
-              textDirection: TextDirection.ltr,
-              autocorrect: false,
-              enableSuggestions: false,
-              textInputAction: TextInputAction.next,
-              // No spaces; the validator checks the name@domain.tld shape.
-              inputFormatters: [
-                FilteringTextInputFormatter.deny(RegExp(r'\s')),
-              ],
-              decoration: InputDecoration(
-                labelText: S.email,
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-              validator: (v) {
-                final value = (v ?? '').trim();
-                if (value.isEmpty) return S.fieldRequired;
-                return AppUser.emailPattern.hasMatch(value)
-                    ? null
-                    : S.emailInvalid;
-              },
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _phone,
-              keyboardType: TextInputType.phone,
-              textDirection: TextDirection.ltr,
-              textInputAction: TextInputAction.next,
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
-              ],
-              decoration: InputDecoration(
-                labelText: S.phone,
-                hintText: S.phoneFormats,
-                helperText: S.phoneOptional,
-                prefixIcon: const Icon(Icons.phone_iphone_rounded),
-              ),
-              validator: (v) {
-                final value = (v ?? '').trim();
-                if (value.isEmpty) return null;
-                return AppUser.phonePattern.hasMatch(value)
-                    ? null
-                    : S.phoneInvalid;
-              },
-            ),
-            const SizedBox(height: 14),
-            TextFormField(
-              controller: _password,
-              obscureText: _obscure,
-              autocorrect: false,
-              enableSuggestions: false,
-              textDirection: TextDirection.ltr,
-              decoration: InputDecoration(
-                labelText: _isEdit ? S.newPassword : S.password,
-                helperText: _isEdit ? S.resetPasswordHint : S.passwordRules,
-                prefixIcon: const Icon(Icons.lock_outline_rounded),
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    _obscure
-                        ? Icons.visibility_rounded
-                        : Icons.visibility_off_rounded,
-                  ),
-                  onPressed: () => setState(() => _obscure = !_obscure),
+    return UnsavedChangesGuard(
+      dirty: _current != _saved,
+      onSave: _save,
+      child: Scaffold(
+        bottomNavigationBar: StickySaveBar(saving: _busy, onSave: _save),
+        appBar: AppBar(title: Text(_isEdit ? S.editUser : S.addUser)),
+        body: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(20),
+            children: [
+              _buildPhoto(),
+              const SizedBox(height: 18),
+              TextFormField(
+                controller: _username,
+                enabled: !_isEdit,
+                textDirection: TextDirection.ltr,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.next,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9_.]')),
+                ],
+                decoration: InputDecoration(
+                  labelText: S.username,
+                  prefixIcon: Icon(Icons.alternate_email_rounded),
                 ),
+                validator: (v) =>
+                    _usernameRe.hasMatch((v ?? '').trim().toLowerCase())
+                    ? null
+                    : S.usernameRules,
               ),
-              validator: (v) {
-                final value = v ?? '';
-                if (_isEdit && value.isEmpty) return null;
-                return value.length < 6 ? S.passwordRules : null;
-              },
-            ),
-            const SizedBox(height: 20),
-            Text(S.role, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final r in UserRole.values)
-                  ChoiceChip(
-                    label: Text(r.label),
-                    avatar: Icon(
-                      r == UserRole.moderator
-                          ? Icons.admin_panel_settings_rounded
-                          : r == UserRole.engineer
-                          ? Icons.engineering_rounded
-                          : Icons.build_rounded,
-                      size: 18,
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _fullName,
+                textInputAction: TextInputAction.next,
+                decoration: InputDecoration(
+                  labelText: S.fullName,
+                  prefixIcon: Icon(Icons.badge_outlined),
+                ),
+                validator: (v) =>
+                    (v ?? '').trim().isEmpty ? S.fieldRequired : null,
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _email,
+                keyboardType: TextInputType.emailAddress,
+                textDirection: TextDirection.ltr,
+                autocorrect: false,
+                enableSuggestions: false,
+                textInputAction: TextInputAction.next,
+                // No spaces; the validator checks the name@domain.tld shape.
+                inputFormatters: [
+                  FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                ],
+                decoration: InputDecoration(
+                  labelText: S.email,
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+                validator: (v) {
+                  final value = (v ?? '').trim();
+                  if (value.isEmpty) return S.fieldRequired;
+                  return AppUser.emailPattern.hasMatch(value)
+                      ? null
+                      : S.emailInvalid;
+                },
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _phone,
+                keyboardType: TextInputType.phone,
+                textDirection: TextDirection.ltr,
+                textInputAction: TextInputAction.next,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
+                ],
+                decoration: InputDecoration(
+                  labelText: S.phone,
+                  hintText: S.phoneFormats,
+                  helperText: S.phoneOptional,
+                  prefixIcon: const Icon(Icons.phone_iphone_rounded),
+                ),
+                validator: (v) {
+                  final value = (v ?? '').trim();
+                  if (value.isEmpty) return null;
+                  return AppUser.phonePattern.hasMatch(value)
+                      ? null
+                      : S.phoneInvalid;
+                },
+              ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _password,
+                obscureText: _obscure,
+                autocorrect: false,
+                enableSuggestions: false,
+                textDirection: TextDirection.ltr,
+                decoration: InputDecoration(
+                  labelText: _isEdit ? S.newPassword : S.password,
+                  helperText: _isEdit ? S.resetPasswordHint : S.passwordRules,
+                  prefixIcon: const Icon(Icons.lock_outline_rounded),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscure
+                          ? Icons.visibility_rounded
+                          : Icons.visibility_off_rounded,
                     ),
-                    // The avatar icon already marks the role; no tick over it.
-                    showCheckmark: false,
-                    selected: _role == r,
-                    onSelected: _busy || _isSelf
-                        ? null
-                        : (_) => setState(() => _role = r),
+                    onPressed: () => setState(() => _obscure = !_obscure),
                   ),
-              ],
-            ),
-            if (_isEdit && !_isSelf) ...[
-              const SizedBox(height: 24),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: scheme.error,
-                  side: BorderSide(color: scheme.error.withValues(alpha: 0.6)),
-                  minimumSize: const Size.fromHeight(48),
                 ),
-                onPressed: _busy ? null : _delete,
-                icon: const Icon(Icons.person_remove_outlined),
-                label: Text(S.deleteUser),
+                validator: (v) {
+                  final value = v ?? '';
+                  if (_isEdit && value.isEmpty) return null;
+                  return value.length < 6 ? S.passwordRules : null;
+                },
+              ),
+              const SizedBox(height: 20),
+              Text(S.role, style: const TextStyle(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [
+                  for (final r in UserRole.values)
+                    ChoiceChip(
+                      label: Text(r.label),
+                      avatar: Icon(
+                        r == UserRole.moderator
+                            ? Icons.admin_panel_settings_rounded
+                            : r == UserRole.engineer
+                            ? Icons.engineering_rounded
+                            : Icons.build_rounded,
+                        size: 18,
+                      ),
+                      // The avatar icon already marks the role; no tick over it.
+                      showCheckmark: false,
+                      selected: _role == r,
+                      onSelected: _busy || _isSelf
+                          ? null
+                          : (_) => setState(() => _role = r),
+                    ),
+                ],
+              ),
+              if (_isEdit && !_isSelf) ...[
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: scheme.error,
+                    side: BorderSide(
+                      color: scheme.error.withValues(alpha: 0.6),
+                    ),
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  onPressed: _busy ? null : _delete,
+                  icon: const Icon(Icons.person_remove_outlined),
+                  label: Text(S.deleteUser),
+                ),
+              ],
+              const SizedBox(height: 28),
+              FilledButton(
+                onPressed: _busy ? null : _save,
+                child: _busy
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Colors.white,
+                        ),
+                      )
+                    : Text(S.save),
               ),
             ],
-            const SizedBox(height: 28),
-            FilledButton(
-              onPressed: _busy ? null : _save,
-              child: _busy
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.5,
-                        color: Colors.white,
-                      ),
-                    )
-                  : Text(S.save),
-            ),
-          ],
+          ),
         ),
       ),
     );

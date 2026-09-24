@@ -34,6 +34,20 @@ Shorebird downloads a patch on one launch and runs it from the next. The
 Adding a package needs a release build, so fold it into the next release
 that happens for another reason — don't tag a version just for this.
 
+## A safer way to test against production
+
+The idea of a "test user" flag (their readings hidden from lists, exports and
+the dashboard) was considered and dropped on 2026-09-24: it would put an
+"unless this user is a test user" condition into every query that reads
+readings, including the gain chain, and the failure mode is silent wrong
+numbers when a later feature forgets the filter.
+
+For now: log test readings and delete them afterwards — deleting recomputes
+that meter's gains, so the numbers heal. If daily testing on production ever
+becomes routine, set up a staging Worker + D1 + R2 + KV instead and point a
+build at it with `--dart-define=API_BASE_URL=...`; that also exercises
+migrations, which the flag never would.
+
 ## Photos left in storage
 
 Replacing or removing a meter or user photo leaves the old object in R2.

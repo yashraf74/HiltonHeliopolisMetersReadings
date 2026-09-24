@@ -72,11 +72,19 @@ export const userRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
 userRoutes.use("*", requireAuth);
 
+/** Accounts left out of the readings "by user" filter (owner's own). */
+const FILTER_HIDDEN_USERNAMES = ["joeashraf"];
+
 // Names only, for the readings "by user" filter (engineers too).
 userRoutes.get("/names", requireRole("moderator", "engineer"), async (c) => {
+  const placeholders = FILTER_HIDDEN_USERNAMES.map(() => "?").join(", ");
   const { results } = await c.env.DB.prepare(
-    "SELECT id, full_name FROM users WHERE is_active = 1 ORDER BY full_name"
-  ).all<{ id: string; full_name: string }>();
+    `SELECT id, full_name FROM users
+     WHERE is_active = 1 AND username NOT IN (${placeholders})
+     ORDER BY full_name`
+  )
+    .bind(...FILTER_HIDDEN_USERNAMES)
+    .all<{ id: string; full_name: string }>();
   return c.json({ users: results.map((u) => ({ id: u.id, fullName: u.full_name })) });
 });
 

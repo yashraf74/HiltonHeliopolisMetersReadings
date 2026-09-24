@@ -561,3 +561,96 @@ class TapLink extends StatelessWidget {
     );
   }
 }
+
+/// Save button pinned to the bottom of a form screen, above the system
+/// navigation bar, so it stays in reach however long the form is.
+class StickySaveBar extends StatelessWidget {
+  const StickySaveBar({super.key, required this.saving, required this.onSave});
+
+  final bool saving;
+  final VoidCallback onSave;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        border: Border(top: BorderSide(color: scheme.outlineVariant)),
+      ),
+      child: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+        child: FilledButton(
+          onPressed: saving ? null : onSave,
+          child: saving
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.5,
+                    color: Colors.white,
+                  ),
+                )
+              : Text(S.save),
+        ),
+      ),
+    );
+  }
+}
+
+/// Asks what to do when leaving a form that has edits. Only steps in while
+/// [dirty] is true, so an untouched form closes silently.
+class UnsavedChangesGuard extends StatelessWidget {
+  const UnsavedChangesGuard({
+    super.key,
+    required this.dirty,
+    required this.onSave,
+    required this.child,
+  });
+
+  final bool dirty;
+
+  /// The screen's own save, which closes the screen when it succeeds.
+  final Future<void> Function() onSave;
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: !dirty,
+    onPopInvokedWithResult: (didPop, _) async {
+      if (didPop) return;
+      final navigator = Navigator.of(context);
+      final save = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(S.unsavedChanges),
+          content: Text(S.unsavedChangesBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(S.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(S.discardChanges),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(S.save),
+            ),
+          ],
+        ),
+      );
+      if (save == null) return;
+      if (save) {
+        await onSave();
+      } else {
+        navigator.pop();
+      }
+    },
+    child: child,
+  );
+}

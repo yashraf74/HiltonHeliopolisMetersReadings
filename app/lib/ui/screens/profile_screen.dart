@@ -9,6 +9,7 @@ import '../../data/api/api_client.dart';
 import '../../data/models.dart';
 import '../../state/session_controller.dart';
 import '../widgets/photo_picker.dart';
+import '../widgets/status_widgets.dart';
 
 /// Lets the signed-in user set their own photo, email and mobile number,
 /// while a moderator keeps that enabled. Roles, usernames and passwords
@@ -39,9 +40,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _loading = true;
   String? _loadError;
 
+  /// Values as loaded, to tell whether anything was edited.
+  String _saved = '';
+  bool _dirty = false;
+
+  String get _current =>
+      '${_email.text.trim()}|${_phone.text.trim()}|$_photoKey|'
+      '${_newPhoto?.path}|$_removePhoto';
+
+  void _checkDirty() {
+    final dirty = _current != _saved;
+    if (dirty != _dirty) setState(() => _dirty = dirty);
+  }
+
   @override
   void initState() {
     super.initState();
+    _email.addListener(_checkDirty);
+    _phone.addListener(_checkDirty);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
@@ -54,6 +70,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _photoKey = me.photoKey;
         _loading = false;
+        _saved = _current;
+        _dirty = false;
       });
       await context.read<SessionController>().updateProfile(
         email: me.email,
@@ -88,6 +106,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final api = context.read<ApiClient>();
     final session = context.read<SessionController>();
     final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
     final phone = _phone.text.trim();
     try {
       String? uploadedKey;
@@ -115,8 +134,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _photoKey = saved.photoKey;
         _newPhoto = null;
         _removePhoto = false;
+        _saved = _current;
+        _dirty = false;
       });
       messenger.showSnackBar(SnackBar(content: Text(S.profileSaved)));
+      // Saved: back to where the user came from.
+      navigator.pop();
     } on NetworkException {
       messenger.showSnackBar(SnackBar(content: Text(S.onlineRequired)));
     } on ApiException catch (e) {
@@ -151,115 +174,114 @@ class _ProfileScreenState extends State<ProfileScreen> {
             headers: api.authHeaders,
           )
         : null;
-    return Scaffold(
-      appBar: AppBar(title: Text(S.myProfile)),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(20),
-                children: [
-                  UserPhotoField(
-                    enabled: !_busy,
-                    image: image,
-                    onPicked: (f) => setState(() {
-                      _newPhoto = f;
-                      _removePhoto = false;
-                    }),
-                    onRemoved: () => setState(() {
-                      _newPhoto = null;
-                      _removePhoto = true;
-                    }),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    _user.fullName,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 17,
+    return UnsavedChangesGuard(
+      dirty: _dirty,
+      onSave: _save,
+      child: Scaffold(
+        appBar: AppBar(title: Text(S.myProfile)),
+        bottomNavigationBar: _loading
+            ? null
+            : StickySaveBar(saving: _busy, onSave: _save),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : Form(
+                key: _formKey,
+                child: ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    UserPhotoField(
+                      enabled: !_busy,
+                      image: image,
+                      onPicked: (f) {
+                        setState(() {
+                          _newPhoto = f;
+                          _removePhoto = false;
+                        });
+                        _checkDirty();
+                      },
+                      onRemoved: () {
+                        setState(() {
+                          _newPhoto = null;
+                          _removePhoto = true;
+                        });
+                        _checkDirty();
+                      },
                     ),
-                  ),
-                  Text(
-                    '${_user.role.label} · @${_user.username}',
-                    textAlign: TextAlign.center,
-                    textDirection: TextDirection.ltr,
-                    style: TextStyle(
-                      color: scheme.onSurfaceVariant,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _email,
-                    keyboardType: TextInputType.emailAddress,
-                    textDirection: TextDirection.ltr,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    textInputAction: TextInputAction.next,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.deny(RegExp(r'\s')),
-                    ],
-                    decoration: InputDecoration(
-                      labelText: S.email,
-                      prefixIcon: const Icon(Icons.email_outlined),
-                    ),
-                    validator: (v) {
-                      final value = (v ?? '').trim();
-                      if (value.isEmpty) return S.fieldRequired;
-                      return AppUser.emailPattern.hasMatch(value)
-                          ? null
-                          : S.emailInvalid;
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  TextFormField(
-                    controller: _phone,
-                    keyboardType: TextInputType.phone,
-                    textDirection: TextDirection.ltr,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
-                    ],
-                    decoration: InputDecoration(
-                      labelText: S.phone,
-                      hintText: S.phoneFormats,
-                      helperText: S.phoneOptional,
-                      prefixIcon: const Icon(Icons.phone_iphone_rounded),
-                    ),
-                    validator: (v) {
-                      final value = (v ?? '').trim();
-                      if (value.isEmpty) return null;
-                      return AppUser.phonePattern.hasMatch(value)
-                          ? null
-                          : S.phoneInvalid;
-                    },
-                  ),
-                  if (_loadError != null) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     Text(
-                      _loadError!,
+                      _user.fullName,
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: scheme.error, fontSize: 12.5),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 17,
+                      ),
                     ),
+                    Text(
+                      '${_user.role.label} · @${_user.username}',
+                      textAlign: TextAlign.center,
+                      textDirection: TextDirection.ltr,
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 13,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _email,
+                      keyboardType: TextInputType.emailAddress,
+                      textDirection: TextDirection.ltr,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      textInputAction: TextInputAction.next,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.deny(RegExp(r'\s')),
+                      ],
+                      decoration: InputDecoration(
+                        labelText: S.email,
+                        prefixIcon: const Icon(Icons.email_outlined),
+                      ),
+                      validator: (v) {
+                        final value = (v ?? '').trim();
+                        if (value.isEmpty) return S.fieldRequired;
+                        return AppUser.emailPattern.hasMatch(value)
+                            ? null
+                            : S.emailInvalid;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _phone,
+                      keyboardType: TextInputType.phone,
+                      textDirection: TextDirection.ltr,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
+                      ],
+                      decoration: InputDecoration(
+                        labelText: S.phone,
+                        hintText: S.phoneFormats,
+                        helperText: S.phoneOptional,
+                        prefixIcon: const Icon(Icons.phone_iphone_rounded),
+                      ),
+                      validator: (v) {
+                        final value = (v ?? '').trim();
+                        if (value.isEmpty) return null;
+                        return AppUser.phonePattern.hasMatch(value)
+                            ? null
+                            : S.phoneInvalid;
+                      },
+                    ),
+                    if (_loadError != null) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        _loadError!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: scheme.error, fontSize: 12.5),
+                      ),
+                    ],
                   ],
-                  const SizedBox(height: 24),
-                  FilledButton(
-                    onPressed: _busy ? null : _save,
-                    child: _busy
-                        ? const SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2.5,
-                              color: Colors.white,
-                            ),
-                          )
-                        : Text(S.save),
-                  ),
-                ],
+                ),
               ),
-            ),
+      ),
     );
   }
 }
