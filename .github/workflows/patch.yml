@@ -55,4 +55,5 @@ jobs:
         run: |
           RELEASE="$(sed -n 's/^version: //p' pubspec.yaml | tr -d '[:space:]')"
           echo "Patching release $RELEASE"
-          shorebird patch android --release-version="$RELEASE"
+          # Matches the release build (see release.yml).
+          shorebird patch android --release-version="$RELEASE" -- --no-tree-shake-icons

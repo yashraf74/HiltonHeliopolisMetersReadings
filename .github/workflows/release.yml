@@ -57,7 +57,10 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
-      - run: shorebird release android --artifact apk --flutter-version=3.47.4
+      # Ship the whole icon font: Flutter would otherwise keep only the
+      # icons this build uses, and a later patch may not change assets, so
+      # any new icon would come out blank.
+      - run: shorebird release android --artifact apk --flutter-version=3.47.4 -- --no-tree-shake-icons
 
       - uses: ./.github/actions/verify-apk-signature
         with:
