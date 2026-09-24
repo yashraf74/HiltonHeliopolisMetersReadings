@@ -527,6 +527,7 @@ class S {
   static String get consumption => _t('الاستهلاك', 'Consumption');
   static String get perDay => _t('يوميًا', 'Daily');
   static String get perWeek => _t('أسبوعيًا', 'Weekly');
+  static String get perMonth => _t('شهريًا', 'Monthly');
   static String get completion =>
       _t('نسبة إنجاز القراءات', 'Reading completion');
   static String get completionHint => _t(
@@ -667,6 +668,51 @@ class S {
   static String get openSourceLicenses =>
       _t('تراخيص البرمجيات مفتوحة المصدر', 'Open-source licenses');
   static String get version => _t('الإصدار', 'Version');
+
+  // Export settings (moderator) and profiles
+  static String get settingExport => _t('إعدادات ملف Excel', 'Excel export');
+  static String get settingExportHint => _t(
+    'تُطبَّق على كل من يصدّر القراءات',
+    'Applies to everyone who exports readings',
+  );
+  static String get exportColumns =>
+      _t('الأعمدة وترتيبها', 'Columns and order');
+  static String get exportColumnsHint => _t(
+    'اسحب لإعادة الترتيب، وألغِ التحديد لإخفاء العمود',
+    'Drag to reorder; untick to leave a column out',
+  );
+  static String get exportAtLeastOneColumn =>
+      _t('اختر عمودًا واحدًا على الأقل', 'Choose at least one column');
+  static String get exportDirection => _t('اتجاه الورقة', 'Sheet direction');
+  static String get exportDirectionAuto => _t('حسب اللغة', 'Follow language');
+  static String get exportDirectionRtl =>
+      _t('من اليمين لليسار', 'Right to left');
+  static String get exportDirectionLtr =>
+      _t('من اليسار لليمين', 'Left to right');
+  static String get exportDateFormat => _t('تنسيق التاريخ', 'Date format');
+  static String get exportDecimals => _t('الأرقام العشرية', 'Decimal places');
+  static String get exportThousands =>
+      _t('فاصل الآلاف (1,234.5)', 'Thousands separator (1,234.5)');
+  static String get exportSheetPerType =>
+      _t('ورقة لكل نوع عداد', 'A sheet per meter type');
+  static String get exportSheetPerTypeHint => _t(
+    'كهرباء ومياه وغاز في أوراق منفصلة داخل نفس الملف',
+    'Electricity, water and gas on separate tabs of the same file',
+  );
+  static String get settingProfileEditing =>
+      _t('السماح بتعديل الملف الشخصي', 'Allow editing own profile');
+  static String get settingProfileEditingHint => _t(
+    'يمكن لكل مستخدم تغيير صورته وبريده ورقم موبايله',
+    'Each user can change their photo, email and mobile number',
+  );
+  static String get myProfile => _t('ملفي الشخصي', 'My profile');
+  static String get profileSaved => _t('تم حفظ الملف الشخصي', 'Profile saved');
+  static String get profileEditingDisabled => _t(
+    'تعديل الملف الشخصي معطّل من قبل المشرف',
+    'Editing your profile is turned off by a moderator',
+  );
+  static String get changingLanguage =>
+      _t('جارٍ تغيير اللغة…', 'Changing language…');
 
   // Generic
   static String get retry => _t('إعادة المحاولة', 'Retry');

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -12,6 +14,7 @@ import '../state/session_controller.dart';
 import '../state/sync_controller.dart';
 import '../state/language_controller.dart';
 import 'screens/about_screen.dart';
+import 'screens/profile_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/meters_screen.dart';
 import 'screens/new_reading_screen.dart';
@@ -92,6 +95,32 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
         body: DashboardScreen(),
       ),
   ];
+
+  /// Switches language after the menu has closed, behind a brief loading
+  /// overlay (at least half a second) so the change never happens under the
+  /// user's finger.
+  Future<void> _switchLanguage(BuildContext context) async {
+    final language = context.read<LanguageController>();
+    final api = context.read<ApiClient>();
+    final target = S.isEnglish ? AppLanguage.ar : AppLanguage.en;
+    final navigator = Navigator.of(context, rootNavigator: true);
+    // Let the popup menu finish closing first.
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    if (!context.mounted) return;
+    unawaited(
+      showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        barrierColor: Theme.of(context).colorScheme.surface,
+        builder: (_) => const _LanguageSplash(),
+      ),
+    );
+    await Future.wait([
+      language.choose(target, api: api),
+      Future<void>.delayed(const Duration(milliseconds: 500)),
+    ]);
+    navigator.pop();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -188,7 +217,7 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
             },
           ),
           PopupMenuButton<String>(
-            icon: const Icon(Icons.account_circle_outlined),
+            icon: _AccountIcon(photoKey: user.photoKey),
             onSelected: (v) {
               switch (v) {
                 case 'settings':
@@ -197,13 +226,12 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                   Navigator.of(context).push(
                     MaterialPageRoute(builder: (_) => const UsersScreen()),
                   );
+                case 'profile':
+                  ProfileScreen.open(context);
                 case 'about':
                   AboutScreen.open(context);
                 case 'language':
-                  context.read<LanguageController>().choose(
-                    S.isEnglish ? AppLanguage.ar : AppLanguage.en,
-                    api: context.read<ApiClient>(),
-                  );
+                  _switchLanguage(context);
                 case 'logout':
                   session.signOut();
               }
@@ -260,6 +288,18 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
                   title: Text(S.aboutApp),
                 ),
               ),
+              if (context
+                  .read<AppStatusController>()
+                  .config
+                  .profileEditingEnabled)
+                PopupMenuItem(
+                  value: 'profile',
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.badge_outlined),
+                    title: Text(S.myProfile),
+                  ),
+                ),
               PopupMenuItem(
                 value: 'language',
                 child: ListTile(
@@ -298,6 +338,60 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
           for (final t in tabs)
             NavigationDestination(icon: Icon(t.icon), label: t.label),
         ],
+      ),
+    );
+  }
+}
+
+/// The account button: the user's photo when they have one.
+class _AccountIcon extends StatelessWidget {
+  const _AccountIcon({required this.photoKey});
+
+  final String? photoKey;
+
+  @override
+  Widget build(BuildContext context) {
+    final key = photoKey;
+    if (key == null) return const Icon(Icons.account_circle_outlined);
+    final api = context.read<ApiClient>();
+    final scheme = Theme.of(context).colorScheme;
+    return CircleAvatar(
+      radius: 15,
+      backgroundColor: scheme.primaryContainer,
+      foregroundImage: NetworkImage(
+        api.photoUri(key).toString(),
+        headers: api.authHeaders,
+      ),
+      onForegroundImageError: (_, _) {},
+      child: Icon(
+        Icons.account_circle_outlined,
+        color: scheme.onPrimaryContainer,
+      ),
+    );
+  }
+}
+
+/// Shown while the language changes.
+class _LanguageSplash extends StatelessWidget {
+  const _LanguageSplash();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return PopScope(
+      canPop: false,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              S.changingLanguage,
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13.5),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -312,10 +312,11 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     setState(() => _exporting = true);
     final messenger = ScaffoldMessenger.of(context);
     final api = context.read<ApiClient>();
+    final exportSettings = context.read<AppStatusController>().config.export;
     final results = <String>[];
     try {
       final all = await api.fetchAllReadings(_filters.toQuery());
-      final bytes = buildReadingsWorkbook(all);
+      final bytes = buildReadingsWorkbook(all, settings: exportSettings);
       final stamp = DateFormat('yyyy-MM-dd_HHmm').format(DateTime.now());
       final fileName = 'meter-readings-$stamp.xlsx';
 

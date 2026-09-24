@@ -195,10 +195,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _SectionHeader(S.completion, subtitle: S.completionHint),
       _CompletionCard(series: series),
       gap,
-      _SectionHeader(
-        S.consumption,
-        subtitle: series.weekly ? S.perWeek : S.perDay,
-      ),
+      _SectionHeader(S.consumption, subtitle: series.bucket.label),
       for (final t in MeterType.values) ...[
         _ConsumptionCard(type: t, series: series),
         if (t != MeterType.values.last) const SizedBox(height: 10),
@@ -289,19 +286,52 @@ class _Data {
 
 /// Chart-ready buckets: one per day, or per week (starting Monday) once the
 /// range is longer than 60 days. Consumption sums; completion averages.
+/// How the range is grouped into chart columns.
+enum _Bucket {
+  daily,
+  weekly,
+  monthly;
+
+  String get label => switch (this) {
+    daily => S.perDay,
+    weekly => S.perWeek,
+    monthly => S.perMonth,
+  };
+
+  /// Chart labels: day and month, or month and year for monthly columns.
+  String format(DateTime d) =>
+      (this == monthly
+              ? DateFormat('M/yyyy', S.localeCode)
+              : DateFormat('d/M', S.localeCode))
+          .format(d);
+
+  /// The column a day belongs to.
+  DateTime keyOf(DateTime day) => switch (this) {
+    daily => day,
+    weekly => day.subtract(Duration(days: day.weekday - 1)),
+    monthly => DateTime(day.year, day.month),
+  };
+}
+
+/// Chart-ready columns: per day, per week (from Monday) or per month, so a
+/// long range never crowds the charts. Consumption sums; completion
+/// averages over the days in the column.
 class _Series {
-  _Series(this.labels, this.consumption, this.completion, this.weekly);
+  _Series(this.labels, this.consumption, this.completion, this.bucket);
+
+  /// Above this many columns, the range is grouped more coarsely.
+  static const maxColumns = 21;
 
   factory _Series.of(_Data d) {
-    final weekly = d.days.length > 60;
-    if (!weekly) {
-      return _Series(d.days, d.consumption, d.completion, false);
+    final bucket = _bucketFor(d.days);
+    if (bucket == _Bucket.daily) {
+      return _Series(d.days, d.consumption, d.completion, bucket);
     }
     final labels = <DateTime>[];
     final index = <int>[];
     for (final day in d.days) {
-      final monday = day.subtract(Duration(days: day.weekday - 1));
-      if (labels.isEmpty || labels.last != monday) labels.add(monday);
+      final key = bucket.keyOf(day);
+      if (labels.isEmpty || labels.last != key) labels.add(key);
       index.add(labels.length - 1);
     }
     final consumption = <MeterType, List<double?>>{};
@@ -322,15 +352,26 @@ class _Series {
     }
     return _Series(labels, consumption, [
       for (var i = 0; i < labels.length; i++) sums[i] / max(1, counts[i]),
-    ], true);
+    ], bucket);
+  }
+
+  /// The finest grouping that keeps the range within [maxColumns] columns.
+  static _Bucket _bucketFor(List<DateTime> days) {
+    for (final bucket in _Bucket.values) {
+      final keys = <DateTime>{for (final d in days) bucket.keyOf(d)};
+      if (keys.length <= maxColumns) return bucket;
+    }
+    return _Bucket.monthly;
   }
 
   final List<DateTime> labels;
   final Map<MeterType, List<double?>> consumption;
   final List<double> completion;
-  final bool weekly;
+  final _Bucket bucket;
 
   int get length => labels.length;
+
+  String labelAt(int i) => bucket.format(labels[i]);
 
   double total(MeterType t) =>
       consumption[t]!.fold(0.0, (sum, v) => sum + (v ?? 0));
@@ -350,7 +391,6 @@ class _Series {
 
 final _numFmt = NumberFormat('#,##0.#', 'en');
 final _compactFmt = NumberFormat.compact(locale: 'en');
-DateFormat get _dayFmt => DateFormat('d/M', S.localeCode);
 
 TextStyle _axisStyle(ColorScheme scheme) =>
     TextStyle(fontSize: 10, color: scheme.onSurfaceVariant);
@@ -364,52 +404,60 @@ FlGridData _grid(ColorScheme scheme, double interval) => FlGridData(
   ),
 );
 
-/// Bottom date labels (about five of them) plus compact left values.
+/// Bottom date labels (at most ten, so they never crowd) plus compact left
+/// values.
 FlTitlesData _titles(
   ColorScheme scheme,
-  List<DateTime> labels, {
+  _Series series, {
   required String Function(double) left,
   required double leftInterval,
-}) => FlTitlesData(
-  topTitles: const AxisTitles(),
-  rightTitles: const AxisTitles(),
-  leftTitles: AxisTitles(
-    sideTitles: SideTitles(
-      showTitles: true,
-      reservedSize: 34,
-      interval: leftInterval,
-      getTitlesWidget: (v, meta) => v == meta.max || v == meta.min && v != 0
-          ? const SizedBox.shrink()
-          : Text(
-              left(v),
-              textDirection: TextDirection.ltr,
-              style: _axisStyle(scheme),
-            ),
+}) {
+  // At most ten date labels: every column up to ten, every other up to
+  // twenty, and so on.
+  final step = max(1, (series.length / 10).ceil());
+  return FlTitlesData(
+    topTitles: const AxisTitles(),
+    rightTitles: const AxisTitles(),
+    leftTitles: AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: 34,
+        interval: leftInterval,
+        getTitlesWidget: (v, meta) => v == meta.max || v == meta.min && v != 0
+            ? const SizedBox.shrink()
+            : Text(
+                left(v),
+                textDirection: TextDirection.ltr,
+                style: _axisStyle(scheme),
+              ),
+      ),
     ),
-  ),
-  bottomTitles: AxisTitles(
-    sideTitles: SideTitles(
-      showTitles: true,
-      reservedSize: 20,
-      interval: max(1, (labels.length / 5).ceil()).toDouble(),
-      getTitlesWidget: (v, _) {
-        final i = v.round();
-        if (i < 0 || i >= labels.length || v != i) {
-          return const SizedBox.shrink();
-        }
-        return Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(_dayFmt.format(labels[i]), style: _axisStyle(scheme)),
-        );
-      },
+    bottomTitles: AxisTitles(
+      sideTitles: SideTitles(
+        showTitles: true,
+        reservedSize: 20,
+        interval: step.toDouble(),
+        getTitlesWidget: (v, _) {
+          final i = v.round();
+          // Bar charts ask for every column, so skip the in-between ones here
+          // as well as through `interval` (which only line charts honour).
+          if (i < 0 || i >= series.length || v != i || i % step != 0) {
+            return const SizedBox.shrink();
+          }
+          return Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(series.labelAt(i), style: _axisStyle(scheme)),
+          );
+        },
+      ),
     ),
-  ),
-);
+  );
+}
 
 /// Light tooltip: white card, hairline border, dark date line.
 LineTouchData _lineTouch(
   ColorScheme scheme,
-  List<DateTime> labels,
+  _Series series,
   String Function(LineBarSpot) text,
 ) => LineTouchData(
   touchTooltipData: LineTouchTooltipData(
@@ -423,7 +471,7 @@ LineTouchData _lineTouch(
     getTooltipItems: (spots) => [
       for (var i = 0; i < spots.length; i++)
         LineTooltipItem(
-          i == 0 ? '${_dayFmt.format(labels[spots[i].x.round()])}\n' : '',
+          i == 0 ? '${series.labelAt(spots[i].x.round())}\n' : '',
           TextStyle(
             color: scheme.onSurfaceVariant,
             fontSize: 11,
@@ -915,7 +963,7 @@ class _CompletionCard extends StatelessWidget {
     final values = series.completion;
     final last = values.isEmpty ? 0.0 : values.last;
     return _ChartCard(
-      title: series.weekly ? S.perWeek : S.perDay,
+      title: series.bucket.label,
       value: Text(
         '${last.round()}%',
         textDirection: TextDirection.ltr,
@@ -936,7 +984,7 @@ class _CompletionCard extends StatelessWidget {
             borderData: FlBorderData(show: false),
             titlesData: _titles(
               scheme,
-              series.labels,
+              series,
               left: (v) => '${v.round()}%',
               leftInterval: 50,
             ),
@@ -944,7 +992,7 @@ class _CompletionCard extends StatelessWidget {
               touchTooltipData: _barTooltip(
                 scheme,
                 (group, rod) => BarTooltipItem(
-                  '${_dayFmt.format(series.labels[group.x])}\n',
+                  '${series.labelAt(group.x)}\n',
                   TextStyle(color: scheme.onSurfaceVariant, fontSize: 11),
                   children: [
                     TextSpan(
@@ -1030,13 +1078,13 @@ class _ConsumptionCard extends StatelessWidget {
                   borderData: FlBorderData(show: false),
                   titlesData: _titles(
                     scheme,
-                    series.labels,
+                    series,
                     left: _compactFmt.format,
                     leftInterval: interval,
                   ),
                   lineTouchData: _lineTouch(
                     scheme,
-                    series.labels,
+                    series,
                     (s) => '${_numFmt.format(s.y)} ${type.unit}',
                   ),
                   lineBarsData: [
@@ -1110,7 +1158,7 @@ class _ChangeCard extends StatelessWidget {
             borderData: FlBorderData(show: false),
             titlesData: _titles(
               scheme,
-              series.labels,
+              series,
               left: (v) => '${v > 0 ? '+' : ''}${v.round()}%',
               leftInterval: interval,
             ),
@@ -1126,7 +1174,7 @@ class _ChangeCard extends StatelessWidget {
             ),
             lineTouchData: _lineTouch(
               scheme,
-              series.labels,
+              series,
               (s) =>
                   '${shown[s.barIndex].label} ${s.y > 0 ? '+' : ''}${s.y.round()}%',
             ),
@@ -1194,7 +1242,7 @@ class _CostCard extends StatelessWidget {
     }
     final interval = _niceInterval(top);
     return _ChartCard(
-      title: series.weekly ? S.perWeek : S.perDay,
+      title: series.bucket.label,
       value: ValueText(total.round(), unit: S.currency, fontSize: 18),
       chart: SizedBox(
         height: 130,
@@ -1207,7 +1255,7 @@ class _CostCard extends StatelessWidget {
             borderData: FlBorderData(show: false),
             titlesData: _titles(
               scheme,
-              series.labels,
+              series,
               left: _compactFmt.format,
               leftInterval: interval,
             ),
@@ -1215,7 +1263,7 @@ class _CostCard extends StatelessWidget {
               touchTooltipData: _barTooltip(
                 scheme,
                 (group, rod) => BarTooltipItem(
-                  _dayFmt.format(series.labels[group.x]),
+                  series.labelAt(group.x),
                   TextStyle(color: scheme.onSurfaceVariant, fontSize: 11),
                   children: [
                     for (final t in priced)

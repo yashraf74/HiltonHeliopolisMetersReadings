@@ -33,6 +33,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _maintenance = false;
   bool _deleteEnabled = true;
   bool _exportEnabled = true;
+  bool _profileEditing = true;
+  ExportSettings _export = const ExportSettings();
   String? _latestVersion;
   bool _loading = true;
   bool _saving = false;
@@ -64,6 +66,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _maintenance = s.maintenanceMode;
     _deleteEnabled = s.readingDeleteEnabled;
     _exportEnabled = s.exportEnabled;
+    _profileEditing = s.profileEditingEnabled;
+    _export = s.export;
     _latestVersion = s.latestAppVersion ?? _latestVersion;
     for (final t in MeterType.values) {
       final p = s.prices[t] ?? 0;
@@ -95,6 +99,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
+    if (_export.columns.isEmpty) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(S.exportAtLeastOneColumn)));
+      return;
+    }
     setState(() => _saving = true);
     final api = context.read<ApiClient>();
     final status = context.read<AppStatusController>();
@@ -108,6 +117,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           exportEnabled: _exportEnabled,
           photoRetentionDays: int.parse(_retention.text.trim()),
           tokenLifetimeDays: int.parse(_tokenDays.text.trim()),
+          profileEditingEnabled: _profileEditing,
+          export: _export,
           prices: {
             for (final t in MeterType.values)
               t: double.parse(_prices[t]!.text.trim()),
@@ -188,6 +199,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onChanged: _saving
                         ? null
                         : (v) => setState(() => _exportEnabled = v),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      S.settingProfileEditing,
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    subtitle: Text(
+                      S.settingProfileEditingHint,
+                      style: TextStyle(
+                        color: scheme.onSurfaceVariant,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    value: _profileEditing,
+                    onChanged: _saving
+                        ? null
+                        : (v) => setState(() => _profileEditing = v),
+                  ),
+                  const Divider(height: 32),
+                  _ExportSection(
+                    settings: _export,
+                    enabled: !_saving,
+                    onChanged: (v) => setState(() => _export = v),
                   ),
                   const Divider(height: 32),
                   TextFormField(
@@ -304,6 +339,179 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+/// Excel export options: which columns, in what order, the sheet direction,
+/// date and number formats, and one sheet per meter type.
+class _ExportSection extends StatelessWidget {
+  const _ExportSection({
+    required this.settings,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final ExportSettings settings;
+  final bool enabled;
+  final ValueChanged<ExportSettings> onChanged;
+
+  /// Selected columns first (in export order), then the unselected ones.
+  List<ExportColumn> get _ordered => [
+    ...settings.columns,
+    ...ExportColumn.values.where((c) => !settings.columns.contains(c)),
+  ];
+
+  void _toggle(ExportColumn column, bool selected) {
+    final columns = [...settings.columns];
+    if (selected) {
+      columns.add(column);
+    } else {
+      columns.remove(column);
+    }
+    onChanged(settings.copyWith(columns: columns));
+  }
+
+  void _reorder(int oldIndex, int newIndex) {
+    final ordered = _ordered;
+    final moved = ordered.removeAt(oldIndex);
+    ordered.insert(newIndex, moved);
+    // Keep the selected ones only, in their new order.
+    onChanged(
+      settings.copyWith(
+        columns: ordered.where(settings.columns.contains).toList(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final muted = TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          S.settingExport,
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+        ),
+        Text(S.settingExportHint, style: muted),
+        const SizedBox(height: 14),
+        Text(
+          S.exportColumns,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        Text(S.exportColumnsHint, style: muted),
+        const SizedBox(height: 4),
+        ReorderableListView(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          buildDefaultDragHandles: false,
+          onReorderItem: _reorder,
+          children: [
+            for (final (i, column) in _ordered.indexed)
+              CheckboxListTile(
+                key: ValueKey(column),
+                contentPadding: EdgeInsets.zero,
+                dense: true,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: settings.columns.contains(column),
+                onChanged: enabled ? (v) => _toggle(column, v ?? false) : null,
+                title: Text(column.label),
+                secondary: ReorderableDragStartListener(
+                  index: i,
+                  child: Icon(
+                    Icons.drag_handle_rounded,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          S.exportDirection,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
+        SegmentedButton<ExportDirection>(
+          showSelectedIcon: false,
+          style: const ButtonStyle(
+            visualDensity: VisualDensity(horizontal: -2, vertical: -2),
+            textStyle: WidgetStatePropertyAll(
+              TextStyle(fontSize: 12, fontFamily: 'Cairo'),
+            ),
+          ),
+          segments: [
+            ButtonSegment(
+              value: ExportDirection.auto,
+              label: Text(S.exportDirectionAuto),
+            ),
+            ButtonSegment(
+              value: ExportDirection.rtl,
+              label: Text(S.exportDirectionRtl),
+            ),
+            ButtonSegment(
+              value: ExportDirection.ltr,
+              label: Text(S.exportDirectionLtr),
+            ),
+          ],
+          selected: {settings.direction},
+          onSelectionChanged: enabled
+              ? (s) => onChanged(settings.copyWith(direction: s.first))
+              : null,
+        ),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<String>(
+          initialValue: settings.dateFormat,
+          decoration: InputDecoration(labelText: S.exportDateFormat),
+          items: [
+            for (final f in ExportSettings.dateFormats)
+              DropdownMenuItem(
+                value: f,
+                child: Text(f, textDirection: TextDirection.ltr),
+              ),
+          ],
+          onChanged: enabled
+              ? (v) => onChanged(settings.copyWith(dateFormat: v))
+              : null,
+        ),
+        const SizedBox(height: 16),
+        DropdownButtonFormField<int>(
+          initialValue: settings.decimals,
+          decoration: InputDecoration(labelText: S.exportDecimals),
+          items: [
+            for (var d = 0; d <= 3; d++)
+              DropdownMenuItem(
+                value: d,
+                child: Text(
+                  d == 0 ? '0' : '0.${'0' * d}',
+                  textDirection: TextDirection.ltr,
+                ),
+              ),
+          ],
+          onChanged: enabled
+              ? (v) => onChanged(settings.copyWith(decimals: v))
+              : null,
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(S.exportThousands),
+          value: settings.thousandsSeparator,
+          onChanged: enabled
+              ? (v) => onChanged(settings.copyWith(thousandsSeparator: v))
+              : null,
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(S.exportSheetPerType),
+          subtitle: Text(S.exportSheetPerTypeHint, style: muted),
+          value: settings.sheetPerType,
+          onChanged: enabled
+              ? (v) => onChanged(settings.copyWith(sheetPerType: v))
+              : null,
+        ),
+      ],
     );
   }
 }

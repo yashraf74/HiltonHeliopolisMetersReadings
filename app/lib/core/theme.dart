@@ -32,9 +32,11 @@ ThemeData buildAppTheme() {
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
+      // Page titles: a touch larger and heavier than the Material default.
       titleTextStyle: base.textTheme.titleLarge?.copyWith(
         fontFamily: 'Cairo',
-        fontWeight: FontWeight.w700,
+        fontSize: (base.textTheme.titleLarge?.fontSize ?? 22) + 2,
+        fontWeight: FontWeight.w800,
         color: scheme.onSurface,
       ),
     ),

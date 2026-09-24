@@ -88,6 +88,8 @@ class AuthUser {
     required this.role,
     this.language,
     this.email,
+    this.phone,
+    this.photoKey,
   });
 
   final String id;
@@ -97,6 +99,21 @@ class AuthUser {
 
   /// From sign-in (null in sessions from older app versions).
   final String? email;
+  final String? phone;
+  final String? photoKey;
+
+  /// The signed-in user after they edited their own profile.
+  AuthUser withProfile({String? email, String? phone, String? photoKey}) =>
+      AuthUser(
+        id: id,
+        username: username,
+        fullName: fullName,
+        role: role,
+        language: language,
+        email: email,
+        phone: phone,
+        photoKey: photoKey,
+      );
 
   /// Saved app language from the server (null in sessions from older app
   /// versions, which then keep the device's choice).
@@ -115,6 +132,8 @@ class AuthUser {
         ? null
         : AppLanguage.fromCode(json['language'] as String),
     email: json['email'] as String?,
+    phone: json['phone'] as String?,
+    photoKey: json['photoKey'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -124,6 +143,8 @@ class AuthUser {
     'role': role.name,
     'language': ?language?.name,
     'email': ?email,
+    'phone': ?phone,
+    'photoKey': ?photoKey,
   };
 }
 
@@ -173,12 +194,144 @@ class AppUser {
 
 /// Runtime switches from the server (GET /api/config), safe to show to any
 /// role. Moderators edit the full set on the settings screen.
+/// Columns the Excel export can include; [ExportSettings.columns] holds the
+/// selected ones in export order.
+enum ExportColumn {
+  loggedAt('logged_at'),
+  meterName('meter_name'),
+  meterType('meter_type'),
+  meterArea('meter_area'),
+  meterNumber('meter_number'),
+  value('value'),
+  gain('gain'),
+  unit('unit'),
+  loggedBy('logged_by'),
+  syncedAt('synced_at'),
+  readingId('reading_id');
+
+  const ExportColumn(this.id);
+
+  final String id;
+
+  static ExportColumn? fromId(String id) =>
+      values.where((c) => c.id == id).firstOrNull;
+
+  String get label => switch (this) {
+    loggedAt => S.colDateTime,
+    meterName => S.colMeterName,
+    meterType => S.colType,
+    meterArea => S.colMeterArea,
+    meterNumber => S.colMeterNumber,
+    value => S.colValue,
+    gain => S.gainLabel,
+    unit => S.colUnit,
+    loggedBy => S.colLoggedBy,
+    syncedAt => S.colSyncedAt,
+    readingId => S.colReadingId,
+  };
+
+  /// Column width in the workbook.
+  double get width => switch (this) {
+    loggedAt || syncedAt => 18,
+    meterName || loggedBy => 22,
+    meterArea => 20,
+    meterNumber || value || gain => 14,
+    meterType => 12,
+    unit => 10,
+    readingId => 38,
+  };
+}
+
+/// Sheet direction for the export: follow the exporter's language, or force.
+enum ExportDirection { auto, rtl, ltr }
+
+/// How the Excel export is built (set by a moderator, used by every device).
+class ExportSettings {
+  const ExportSettings({
+    this.columns = ExportColumn.values,
+    this.direction = ExportDirection.auto,
+    this.dateFormat = defaultDateFormat,
+    this.decimals = 2,
+    this.thousandsSeparator = true,
+    this.sheetPerType = false,
+  });
+
+  static const defaultDateFormat = 'yyyy-MM-dd HH:mm';
+
+  /// Patterns offered for date cells.
+  static const dateFormats = [
+    'yyyy-MM-dd HH:mm',
+    'dd/MM/yyyy HH:mm',
+    'MM/dd/yyyy HH:mm',
+    'yyyy-MM-dd',
+    'dd/MM/yyyy',
+  ];
+
+  final List<ExportColumn> columns;
+  final ExportDirection direction;
+  final String dateFormat;
+  final int decimals;
+  final bool thousandsSeparator;
+
+  /// One sheet per meter type, each tab named after the type.
+  final bool sheetPerType;
+
+  factory ExportSettings.fromJson(Map<String, dynamic>? j) {
+    if (j == null) return const ExportSettings();
+    final ids = (j['columns'] as List<dynamic>?)?.cast<String>() ?? const [];
+    final columns = [for (final id in ids) ?ExportColumn.fromId(id)];
+    return ExportSettings(
+      columns: columns.isEmpty ? ExportColumn.values : columns,
+      direction: ExportDirection.values.firstWhere(
+        (d) => d.name == j['direction'],
+        orElse: () => ExportDirection.auto,
+      ),
+      dateFormat: dateFormats.contains(j['dateFormat'])
+          ? j['dateFormat'] as String
+          : defaultDateFormat,
+      decimals: switch (j['decimals']) {
+        final int d when d >= 0 && d <= 3 => d,
+        _ => 2,
+      },
+      thousandsSeparator: j['thousandsSeparator'] as bool? ?? true,
+      sheetPerType: j['sheetPerType'] as bool? ?? false,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'columns': [for (final c in columns) c.id],
+    'direction': direction.name,
+    'dateFormat': dateFormat,
+    'decimals': decimals,
+    'thousandsSeparator': thousandsSeparator,
+    'sheetPerType': sheetPerType,
+  };
+
+  ExportSettings copyWith({
+    List<ExportColumn>? columns,
+    ExportDirection? direction,
+    String? dateFormat,
+    int? decimals,
+    bool? thousandsSeparator,
+    bool? sheetPerType,
+  }) => ExportSettings(
+    columns: columns ?? this.columns,
+    direction: direction ?? this.direction,
+    dateFormat: dateFormat ?? this.dateFormat,
+    decimals: decimals ?? this.decimals,
+    thousandsSeparator: thousandsSeparator ?? this.thousandsSeparator,
+    sheetPerType: sheetPerType ?? this.sheetPerType,
+  );
+}
+
 class AppConfig {
   const AppConfig({
     this.minAppVersion = '0.0.0',
     this.maintenanceMode = false,
     this.readingDeleteEnabled = true,
     this.exportEnabled = true,
+    this.profileEditingEnabled = true,
+    this.export = const ExportSettings(),
   });
 
   final String minAppVersion;
@@ -186,11 +339,19 @@ class AppConfig {
   final bool readingDeleteEnabled;
   final bool exportEnabled;
 
+  /// Users may edit their own photo, email and mobile number.
+  final bool profileEditingEnabled;
+
+  /// How this device builds the Excel workbook.
+  final ExportSettings export;
+
   factory AppConfig.fromJson(Map<String, dynamic> j) => AppConfig(
     minAppVersion: j['minAppVersion'] as String? ?? '0.0.0',
     maintenanceMode: j['maintenanceMode'] as bool? ?? false,
     readingDeleteEnabled: j['readingDeleteEnabled'] as bool? ?? true,
     exportEnabled: j['exportEnabled'] as bool? ?? true,
+    profileEditingEnabled: j['profileEditingEnabled'] as bool? ?? true,
+    export: ExportSettings.fromJson(j['export'] as Map<String, dynamic>?),
   );
 }
 
@@ -202,6 +363,8 @@ class AppSettings {
     required this.exportEnabled,
     required this.photoRetentionDays,
     required this.tokenLifetimeDays,
+    required this.profileEditingEnabled,
+    required this.export,
     required this.prices,
     this.latestAppVersion,
   });
@@ -214,6 +377,12 @@ class AppSettings {
 
   /// How long a login stays valid; applies to logins after it is changed.
   final int tokenLifetimeDays;
+
+  /// Users may edit their own photo, email and mobile number.
+  final bool profileEditingEnabled;
+
+  /// How the Excel export is built.
+  final ExportSettings export;
 
   /// EGP per unit for the dashboard cost chart; 0 = not set.
   final Map<MeterType, double> prices;
@@ -228,6 +397,8 @@ class AppSettings {
     exportEnabled: j['exportEnabled'] as bool,
     photoRetentionDays: j['photoRetentionDays'] as int,
     tokenLifetimeDays: j['tokenLifetimeDays'] as int? ?? 7,
+    profileEditingEnabled: j['profileEditingEnabled'] as bool? ?? true,
+    export: ExportSettings.fromJson(j['export'] as Map<String, dynamic>?),
     prices: pricesFromJson(j['prices'] as Map<String, dynamic>?),
     latestAppVersion: j['latestAppVersion'] as String?,
   );
@@ -243,6 +414,8 @@ class AppSettings {
     'exportEnabled': exportEnabled,
     'photoRetentionDays': photoRetentionDays,
     'tokenLifetimeDays': tokenLifetimeDays,
+    'profileEditingEnabled': profileEditingEnabled,
+    'export': export.toJson(),
     'prices': {for (final e in prices.entries) e.key.name: e.value},
   };
 }

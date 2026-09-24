@@ -80,6 +80,20 @@ class SessionController extends ChangeNotifier {
     }
   }
 
+  /// Stores the profile the user just saved (photo, email, mobile), so the
+  /// account menu and export hints use it without signing in again.
+  Future<void> updateProfile({
+    String? email,
+    String? phone,
+    String? photoKey,
+  }) async {
+    final user = _user;
+    if (user == null) return;
+    _user = user.withProfile(email: email, phone: phone, photoKey: photoKey);
+    await _storage.write(key: _userKey, value: jsonEncode(_user!.toJson()));
+    notifyListeners();
+  }
+
   Future<void> signOut() async {
     await _storage.delete(key: _tokenKey);
     await _storage.delete(key: _userKey);

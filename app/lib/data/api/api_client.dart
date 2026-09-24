@@ -470,6 +470,29 @@ class ApiClient {
     );
   }
 
+  /// Saves the signed-in user's own profile (photo, email, mobile) and
+  /// returns the stored values.
+  Future<AppUser> saveProfile({
+    String? email,
+    String? phone,
+    bool clearPhone = false,
+    String? photoKey,
+    bool clearPhoto = false,
+  }) async {
+    final body = await _json(
+      _http.put(
+        _uri('/users/me/profile'),
+        headers: _headers(contentType: 'application/json'),
+        body: jsonEncode({
+          'email': ?email,
+          if (phone != null || clearPhone) 'phone': phone,
+          if (photoKey != null || clearPhoto) 'photoKey': photoKey,
+        }),
+      ),
+    );
+    return AppUser.fromJson(body['user'] as Map<String, dynamic>);
+  }
+
   /// Saves the signed-in user's app language.
   Future<void> saveLanguage(AppLanguage language) async {
     await _json(
