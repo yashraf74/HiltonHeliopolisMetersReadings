@@ -179,61 +179,28 @@ class _UserFormScreenState extends State<UserFormScreen> {
     }
   }
 
-  /// Round photo preview with camera / gallery buttons and "remove".
   Widget _buildPhoto() {
-    final scheme = Theme.of(context).colorScheme;
     final api = context.read<ApiClient>();
     final showExisting =
         _photoKey != null && !_removePhoto && _newPhoto == null;
-    final ImageProvider? image = _newPhoto != null
-        ? FileImage(_newPhoto!)
-        : showExisting
-        ? NetworkImage(
-            api.photoUri(_photoKey!).toString(),
-            headers: api.authHeaders,
-          )
-        : null;
-    return Column(
-      children: [
-        CircleAvatar(
-          radius: 44,
-          backgroundColor: scheme.primaryContainer,
-          foregroundImage: image,
-          child: Icon(
-            Icons.person_rounded,
-            size: 44,
-            color: scheme.onPrimaryContainer,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          S.userPhoto,
-          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
-        ),
-        const SizedBox(height: 8),
-        PhotoSourceButtons(
-          compact: true,
-          onPicked: (f) => setState(() {
-            _newPhoto = f;
-            _removePhoto = false;
-          }),
-        ),
-        if (image != null)
-          TextButton.icon(
-            onPressed: _busy
-                ? null
-                : () => setState(() {
-                    _newPhoto = null;
-                    _removePhoto = true;
-                  }),
-            icon: Icon(
-              Icons.hide_image_outlined,
-              size: 18,
-              color: scheme.error,
-            ),
-            label: Text(S.removePhoto, style: TextStyle(color: scheme.error)),
-          ),
-      ],
+    return UserPhotoField(
+      enabled: !_busy,
+      image: _newPhoto != null
+          ? FileImage(_newPhoto!)
+          : showExisting
+          ? NetworkImage(
+              api.photoUri(_photoKey!).toString(),
+              headers: api.authHeaders,
+            )
+          : null,
+      onPicked: (f) => setState(() {
+        _newPhoto = f;
+        _removePhoto = false;
+      }),
+      onRemoved: () => setState(() {
+        _newPhoto = null;
+        _removePhoto = true;
+      }),
     );
   }
 

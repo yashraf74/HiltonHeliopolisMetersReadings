@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/strings.dart';
+import 'status_widgets.dart';
 
 const maxPhotoBytes = 3 * 1024 * 1024;
 
@@ -138,6 +139,73 @@ class _BigButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Round photo preview with camera / gallery buttons and "remove", shared by
+/// the moderator's user form and the user's own profile page so both look
+/// and behave the same. Tapping the photo opens it full size.
+class UserPhotoField extends StatelessWidget {
+  const UserPhotoField({
+    super.key,
+    required this.image,
+    required this.onPicked,
+    required this.onRemoved,
+    this.enabled = true,
+  });
+
+  final ImageProvider? image;
+  final ValueChanged<File> onPicked;
+  final VoidCallback onRemoved;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final photo = image;
+    final avatar = CircleAvatar(
+      radius: 44,
+      backgroundColor: scheme.primaryContainer,
+      foregroundImage: photo,
+      child: Icon(
+        Icons.person_rounded,
+        size: 44,
+        color: scheme.onPrimaryContainer,
+      ),
+    );
+    return Column(
+      children: [
+        if (photo == null)
+          avatar
+        else
+          GestureDetector(
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => PhotoViewerScreen(image: photo),
+                fullscreenDialog: true,
+              ),
+            ),
+            child: avatar,
+          ),
+        const SizedBox(height: 6),
+        Text(
+          S.userPhoto,
+          style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
+        ),
+        const SizedBox(height: 8),
+        PhotoSourceButtons(compact: true, onPicked: onPicked),
+        if (photo != null)
+          TextButton.icon(
+            onPressed: enabled ? onRemoved : null,
+            icon: Icon(
+              Icons.hide_image_outlined,
+              size: 18,
+              color: scheme.error,
+            ),
+            label: Text(S.removePhoto, style: TextStyle(color: scheme.error)),
+          ),
+      ],
     );
   }
 }

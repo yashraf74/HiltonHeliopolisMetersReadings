@@ -143,7 +143,8 @@ class _MetersScreenState extends State<MetersScreen> {
                 ),
               ),
               Padding(
-                padding: const EdgeInsetsDirectional.only(end: 8, top: 6),
+                // Same 16 from the edge as the readings screen's buttons.
+                padding: const EdgeInsetsDirectional.only(end: 16, top: 6),
                 child: IconButton.filledTonal(
                   tooltip: S.sortBy,
                   onPressed: _openSort,

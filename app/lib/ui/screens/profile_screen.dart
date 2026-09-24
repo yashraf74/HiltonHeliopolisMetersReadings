@@ -160,15 +160,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(20),
                 children: [
-                  CircleAvatar(
-                    radius: 48,
-                    backgroundColor: scheme.primaryContainer,
-                    foregroundImage: image,
-                    child: Icon(
-                      Icons.person_rounded,
-                      size: 48,
-                      color: scheme.onPrimaryContainer,
-                    ),
+                  UserPhotoField(
+                    enabled: !_busy,
+                    image: image,
+                    onPicked: (f) => setState(() {
+                      _newPhoto = f;
+                      _removePhoto = false;
+                    }),
+                    onRemoved: () => setState(() {
+                      _newPhoto = null;
+                      _removePhoto = true;
+                    }),
                   ),
                   const SizedBox(height: 10),
                   Text(
@@ -188,32 +190,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       fontSize: 13,
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  PhotoSourceButtons(
-                    compact: true,
-                    onPicked: (f) => setState(() {
-                      _newPhoto = f;
-                      _removePhoto = false;
-                    }),
-                  ),
-                  if (image != null)
-                    TextButton.icon(
-                      onPressed: _busy
-                          ? null
-                          : () => setState(() {
-                              _newPhoto = null;
-                              _removePhoto = true;
-                            }),
-                      icon: Icon(
-                        Icons.hide_image_outlined,
-                        size: 18,
-                        color: scheme.error,
-                      ),
-                      label: Text(
-                        S.removePhoto,
-                        style: TextStyle(color: scheme.error),
-                      ),
-                    ),
                   const SizedBox(height: 14),
                   TextFormField(
                     controller: _email,

@@ -235,7 +235,10 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
               );
             },
           ),
+          // Keeps the avatar off the screen edge.
+          const SizedBox(width: 4),
           PopupMenuButton<String>(
+            padding: const EdgeInsetsDirectional.only(end: 8),
             icon: _AccountIcon(photoKey: user.photoKey),
             onSelected: (v) {
               switch (v) {
