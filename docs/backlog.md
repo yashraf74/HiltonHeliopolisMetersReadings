@@ -34,6 +34,22 @@ Shorebird downloads a patch on one launch and runs it from the next. The
 Adding a package needs a release build, so fold it into the next release
 that happens for another reason — don't tag a version just for this.
 
+## The "by user" filter list is cached for the whole session
+
+Hiding or unhiding an account (the switch in the user form) doesn't change
+the readings filter's dropdown until the app is closed and reopened; pulling
+to refresh the readings list doesn't help either.
+
+Cause: `ReadingsScreen` fetches `GET /api/users/names` once in `initState`
+(`_loadUserNames`) and keeps it in `_userNames` for the life of the screen.
+Pull-to-refresh calls `_load()`, which only refetches readings, and the
+screen is kept alive by the tab's IndexedStack, so `initState` doesn't run
+again when switching tabs.
+
+Fix options: refetch the names inside `_load()` (simplest); or have the user
+form return a flag and refresh the list when user management closes; or move
+the names into a small controller that user edits can invalidate.
+
 ## A safer way to test against production
 
 The idea of a "test user" flag (their readings hidden from lists, exports and
