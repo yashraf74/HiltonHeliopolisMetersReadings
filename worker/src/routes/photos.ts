@@ -39,9 +39,12 @@ photoRoutes.post("/", async (c) => {
 
   const kindParam = c.req.query("kind");
   const kind = kindParam === "meter" ? "meters" : kindParam === "user" ? "users" : "readings";
-  if (kind !== "readings" && c.get("user").role !== "moderator") {
-    return c.json({ error: "Forbidden" }, 403);
-  }
+  // Meter photos are moderator-only; a user photo is either a moderator
+  // editing someone, or anyone setting their own while that is enabled.
+  const isModerator = c.get("user").role === "moderator";
+  const mayUpload =
+    kind === "readings" || isModerator || (kind === "users" && c.get("settings").profileEditingEnabled);
+  if (!mayUpload) return c.json({ error: "Forbidden" }, 403);
   const key = `${kind}/${crypto.randomUUID()}.${ext}`;
   await c.env.PHOTOS.put(key, bytes, { httpMetadata: { contentType } });
 
@@ -51,9 +54,13 @@ photoRoutes.post("/", async (c) => {
 photoRoutes.get("/", async (c) => {
   const key = c.req.query("key");
   if (!key) return c.json({ error: "key query param is required" }, 400);
-  // User photos are only for moderators and engineers.
+  // User photos are for moderators and engineers; a technician may only
+  // load their own (the account menu and their profile page).
   if (key.startsWith("users/") && c.get("user").role === "technician") {
-    return c.json({ error: "Forbidden" }, 403);
+    const own = await c.env.DB.prepare("SELECT photo_key FROM users WHERE id = ?")
+      .bind(c.get("user").id)
+      .first<{ photo_key: string | null }>();
+    if (own?.photo_key !== key) return c.json({ error: "Forbidden" }, 403);
   }
 
   const object = await c.env.PHOTOS.get(key);

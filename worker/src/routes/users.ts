@@ -80,6 +80,37 @@ userRoutes.get("/names", requireRole("moderator", "engineer"), async (c) => {
   return c.json({ users: results.map((u) => ({ id: u.id, fullName: u.full_name })) });
 });
 
+// Any signed-in user edits their own photo, email and mobile number, while
+// the moderator's profileEditingEnabled switch allows it. Roles, usernames
+// and passwords stay with moderators.
+userRoutes.put("/me/profile", async (c) => {
+  if (!c.get("settings").profileEditingEnabled) {
+    return c.json({ error: "Editing your profile is disabled", code: "profile_editing_disabled" }, 403);
+  }
+  const body = await c.req.json().catch(() => null);
+  const email = body?.email === undefined ? null : normalizeEmail(body.email);
+  if (body?.email !== undefined && !email) return c.json({ error: EMAIL_ERROR }, 400);
+  const phone = optionalField(body, "phone", (v) => PHONE_RE.test(v));
+  if (phone === "invalid") return c.json({ error: PHONE_ERROR }, 400);
+  const photoKey = optionalField(body, "photoKey", (v) => v.startsWith("users/"));
+  if (photoKey === "invalid") return c.json({ error: "photoKey must be an uploaded user photo" }, 400);
+
+  await c.env.DB.prepare(
+    `UPDATE users SET
+       email = COALESCE(?, email),
+       phone = CASE WHEN ? THEN ? ELSE phone END,
+       photo_key = CASE WHEN ? THEN ? ELSE photo_key END
+     WHERE id = ?`
+  )
+    .bind(email, phone !== undefined ? 1 : 0, phone ?? null, photoKey !== undefined ? 1 : 0, photoKey ?? null, c.get("user").id)
+    .run();
+
+  const user = await c.env.DB.prepare(`SELECT ${USER_COLUMNS} FROM users WHERE id = ?`)
+    .bind(c.get("user").id)
+    .first<UserRow>();
+  return c.json({ user: publicUser(user!) });
+});
+
 // Any signed-in user saves their own app language.
 userRoutes.put("/me/language", async (c) => {
   const body = await c.req.json().catch(() => null);

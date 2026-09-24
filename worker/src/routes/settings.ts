@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Env, Settings } from "../types";
 import type { AuthedVars } from "../middleware";
 import { requireAuth, requireRole } from "../middleware";
-import { saveSettings } from "../settings";
+import { saveSettings, parseExportSettings } from "../settings";
 
 export const settingsRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
@@ -14,6 +14,9 @@ settingsRoutes.get("/config", (c) => {
     maintenanceMode: s.maintenanceMode,
     readingDeleteEnabled: s.readingDeleteEnabled,
     exportEnabled: s.exportEnabled,
+    // Every role builds its own workbook and may edit its own profile.
+    profileEditingEnabled: s.profileEditingEnabled,
+    export: s.export,
   });
 });
 
@@ -96,11 +99,22 @@ settingsRoutes.put("/settings", requireAuth, requireRole("moderator"), async (c)
     if (!/^\d+(\.\d+){0,2}$/.test(v)) return c.json({ error: "minAppVersion must look like 2.0.0" }, 400);
     next.minAppVersion = v;
   }
-  for (const key of ["maintenanceMode", "readingDeleteEnabled", "exportEnabled"] as const) {
+  for (const key of ["maintenanceMode", "readingDeleteEnabled", "exportEnabled", "profileEditingEnabled"] as const) {
     if (body?.[key] !== undefined) {
       if (typeof body[key] !== "boolean") return c.json({ error: `${key} must be a boolean` }, 400);
       next[key] = body[key];
     }
+  }
+  if (body?.export !== undefined) {
+    if (typeof body.export !== "object" || body.export === null) {
+      return c.json({ error: "export must be an object" }, 400);
+    }
+    const parsed = parseExportSettings(JSON.stringify(body.export));
+    // Anything unusable falls back, so only an empty column list is an error.
+    if (Array.isArray(body.export.columns) && body.export.columns.length === 0) {
+      return c.json({ error: "export.columns must list at least one column" }, 400);
+    }
+    next.export = parsed;
   }
   if (body?.photoRetentionDays !== undefined) {
     const n = Number(body.photoRetentionDays);

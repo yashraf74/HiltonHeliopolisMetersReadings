@@ -11,6 +11,8 @@ interface UserRow {
   password_hash: string;
   full_name: string;
   email: string;
+  phone: string | null;
+  photo_key: string | null;
   language: Language | null;
   role: "moderator" | "engineer" | "technician";
 }
@@ -27,7 +29,7 @@ authRoutes.post("/login", async (c) => {
   }
 
   const user = await c.env.DB.prepare(
-    "SELECT id, username, password_hash, full_name, email, language, role FROM users WHERE username = ? AND is_active = 1"
+    "SELECT id, username, password_hash, full_name, email, phone, photo_key, language, role FROM users WHERE username = ? AND is_active = 1"
   )
     .bind(username)
     .first<UserRow>();
@@ -52,6 +54,8 @@ authRoutes.post("/login", async (c) => {
       username: user.username,
       fullName: user.full_name,
       email: user.email,
+      phone: user.phone,
+      photoKey: user.photo_key,
       role: user.role,
       language: user.language ?? defaultLanguage(user.role),
     },
