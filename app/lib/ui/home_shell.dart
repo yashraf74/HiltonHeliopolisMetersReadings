@@ -58,12 +58,31 @@ class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
 
   void _refreshAll() {
     final session = context.read<SessionController>();
+    final api = context.read<ApiClient>();
     context.read<MetersController>().refresh();
     context.read<SyncController>().sync();
     context.read<AppStatusController>().refresh(
-      context.read<ApiClient>(),
+      api,
       isModerator: session.user?.canManage ?? false,
     );
+    _refreshProfile(api, session);
+  }
+
+  /// Picks up a photo, email or mobile number a moderator changed since this
+  /// device signed in, so the account icon and profile page stay right.
+  Future<void> _refreshProfile(ApiClient api, SessionController session) async {
+    try {
+      final me = await api.fetchMe();
+      await session.updateProfile(
+        email: me.email,
+        phone: me.phone,
+        photoKey: me.photoKey,
+      );
+    } on NetworkException {
+      // Offline: keep what sign-in stored.
+    } on ApiException {
+      // Signed out or rejected: handled by the request that matters.
+    }
   }
 
   // Coming back to the foreground is the moment connectivity most often
@@ -371,7 +390,9 @@ class _AccountIcon extends StatelessWidget {
   }
 }
 
-/// Shown while the language changes.
+/// Shown while the language changes. [Material] gives the text the app's
+/// styling; bare text on a dialog barrier gets Flutter's yellow-underlined
+/// fallback instead.
 class _LanguageSplash extends StatelessWidget {
   const _LanguageSplash();
 
@@ -380,17 +401,23 @@ class _LanguageSplash extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return PopScope(
       canPop: false,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const CircularProgressIndicator(),
-            const SizedBox(height: 16),
-            Text(
-              S.changingLanguage,
-              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 13.5),
-            ),
-          ],
+      child: Material(
+        type: MaterialType.transparency,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              Text(
+                S.changingLanguage,
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
+                  fontSize: 13.5,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

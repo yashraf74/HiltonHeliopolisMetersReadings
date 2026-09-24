@@ -470,6 +470,13 @@ class ApiClient {
     );
   }
 
+  /// The signed-in user's own record, including any change a moderator
+  /// made since sign-in.
+  Future<AppUser> fetchMe() async {
+    final body = await _json(_http.get(_uri('/users/me'), headers: _headers()));
+    return AppUser.fromJson(body['user'] as Map<String, dynamic>);
+  }
+
   /// Saves the signed-in user's own profile (photo, email, mobile) and
   /// returns the stored values.
   Future<AppUser> saveProfile({

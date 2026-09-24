@@ -120,6 +120,16 @@ userRoutes.put("/me/language", async (c) => {
   return c.json({ language });
 });
 
+// The signed-in user's own record: the profile page and the account menu
+// read it, so a moderator's edits show up without signing in again.
+userRoutes.get("/me", async (c) => {
+  const user = await c.env.DB.prepare(`SELECT ${USER_COLUMNS} FROM users WHERE id = ?`)
+    .bind(c.get("user").id)
+    .first<UserRow>();
+  if (!user) return c.json({ error: "User not found" }, 404);
+  return c.json({ user: publicUser(user) });
+});
+
 // One user's card (name, role, email, phone, photo) for the user popup.
 // Technicians never see other users' details.
 userRoutes.get("/:id", requireRole("moderator", "engineer"), async (c) => {
