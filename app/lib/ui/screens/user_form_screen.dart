@@ -65,11 +65,12 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _email = TextEditingController(text: widget.existing?.email ?? '');
     _phone = TextEditingController(text: widget.existing?.phone ?? '');
     _photoKey = widget.existing?.photoKey;
+    _role = widget.existing?.role ?? UserRole.technician;
     for (final c in [_username, _fullName, _email, _phone, _password]) {
       c.addListener(() => setState(() {}));
     }
+    // Last: _current reads every field above.
     _saved = _current;
-    _role = widget.existing?.role ?? UserRole.technician;
   }
 
   @override
@@ -376,20 +377,6 @@ class _UserFormScreenState extends State<UserFormScreen> {
                   label: Text(S.deleteUser),
                 ),
               ],
-              const SizedBox(height: 28),
-              FilledButton(
-                onPressed: _busy ? null : _save,
-                child: _busy
-                    ? const SizedBox(
-                        width: 22,
-                        height: 22,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2.5,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(S.save),
-              ),
             ],
           ),
         ),

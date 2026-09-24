@@ -12,7 +12,11 @@ import 'package:meters_app/state/meters_controller.dart';
 import 'package:meters_app/state/session_controller.dart';
 import 'package:meters_app/state/sync_controller.dart';
 import 'package:meters_app/ui/home_shell.dart';
+import 'package:meters_app/data/models.dart';
 import 'package:meters_app/ui/login_screen.dart';
+import 'package:meters_app/ui/screens/meter_form_screen.dart';
+import 'package:meters_app/ui/screens/user_form_screen.dart';
+import 'package:provider/provider.dart';
 
 /// Guards against a provider being left out of the app root: every screen
 /// must be able to resolve every controller it reads.
@@ -103,5 +107,49 @@ void main() {
     sync.dispose();
     connectivity.dispose();
     await db.close();
+  });
+
+  testWidgets('the meter and user forms open without throwing', (tester) async {
+    final session = SessionController(storage: const FlutterSecureStorage());
+    final api = ApiClient(
+      tokenProvider: () => session.token,
+      appVersion: '2.6.0',
+      baseUrl: 'http://127.0.0.1:9',
+    );
+    const user = AppUser(
+      id: 'u2',
+      username: 'tech',
+      fullName: 'Tech',
+      email: 'tech@example.com',
+      role: UserRole.technician,
+      isActive: true,
+    );
+    const meter = Meter(
+      id: 'm1',
+      name: 'Pool',
+      type: 'water',
+      area: 'Pool',
+      isActive: true,
+      updatedAt: '2026-09-24T00:00:00Z',
+    );
+
+    for (final screen in <Widget>[
+      const UserFormScreen(existing: user),
+      const UserFormScreen(),
+      const MeterFormScreen(existing: meter),
+      const MeterFormScreen(),
+    ]) {
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            Provider<ApiClient>.value(value: api),
+            ChangeNotifierProvider<SessionController>.value(value: session),
+          ],
+          child: MaterialApp(home: screen),
+        ),
+      );
+      await tester.pump();
+      expect(tester.takeException(), isNull, reason: '$screen');
+    }
   });
 }
