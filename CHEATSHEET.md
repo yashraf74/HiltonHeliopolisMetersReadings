@@ -13,9 +13,32 @@ git commit -m "Describe the change"
 git push origin main
 ```
 
-- Pushing triggers the Android build on GitHub. Watch it with `gh run watch`; ~5 minutes later the APK on the `latest` release is replaced.
-- If analyze or test fails, the push still goes through but CI fails and no APK is published. Fix first.
-- Bump `version:` in `app/pubspec.yaml` for every release. The app sends it to the server; a build below the "minimum app version" setting is refused, so a new minimum must never exceed the version you ship.
+Pushing app code builds nothing by itself. Ship it one of two ways — the
+full rules are in [`docs/shipping.md`](docs/shipping.md):
+
+**Patch** (Dart-only changes; no new APK, Android only):
+
+```
+gh workflow run patch.yml            # keep app/pubspec.yaml's version unchanged
+```
+
+Phones download it on the next launch and run it from the launch after.
+
+**Release** (assets, native changes, a new Flutter version, or when you want
+a visible version):
+
+```
+# bump version: in app/pubspec.yaml, then
+flutter build ios --config-only      # so Xcode picks up the new version
+git commit -am "vX.Y.Z" && git push origin main
+git tag -a vX.Y.Z -m "vX.Y.Z"        # add "beta" to the message for a pre-release
+git push origin vX.Y.Z
+```
+
+Watch either with `gh run list` / `gh run view <id>`; a release takes ~10
+minutes and publishes a signed APK to GitHub Releases. The app sends its
+version to the server, so a new "minimum app version" must never exceed the
+version you have shipped.
 
 ## 2. Running on the iOS simulator
 
@@ -38,7 +61,13 @@ flutter pub get                                   # after any change to pubspec.
 dart run build_runner build --delete-conflicting-outputs   # after changing lib/data/db/database.dart
 ```
 
-Xcode's Run is a debug build (slower; shows red assertion screens on framework bugs). For a realistic test on a phone: Product → Scheme → Edit Scheme → Run → Build Configuration → Release.
+Pick the scheme next to the Run button: **Runner** builds Release for a real
+iPhone (so the app works without the Mac attached), **Runner (Simulator)**
+builds Debug for simulators. Flutter's Release mode doesn't support
+simulators, which is why there are two.
+
+After any version bump, run `flutter build ios --config-only` and then
+Product → Clean Build Folder (⇧⌘K), or Xcode keeps showing the old version.
 
 ## 4. Installing on your own iPhone (one-time setup)
 
@@ -107,13 +136,21 @@ npx wrangler kv key put --binding SETTINGS --remote min_app_version 2.0.0
 npx wrangler kv key get --binding SETTINGS --remote maintenance_mode
 ```
 
-Keys: `min_app_version`, `maintenance_mode` (true/false), `reading_delete_enabled`, `export_enabled`, `photo_retention_days`.
+Keys: `min_app_version`, `maintenance_mode` (true/false), `reading_delete_enabled`, `export_enabled`, `photo_retention_days`, `token_lifetime_days`, `profile_editing_enabled`, `export_settings` (JSON), `price_electricity`, `price_water`, `price_gas`.
+
+Two keys are deliberately not in the app's settings screen — the About page reads them:
+
+```
+npx wrangler kv key put --binding SETTINGS --remote developer_title "Senior Shift Engineer"
+npx wrangler kv key put --binding SETTINGS --remote developer_username khalidabdoo
+```
 
 ## 10. Cloudflare account tasks
 
 ```
 npx wrangler login                # once per machine
-npx wrangler secret put JWT_SECRET
+npx wrangler secret put JWT_SECRET          # also: MAILJET_API_KEY, MAILJET_SECRET_KEY
+npx wrangler secret list
 npx wrangler d1 execute DB --remote --command "SELECT username, role FROM users"
 npx wrangler d1 export DB --remote --output backups/backup.sql   # full backup before risky migrations
 ```
@@ -128,7 +165,7 @@ curl "http://localhost:8787/__scheduled?cron=0+10+*+*+5"
 
 | Need | File |
 |---|---|
-| All Arabic text | `app/lib/core/strings.dart` |
+| All text (Arabic + English) | `app/lib/core/strings.dart` |
 | API base URL | `app/lib/core/config.dart` |
 | Colours / fonts | `app/lib/core/theme.dart` |
 | Local DB schema | `app/lib/data/db/database.dart` (regenerate after editing) |
@@ -141,7 +178,11 @@ curl "http://localhost:8787/__scheduled?cron=0+10+*+*+5"
 | Tabs per role | `app/lib/ui/home_shell.dart` |
 | Server DB schema | `worker/migrations/` |
 | API routes | `worker/src/routes/` |
-| CI workflow | `.github/workflows/android-apk.yml` |
+| Excel export | `app/lib/data/export/excel_export.dart` (options come from settings) |
+| Popups (meter / user / reading) | `app/lib/ui/popups.dart` |
+| Language switching | `app/lib/state/language_controller.dart` |
+| CI workflows | `.github/workflows/release.yml` (tags), `patch.yml` (over the air) |
+| Shipping rules, backlog | `docs/` |
 
 ## Environment notes for this Mac
 
