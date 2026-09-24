@@ -43,6 +43,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
   bool _removePhoto = false;
   final _password = TextEditingController();
   late UserRole _role;
+  late bool _hiddenFromFilter;
   bool _obscure = true;
   bool _busy = false;
 
@@ -52,7 +53,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
   String get _current =>
       '${_username.text}|${_fullName.text}|${_email.text}|${_phone.text}|'
       '${_password.text}|${_role.name}|$_photoKey|${_newPhoto?.path}|'
-      '$_removePhoto';
+      '$_removePhoto|$_hiddenFromFilter';
   String _saved = '';
   bool get _isSelf =>
       widget.existing?.id == context.read<SessionController>().user?.id;
@@ -66,6 +67,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     _phone = TextEditingController(text: widget.existing?.phone ?? '');
     _photoKey = widget.existing?.photoKey;
     _role = widget.existing?.role ?? UserRole.technician;
+    _hiddenFromFilter = widget.existing?.hiddenFromFilter ?? false;
     for (final c in [_username, _fullName, _email, _phone, _password]) {
       c.addListener(() => setState(() {}));
     }
@@ -123,6 +125,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
           clearPhone: phone.isEmpty,
           photoKey: uploadedKey,
           clearPhoto: _removePhoto && uploadedKey == null,
+          hiddenFromFilter: _hiddenFromFilter,
         );
       } else {
         await api.createUser(
@@ -133,6 +136,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
           role: _role,
           phone: phone.isEmpty ? null : phone,
           photoKey: uploadedKey,
+          hiddenFromFilter: _hiddenFromFilter,
         );
       }
       messenger.showSnackBar(SnackBar(content: Text(S.userSaved)));
@@ -361,6 +365,24 @@ class _UserFormScreenState extends State<UserFormScreen> {
                           : (_) => setState(() => _role = r),
                     ),
                 ],
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(
+                  S.hiddenFromFilter,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  S.hiddenFromFilterHint,
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 12.5,
+                  ),
+                ),
+                value: _hiddenFromFilter,
+                onChanged: _busy
+                    ? null
+                    : (v) => setState(() => _hiddenFromFilter = v),
               ),
               if (_isEdit && !_isSelf) ...[
                 const SizedBox(height: 24),

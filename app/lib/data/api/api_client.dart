@@ -404,6 +404,7 @@ class ApiClient {
     required UserRole role,
     String? phone,
     String? photoKey,
+    bool hiddenFromFilter = false,
   }) async {
     final body = await _json(
       _http.post(
@@ -417,6 +418,7 @@ class ApiClient {
           'role': role.name,
           'phone': ?phone,
           'photoKey': ?photoKey,
+          'hiddenFromFilter': hiddenFromFilter,
         }),
       ),
     );
@@ -434,6 +436,7 @@ class ApiClient {
     bool clearPhone = false,
     String? photoKey,
     bool clearPhoto = false,
+    bool? hiddenFromFilter,
   }) async {
     await _json(
       _http.put(
@@ -444,6 +447,7 @@ class ApiClient {
           'email': ?email,
           if (phone != null || clearPhone) 'phone': phone,
           if (photoKey != null || clearPhoto) 'photoKey': photoKey,
+          'hiddenFromFilter': ?hiddenFromFilter,
           'role': ?role?.name,
           'isActive': ?isActive,
           'password': ?password,

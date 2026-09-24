@@ -46,12 +46,14 @@ interface UserRow {
   phone: string | null;
   photo_key: string | null;
   language: Language | null;
+  hidden_from_filter: number;
   role: Role;
   is_active: number;
   created_at: string;
 }
 
-const USER_COLUMNS = "id, username, full_name, email, phone, photo_key, language, role, is_active, created_at";
+const USER_COLUMNS =
+  "id, username, full_name, email, phone, photo_key, language, hidden_from_filter, role, is_active, created_at";
 
 function publicUser(u: UserRow) {
   return {
@@ -62,6 +64,7 @@ function publicUser(u: UserRow) {
     phone: u.phone,
     photoKey: u.photo_key,
     language: u.language ?? defaultLanguage(u.role),
+    hiddenFromFilter: u.hidden_from_filter === 1,
     role: u.role,
     isActive: u.is_active === 1,
     createdAt: u.created_at,
@@ -72,19 +75,14 @@ export const userRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
 userRoutes.use("*", requireAuth);
 
-/** Accounts left out of the readings "by user" filter (owner's own). */
-const FILTER_HIDDEN_USERNAMES = ["joeashraf"];
-
-// Names only, for the readings "by user" filter (engineers too).
+// Names only, for the readings "by user" filter (engineers too). Accounts
+// a moderator marked hidden are left out; their readings still show.
 userRoutes.get("/names", requireRole("moderator", "engineer"), async (c) => {
-  const placeholders = FILTER_HIDDEN_USERNAMES.map(() => "?").join(", ");
   const { results } = await c.env.DB.prepare(
     `SELECT id, full_name FROM users
-     WHERE is_active = 1 AND username NOT IN (${placeholders})
+     WHERE is_active = 1 AND hidden_from_filter = 0
      ORDER BY full_name`
-  )
-    .bind(...FILTER_HIDDEN_USERNAMES)
-    .all<{ id: string; full_name: string }>();
+  ).all<{ id: string; full_name: string }>();
   return c.json({ users: results.map((u) => ({ id: u.id, fullName: u.full_name })) });
 });
 
@@ -166,6 +164,7 @@ userRoutes.post("/", async (c) => {
   const email = normalizeEmail(body?.email);
   const phone = optionalField(body, "phone", (v) => PHONE_RE.test(v));
   const photoKey = optionalField(body, "photoKey", (v) => v.startsWith("users/"));
+  const hiddenFromFilter = body?.hiddenFromFilter === true ? 1 : 0;
   const role = body?.role;
 
   if (!USERNAME_RE.test(username)) {
@@ -188,9 +187,9 @@ userRoutes.post("/", async (c) => {
     // A deleted account being re-created: revive it under the same id so
     // its historical readings keep pointing at it.
     await c.env.DB.prepare(
-      "UPDATE users SET password_hash = ?, full_name = ?, email = ?, phone = ?, photo_key = ?, role = ?, is_active = 1 WHERE id = ?"
+      "UPDATE users SET password_hash = ?, full_name = ?, email = ?, phone = ?, photo_key = ?, hidden_from_filter = ?, role = ?, is_active = 1 WHERE id = ?"
     )
-      .bind(await hashPassword(password), fullName, email, phone ?? null, photoKey ?? null, role, existing.id)
+      .bind(await hashPassword(password), fullName, email, phone ?? null, photoKey ?? null, hiddenFromFilter, role, existing.id)
       .run();
     return c.json({ id: existing.id }, 201);
   }
@@ -198,9 +197,9 @@ userRoutes.post("/", async (c) => {
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   await c.env.DB.prepare(
-    "INSERT INTO users (id, username, password_hash, full_name, email, phone, photo_key, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?)"
+    "INSERT INTO users (id, username, password_hash, full_name, email, phone, photo_key, hidden_from_filter, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)"
   )
-    .bind(id, username, await hashPassword(password), fullName, email, phone ?? null, photoKey ?? null, role, now)
+    .bind(id, username, await hashPassword(password), fullName, email, phone ?? null, photoKey ?? null, hiddenFromFilter, role, now)
     .run();
 
   return c.json({ id }, 201);
@@ -225,6 +224,7 @@ userRoutes.put("/:id", async (c) => {
   if (phone === "invalid") return c.json({ error: PHONE_ERROR }, 400);
   const photoKey = optionalField(body, "photoKey", (v) => v.startsWith("users/"));
   if (photoKey === "invalid") return c.json({ error: "photoKey must be an uploaded user photo" }, 400);
+  const hiddenFromFilter = typeof body?.hiddenFromFilter === "boolean" ? (body.hiddenFromFilter ? 1 : 0) : null;
   const role = body?.role ?? null;
   const isActive = typeof body?.isActive === "boolean" ? (body.isActive ? 1 : 0) : null;
   const password = typeof body?.password === "string" ? body.password : null;
@@ -247,6 +247,7 @@ userRoutes.put("/:id", async (c) => {
        email = COALESCE(?, email),
        phone = CASE WHEN ? THEN ? ELSE phone END,
        photo_key = CASE WHEN ? THEN ? ELSE photo_key END,
+       hidden_from_filter = COALESCE(?, hidden_from_filter),
        role = COALESCE(?, role),
        is_active = COALESCE(?, is_active),
        password_hash = COALESCE(?, password_hash)
@@ -259,6 +260,7 @@ userRoutes.put("/:id", async (c) => {
       phone ?? null,
       photoKey !== undefined ? 1 : 0,
       photoKey ?? null,
+      hiddenFromFilter,
       role,
       isActive,
       passwordHash,

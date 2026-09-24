@@ -714,6 +714,13 @@ class S {
   static String get changingLanguage =>
       _t('جارٍ تغيير اللغة…', 'Changing language…');
 
+  static String get hiddenFromFilter =>
+      _t('إخفاء من فلتر القراءات', 'Hide from the readings filter');
+  static String get hiddenFromFilterHint => _t(
+    'لن يظهر هذا الحساب في قائمة "اسم المستخدم" عند تصفية القراءات. قراءاته تبقى ظاهرة كالمعتاد.',
+    "This account won't appear in the readings 'by user' filter. Its readings still show as usual.",
+  );
+
   // Leaving a form with edits
   static String get unsavedChanges =>
       _t('تغييرات غير محفوظة', 'Unsaved changes');

@@ -158,6 +158,7 @@ class AppUser {
     required this.isActive,
     this.phone,
     this.photoKey,
+    this.hiddenFromFilter = false,
   });
 
   /// Stored for users created before emails existed.
@@ -178,6 +179,10 @@ class AppUser {
   final String? phone;
   final String? photoKey;
 
+  /// Left out of the readings "by user" filter (internal or test accounts);
+  /// their readings still show everywhere.
+  final bool hiddenFromFilter;
+
   bool get hasEmail => email.isNotEmpty && email != placeholderEmail;
 
   factory AppUser.fromJson(Map<String, dynamic> json) => AppUser(
@@ -189,6 +194,7 @@ class AppUser {
     isActive: json['isActive'] as bool,
     phone: json['phone'] as String?,
     photoKey: json['photoKey'] as String?,
+    hiddenFromFilter: json['hiddenFromFilter'] as bool? ?? false,
   );
 }
 
