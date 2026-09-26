@@ -1,8 +1,10 @@
 /**
- * The day this system went live: no reading predates it, so "all dates"
- * starts here rather than at the epoch.
+ * The lower bound for "every date". The app's pickers start at the day the
+ * system went live (15/9/2026 in local time), but that local day begins
+ * before 15/9 00:00 UTC — the first readings really are stamped 14/9 21:52Z
+ * — so the default here reaches back instead of clipping them.
  */
-export const DATA_START = "2026-09-15T00:00:00.000Z";
+export const ALL_DATES_FROM = "1970-01-01T00:00:00.000Z";
 
 export type Role = "moderator" | "engineer" | "technician";
 

@@ -739,8 +739,8 @@ class S {
   static String get unusualBeforeExport =>
       _t('قراءات غير معتادة', 'Unusual readings');
   static String unusualBeforeExportBody(int count) => _t(
-    'تحتوي هذه الفترة على $count من القراءات غير المعتادة. يمكنك مراجعتها في لوحة التحكم أو المتابعة والتصدير.',
-    'This selection has $count unusual readings. Review them on the dashboard, or carry on and export.',
+    'يحتوي هذا التصدير على $count من القراءات غير المعتادة. يمكنك مراجعتها أولًا أو المتابعة والتصدير.',
+    'This export has $count unusual readings. Review them first, or carry on and export.',
   );
   static String get reviewUnusual => _t('مراجعة', 'Review');
   static String get exportAnyway => _t('تصدير على أي حال', 'Export anyway');
@@ -752,8 +752,8 @@ class S {
     'All unusual readings have been dealt with',
   );
   static String get unusualBanner => _t(
-    'توجد قراءات غير معتادة تحتاج مراجعة (كل التواريخ). اضغط للانتقال إليها.',
-    'Some readings look unusual and need a check (all dates). Tap to jump to them.',
+    'توجد قراءات غير معتادة تحتاج مراجعة. اضغط للانتقال إليها.',
+    'Some readings look unusual and need a check. Tap to jump to them.',
   );
   static String get markNormal => _t('تحديدها كطبيعية', 'Mark as normal');
   static String get markUnusualAgain =>

@@ -15,114 +15,11 @@ import '../../state/app_status_controller.dart';
 import '../../state/session_controller.dart';
 import '../../state/sync_controller.dart';
 import '../../state/app_events.dart';
-import '../../core/config.dart';
 import '../popups.dart';
+import 'reading_filters.dart';
 import 'unusual_screen.dart';
 import '../reading_actions.dart';
 import '../widgets/status_widgets.dart';
-
-enum ReadingSort {
-  byDefault('default'),
-  loggedAt('logged_at'),
-  value('value'),
-  meterName('meter_name'),
-  meterType('meter_type'),
-  user('technician');
-
-  const ReadingSort(this.apiName);
-
-  final String apiName;
-
-  String get label => switch (this) {
-    byDefault => S.sortDefault,
-    loggedAt => S.sortDate,
-    value => S.sortValue,
-    meterName => S.sortMeterName,
-    meterType => S.sortType,
-    user => S.sortUser,
-  };
-}
-
-class ReadingFilters {
-  const ReadingFilters({
-    this.types = const {},
-    this.number = '',
-    this.userId,
-    this.from,
-    this.to,
-    this.search = '',
-    this.sort = ReadingSort.byDefault,
-    this.descending = false,
-  });
-
-  final Set<MeterType> types;
-  final String number;
-  final String? userId;
-  final DateTime? from;
-  final DateTime? to;
-  final String search;
-  final ReadingSort sort;
-
-  /// The default sort is newest day first, then export order: this flag
-  /// flips only the export order (ascending unless chosen otherwise). The
-  /// others default to newest / highest first.
-  final bool descending;
-
-  bool get isEmpty => !hasActiveFilters && search.isEmpty;
-  bool get hasActiveFilters =>
-      types.isNotEmpty ||
-      number.isNotEmpty ||
-      userId != null ||
-      from != null ||
-      to != null;
-  bool get isDefaultSort => sort == ReadingSort.byDefault && !descending;
-
-  ReadingFilters copyWith({
-    Set<MeterType>? types,
-    String? number,
-    String? userId,
-    bool clearUser = false,
-    DateTime? from,
-    DateTime? to,
-    bool clearDates = false,
-    String? search,
-    ReadingSort? sort,
-    bool? descending,
-  }) => ReadingFilters(
-    types: types ?? this.types,
-    number: number ?? this.number,
-    userId: clearUser ? null : (userId ?? this.userId),
-    from: clearDates ? null : (from ?? this.from),
-    to: clearDates ? null : (to ?? this.to),
-    search: search ?? this.search,
-    sort: sort ?? this.sort,
-    descending: descending ?? this.descending,
-  );
-
-  Map<String, String> toQuery() => {
-    if (types.isNotEmpty) 'type': types.map((t) => t.name).join(','),
-    if (number.isNotEmpty) 'number': number,
-    'userId': ?userId,
-    if (from != null)
-      'dateFrom': DateTime(
-        from!.year,
-        from!.month,
-        from!.day,
-      ).toUtc().toIso8601String(),
-    if (to != null)
-      'dateTo': DateTime(
-        to!.year,
-        to!.month,
-        to!.day,
-        23,
-        59,
-        59,
-      ).toUtc().toIso8601String(),
-    if (search.isNotEmpty) 'search': search,
-    'sort': sort.apiName,
-    'dir': descending ? 'desc' : 'asc',
-  };
-}
 
 /// Server-backed readings list for every role. Technicians see their own
 /// readings (the server scopes them); moderators and engineers see all.
@@ -155,9 +52,9 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     _events = context.read<AppEvents>();
     _events.addListener(_onUsersChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // _load() re-checks the unusual card once the list is in.
       _load();
       _loadUserNames();
-      _loadUnusualCount();
     });
   }
 
@@ -185,16 +82,23 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     _loadUnusualCount();
   }
 
-  /// Unusual readings across every date, for the card at the top.
+  /// Unusual readings among the readings currently filtered for, so the
+  /// card follows the list: it goes away when nothing matching is flagged.
   int _unusualTotal = 0;
-  bool _unusualHintDismissed = false;
 
   Future<void> _loadUnusualCount() async {
     final user = context.read<SessionController>().user;
     if (user == null || !user.canSeeAllReadings) return;
+    final asked = _filters;
     try {
-      final result = await context.read<ApiClient>().fetchUnusual();
-      if (mounted) setState(() => _unusualTotal = result.count);
+      final result = await context.read<ApiClient>().fetchUnusual(
+        asked.toQuery(),
+      );
+      // A later filter change may have already asked again; ignore the
+      // answer to the older question.
+      if (mounted && identical(asked, _filters)) {
+        setState(() => _unusualTotal = result.count);
+      }
     } catch (_) {
       // Offline or refused: the card just stays as it is.
     }
@@ -234,7 +138,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     });
     try {
       final page = await context.read<ApiClient>().fetchReadings(
-        _filters.toQuery(),
+        _filters.toReadingsQuery(),
       );
       if (!mounted) {
         return;
@@ -243,6 +147,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
         _rows = page.rows;
         _nextCursor = page.nextCursor;
       });
+      _loadUnusualCount();
     } catch (e) {
       if (!mounted) {
         return;
@@ -261,7 +166,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     setState(() => _loadingMore = true);
     try {
       final page = await context.read<ApiClient>().fetchReadings(
-        _filters.toQuery(),
+        _filters.toReadingsQuery(),
         cursor: cursor,
       );
       if (!mounted) {
@@ -287,13 +192,22 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     }
   }
 
+  /// The unusual readings page starts from this list's filters, then keeps
+  /// its own: what happens there never changes the filters here.
+  Future<void> _openUnusual() async {
+    await UnusualScreen.open(context, filters: _filters);
+    // Readings may have been edited or deleted over there; _load() also
+    // re-checks the card.
+    if (mounted) _load();
+  }
+
   Future<void> _openFilters(bool showUser) async {
     final result = await showModalBottomSheet<ReadingFilters>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => _FilterSheet(
+      builder: (_) => ReadingFilterSheet(
         initial: _filters,
         showUser: showUser,
         users: _userNames,
@@ -303,6 +217,8 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
       return;
     }
     setState(() => _filters = result);
+    // "Clear filters" in the sheet drops the search term as well.
+    if (_search.text != result.search) _search.text = result.search;
     _load();
   }
 
@@ -314,7 +230,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (_) => _SortSheet(initial: _filters, showUser: showUser),
+      builder: (_) => ReadingSortSheet(initial: _filters, showUser: showUser),
     );
     if (result == null) {
       return;
@@ -339,10 +255,10 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     }
     final int count;
     try {
-      count = (await context.read<ApiClient>().fetchUnusual(
-        from: _filters.from,
-        to: _filters.to,
-      )).count;
+      // The very query the export itself runs, so the warning can't miss
+      // readings the file will contain.
+      count = (await context.read<ApiClient>().fetchUnusual(_filters.toQuery()))
+          .count;
     } catch (_) {
       // Can't check (offline, say): don't stand in the way of the export.
       return true;
@@ -373,14 +289,8 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     );
     if (choice == true) return true;
     if (choice == false && mounted) {
-      // Review: the unusual readings page, over the period being exported
-      // (no date filter means every date).
-      await UnusualScreen.open(
-        context,
-        range: _filters.from != null && _filters.to != null
-            ? DateTimeRange(start: _filters.from!, end: _filters.to!)
-            : null,
-      );
+      // Review: the same readings the export would have covered.
+      await _openUnusual();
     }
     return false;
   }
@@ -406,7 +316,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     final exportSettings = context.read<AppStatusController>().config.export;
     final results = <String>[];
     try {
-      final all = await api.fetchAllReadings(_filters.toQuery());
+      final all = await api.fetchAllReadings(_filters.toReadingsQuery());
       final bytes = buildReadingsWorkbook(all, settings: exportSettings);
       final stamp = DateFormat('yyyy-MM-dd_HHmm').format(DateTime.now());
       final fileName = 'meter-readings-$stamp.xlsx';
@@ -459,15 +369,6 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
 
     return Column(
       children: [
-        if (_unusualTotal > 0)
-          UnusualCard(
-            hintDismissed: _unusualHintDismissed,
-            onDismissHint: () => setState(() => _unusualHintDismissed = true),
-            onTap: () async {
-              await UnusualScreen.open(context);
-              if (mounted) _loadUnusualCount();
-            },
-          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
           child: Row(
@@ -562,6 +463,9 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
               ],
             ),
           ),
+        // Below the filters and above the list, and outside it: the card
+        // stays put while the readings scroll.
+        if (_unusualTotal > 0) UnusualCard(onTap: _openUnusual),
         Expanded(
           child: StreamBuilder<List<Reading>>(
             stream: db.watchQueue(user.id),
@@ -987,297 +891,6 @@ class _ReadingCardState extends State<_ReadingCard> {
                   ),
                 ],
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ---- sort sheet ------------------------------------------------------------
-
-class _SortSheet extends StatefulWidget {
-  const _SortSheet({required this.initial, required this.showUser});
-
-  final ReadingFilters initial;
-  final bool showUser;
-
-  @override
-  State<_SortSheet> createState() => _SortSheetState();
-}
-
-class _SortSheetState extends State<_SortSheet> {
-  late ReadingSort _sort = widget.initial.sort;
-  late bool _desc = widget.initial.descending;
-
-  @override
-  Widget build(BuildContext context) {
-    final options = ReadingSort.values.where(
-      (s) => widget.showUser || s != ReadingSort.user,
-    );
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        0,
-        20,
-        24 + MediaQuery.viewPaddingOf(context).bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            S.sortBy,
-            style: Theme.of(context).textTheme.titleLarge
-                ?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          RadioGroup<ReadingSort>(
-            groupValue: _sort,
-            onChanged: (v) => setState(() {
-              _sort = v!;
-              // Sensible direction per field: default = ascending export
-              // order within each day; everything else newest / highest first.
-              _desc = _sort != ReadingSort.byDefault;
-            }),
-            child: Column(
-              children: [
-                for (final s in options)
-                  RadioListTile<ReadingSort>(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    title: Text(s.label),
-                    value: s,
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: SegmentedButton<bool>(
-              segments: [
-                ButtonSegment(
-                  value: false,
-                  label: Text(S.sortAsc),
-                  icon: Icon(Icons.arrow_upward_rounded, size: 16),
-                ),
-                ButtonSegment(
-                  value: true,
-                  label: Text(S.sortDesc),
-                  icon: Icon(Icons.arrow_downward_rounded, size: 16),
-                ),
-              ],
-              selected: {_desc},
-              onSelectionChanged: (s) => setState(() => _desc = s.first),
-            ),
-          ),
-          const SizedBox(height: 20),
-          FilledButton(
-            onPressed: () => Navigator.pop(
-              context,
-              widget.initial.copyWith(sort: _sort, descending: _desc),
-            ),
-            child: Text(S.applyFilters),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ---- filter sheet ----------------------------------------------------------
-
-class _FilterSheet extends StatefulWidget {
-  const _FilterSheet({
-    required this.initial,
-    required this.showUser,
-    required this.users,
-  });
-
-  final ReadingFilters initial;
-  final bool showUser;
-  final List<UserName> users;
-
-  @override
-  State<_FilterSheet> createState() => _FilterSheetState();
-}
-
-class _FilterSheetState extends State<_FilterSheet> {
-  late ReadingFilters _f = widget.initial;
-  late Set<MeterType> _types = {...widget.initial.types};
-  late final _number = TextEditingController(text: widget.initial.number);
-  late String? _userId = widget.users.any((u) => u.id == widget.initial.userId)
-      ? widget.initial.userId
-      : null;
-
-  @override
-  void dispose() {
-    _number.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickDates() async {
-    final now = DateTime.now();
-    final range = await showDateRangePicker(
-      context: context,
-      firstDate: BuildConfig.dataStart,
-      lastDate: DateTime(now.year + 1),
-      initialDateRange: _f.from != null && _f.to != null
-          ? DateTimeRange(start: _f.from!, end: _f.to!)
-          : null,
-    );
-    if (range == null) {
-      return;
-    }
-    setState(() => _f = _f.copyWith(from: range.start, to: range.end));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final fmt = DateFormat('d/M/yyyy', S.localeCode);
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20,
-        0,
-        20,
-        20 +
-            MediaQuery.viewInsetsOf(context).bottom +
-            MediaQuery.viewPaddingOf(context).bottom,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              S.filters,
-              style: Theme.of(context).textTheme.titleLarge
-                  ?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              S.filterType,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: [
-                ChoiceChip(
-                  label: Text(S.filterAllTypes),
-                  selected: _types.isEmpty,
-                  onSelected: (_) => setState(() => _types = {}),
-                ),
-                for (final t in MeterType.values)
-                  TypeChip(
-                    type: t,
-                    selected: _types.contains(t),
-                    onSelected: (on) => setState(() {
-                      _types = on ? {..._types, t} : ({..._types}..remove(t));
-                      // Every type selected is the same as "all".
-                      if (_types.length == MeterType.values.length) {
-                        _types = {};
-                      }
-                    }),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _number,
-              textDirection: TextDirection.ltr,
-              contextMenuBuilder: appContextMenuBuilder,
-              decoration: InputDecoration(
-                labelText: S.filterNumber,
-                isDense: true,
-                prefixIcon: Icon(Icons.tag_rounded),
-              ),
-            ),
-            if (widget.showUser) ...[
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String?>(
-                initialValue: _userId,
-                isExpanded: true,
-                items: [
-                  DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text(S.filterAllUsers),
-                  ),
-                  for (final u in widget.users)
-                    DropdownMenuItem<String?>(
-                      value: u.id,
-                      child: Text(u.fullName),
-                    ),
-                ],
-                decoration: InputDecoration(
-                  labelText: S.filterUser,
-                  isDense: true,
-                  prefixIcon: Icon(Icons.person_outline_rounded),
-                ),
-                onChanged: (v) => setState(() => _userId = v),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Text(
-              S.filterDateRange,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _pickDates,
-                    icon: const Icon(Icons.date_range_rounded),
-                    label: Text(
-                      _f.from == null
-                          ? S.pickDates
-                          : '${fmt.format(_f.from!)} – ${fmt.format(_f.to ?? _f.from!)}',
-                    ),
-                  ),
-                ),
-                if (_f.from != null)
-                  IconButton(
-                    onPressed: () =>
-                        setState(() => _f = _f.copyWith(clearDates: true)),
-                    icon: const Icon(Icons.close_rounded),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(
-                      context,
-                      ReadingFilters(sort: _f.sort, descending: _f.descending),
-                    ),
-                    child: Text(S.clearFilters),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(
-                      context,
-                      ReadingFilters(
-                        types: _types,
-                        number: _number.text.trim(),
-                        userId: widget.showUser ? _userId : null,
-                        from: _f.from,
-                        to: _f.to,
-                        search: widget.initial.search,
-                        sort: _f.sort,
-                        descending: _f.descending,
-                      ),
-                    ),
-                    child: Text(S.applyFilters),
-                  ),
-                ),
-              ],
             ),
           ],
         ),

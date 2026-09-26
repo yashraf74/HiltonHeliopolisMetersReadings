@@ -3,7 +3,7 @@ import type { Env } from "../types";
 import type { AuthedVars } from "../middleware";
 import { requireAuth, requireRole } from "../middleware";
 import type { UnusualRow } from "../unusual";
-import { findUnusual, loadRowsForUnusual, spreadDays } from "../unusual";
+import { findUnusual, loadRowsForUnusual, spreadDays, unusualWindow } from "../unusual";
 
 export const dashboardRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
@@ -13,12 +13,8 @@ const TYPES = ["electricity", "water", "gas"] as const;
 type MeterType = (typeof TYPES)[number];
 
 const DAY_MS = 86_400_000;
-/** Earlier readings of a meter within this window form its "usual" daily use. */
-const BASELINE_DAYS = 60;
 /** A reading this long after the range can still spread its gain back into it. */
 const LOOKAHEAD_DAYS = 31;
-/** Extra history before the window so the first readings still know their previous one. */
-const LOOKBEHIND_DAYS = 45;
 const MAX_UNUSUAL = 30;
 const MAX_RANGE_DAYS = 1200;
 
@@ -35,7 +31,6 @@ type MeterRow = {
   last_logged_at: string | null;
 };
 
-const iso = (ms: number) => new Date(ms).toISOString();
 const addDays = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * DAY_MS).toISOString().slice(0, 10);
 
 // GET /api/dashboard?from=ISO&to=ISO&tz=<minutes east of UTC>
@@ -54,16 +49,13 @@ dashboardRoutes.get("/", async (c) => {
 
   const fromMs = Date.parse(from);
   const toMs = Date.parse(to);
-  const windowStart = Math.min(fromMs, toMs - BASELINE_DAYS * DAY_MS);
   const db = c.env.DB;
+  // The same window the unusual page uses, plus room for gains that spread
+  // back into the range.
+  const window = unusualWindow(from, to, LOOKAHEAD_DAYS);
 
   const [rowsResult, metersResult] = await Promise.all([
-    loadRowsForUnusual(
-      db,
-      iso(windowStart - LOOKBEHIND_DAYS * DAY_MS),
-      iso(toMs + LOOKAHEAD_DAYS * DAY_MS),
-      iso(windowStart)
-    ),
+    loadRowsForUnusual(db, window.innerFrom, window.innerTo, window.outerFrom),
     db
       .prepare(
         `SELECT m.id, m.name, m.type, m.area, m.photo_key,

@@ -1,11 +1,11 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import type { Env } from "../types";
-import { DATA_START, READINGS_ADMIN_ROLES } from "../types";
+import { ALL_DATES_FROM, READINGS_ADMIN_ROLES } from "../types";
 import type { AuthedVars } from "../middleware";
 import { requireAuth, requireRole } from "../middleware";
 import { recomputeGains } from "../gain";
-import { findUnusual, loadRowsForUnusual } from "../unusual";
+import { filterUnusual, findUnusual, loadRowsForUnusual, unusualWindow } from "../unusual";
 
 export const readingRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
@@ -257,14 +257,26 @@ readingRoutes.post("/:id/normal", requireRole("moderator", "engineer"), async (c
   return c.json({ normal });
 });
 
-// The unusual readings in a range, for the unusual-readings page, the card
-// on the readings screen and the warning before an export. Without from/to
-// it covers every reading since the system went live.
+// The unusual readings among the ones a filter selects, for the unusual
+// readings page, the card on the readings screen and the warning before an
+// export. It takes the same filter parameters as `GET /readings` so the two
+// always talk about the same readings; with none it covers every reading
+// ever logged. (`from`/`to` are the 2.6.0 spelling of
+// `dateFrom`/`dateTo`, kept for apps that haven't taken the patch yet.)
 readingRoutes.get("/unusual", requireRole("moderator", "engineer"), async (c) => {
-  const to = c.req.query("to") ?? new Date().toISOString();
-  const from = c.req.query("from") ?? DATA_START;
-  const { results } = await loadRowsForUnusual(c.env.DB, DATA_START, to, from);
-  const unusual = findUnusual(results, from, to);
+  const date = (...values: (string | undefined)[]) => values.find((v) => v && !Number.isNaN(Date.parse(v)));
+  const to = date(c.req.query("dateTo"), c.req.query("to")) ?? new Date().toISOString();
+  const from = date(c.req.query("dateFrom"), c.req.query("from")) ?? ALL_DATES_FROM;
+  const types = (c.req.query("type") ?? "").split(",").map((t) => t.trim()).filter(Boolean);
+
+  const { innerFrom, innerTo, outerFrom } = unusualWindow(from, to);
+  const { results } = await loadRowsForUnusual(c.env.DB, innerFrom, innerTo, outerFrom);
+  const unusual = filterUnusual(findUnusual(results, from, to), {
+    types,
+    number: c.req.query("number"),
+    userId: c.req.query("userId"),
+    search: c.req.query("search"),
+  });
   return c.json({ count: unusual.length, from, to, unusual: unusual.slice(0, MAX_UNUSUAL) });
 });
 

@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:meters_app/data/export/excel_export.dart';
 import 'package:meters_app/core/strings.dart';
 import 'package:meters_app/data/models.dart';
-import 'package:meters_app/ui/screens/readings_screen.dart';
+import 'package:meters_app/ui/screens/reading_filters.dart';
 
 void main() {
   test(
@@ -53,8 +53,9 @@ void main() {
     expect(q['userId'], 'u1');
     expect(q['search'], 'مطبخ');
     expect(q['type'], 'water,gas');
-    expect(q['sort'], 'default');
-    expect(q['dir'], 'asc');
+    expect(q.containsKey('sort'), isFalse);
+    expect(f.toReadingsQuery()['sort'], 'default');
+    expect(f.toReadingsQuery()['dir'], 'asc');
     expect(const ReadingFilters().isEmpty, isTrue);
     expect(const ReadingFilters().isDefaultSort, isTrue);
     expect(f.hasActiveFilters, isTrue);
@@ -62,9 +63,21 @@ void main() {
       const ReadingFilters(
         sort: ReadingSort.value,
         descending: true,
-      ).toQuery()['dir'],
+      ).toReadingsQuery()['dir'],
       'desc',
     );
+  });
+
+  test('a one-day filter covers that whole local day', () {
+    final day = DateTime(2026, 9, 26);
+    final q = ReadingFilters(from: day, to: day).toQuery();
+    final from = DateTime.parse(q['dateFrom']!).toLocal();
+    final to = DateTime.parse(q['dateTo']!).toLocal();
+    expect(from, DateTime(2026, 9, 26));
+    expect(to.isAfter(DateTime(2026, 9, 26, 23, 59)), isTrue);
+    expect(to.day, 26);
+    // The unusual check has to ask with the very same bounds.
+    expect(ReadingFilters(from: day, to: day).toQuery(), q);
   });
 
   test('export settings pick the columns, order and sheets', () {

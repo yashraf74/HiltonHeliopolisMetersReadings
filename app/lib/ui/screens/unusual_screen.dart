@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:provider/provider.dart';
 
-import '../../core/config.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../../data/api/api_client.dart';
@@ -11,39 +10,50 @@ import '../../state/app_events.dart';
 import '../../state/session_controller.dart';
 import '../popups.dart';
 import '../widgets/status_widgets.dart';
+import 'reading_filters.dart';
 
 /// Every reading flagged as unusual, for moderators and engineers. Tapping
-/// one opens it, where it can be edited, deleted or marked as normal. Once
-/// the last one is handled the page closes itself.
+/// one opens it, where it can be edited, deleted or marked as normal.
+///
+/// The page opens on whatever the readings list is filtered by and then
+/// keeps its own copy: filters changed here never travel back.
 class UnusualScreen extends StatefulWidget {
-  const UnusualScreen({super.key, this.range});
+  const UnusualScreen({super.key, this.filters = const ReadingFilters()});
 
-  /// Period to start on; null means every date since the system went live
-  /// (the export warning passes the period being exported).
-  final DateTimeRange? range;
+  /// The readings screen's filters at the moment it was left.
+  final ReadingFilters filters;
 
-  static Future<void> open(BuildContext context, {DateTimeRange? range}) =>
-      Navigator.of(context)
-          .push(MaterialPageRoute(builder: (_) => UnusualScreen(range: range)));
+  static Future<void> open(
+    BuildContext context, {
+    ReadingFilters filters = const ReadingFilters(),
+  }) => Navigator.of(context)
+      .push(MaterialPageRoute(builder: (_) => UnusualScreen(filters: filters)));
 
   @override
   State<UnusualScreen> createState() => _UnusualScreenState();
 }
 
 class _UnusualScreenState extends State<UnusualScreen> {
-  late DateTimeRange? _range = widget.range;
+  late ReadingFilters _filters = widget.filters;
+  late final _search = TextEditingController(text: widget.filters.search);
   List<Map<String, dynamic>> _rows = const [];
+  List<UserName> _userNames = const [];
   bool _loading = true;
   String? _error;
-
-  /// Set once the list has been non-empty, so arriving at an already empty
-  /// page doesn't look like the user just fixed everything.
-  bool _hadAny = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _load();
+      _loadUserNames();
+    });
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -53,22 +63,13 @@ class _UnusualScreenState extends State<UnusualScreen> {
     });
     try {
       final result = await context.read<ApiClient>().fetchUnusual(
-        from: _range?.start,
-        to: _range == null ? null : _endOfDay(_range!.end),
+        _filters.toQuery(),
       );
       if (!mounted) return;
       setState(() {
         _rows = result.rows;
         _loading = false;
-        _hadAny = _hadAny || result.rows.isNotEmpty;
       });
-      // Everything handled: tell the readings screen and step back out.
-      if (result.count == 0 && _hadAny && mounted) {
-        context.read<AppEvents>().unusualChanged();
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(S.allUnusualResolved)));
-        Navigator.of(context).pop();
-      }
     } on NetworkException {
       if (mounted) {
         setState(() {
@@ -88,19 +89,30 @@ class _UnusualScreenState extends State<UnusualScreen> {
     }
   }
 
-  static DateTime _endOfDay(DateTime d) =>
-      DateTime(d.year, d.month, d.day, 23, 59, 59);
+  Future<void> _loadUserNames() async {
+    try {
+      final names = await context.read<ApiClient>().fetchUserNames();
+      if (mounted) setState(() => _userNames = names);
+    } catch (_) {
+      // The dropdown just stays empty; not worth surfacing.
+    }
+  }
 
-  Future<void> _pickRange() async {
-    final now = DateTime.now();
-    final picked = await showDateRangePicker(
+  Future<void> _openFilters() async {
+    final result = await showModalBottomSheet<ReadingFilters>(
       context: context,
-      firstDate: BuildConfig.dataStart,
-      lastDate: now,
-      initialDateRange: _range,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => ReadingFilterSheet(
+        initial: _filters,
+        showUser: true,
+        users: _userNames,
+      ),
     );
-    if (picked == null || !mounted) return;
-    setState(() => _range = picked);
+    if (result == null) return;
+    setState(() => _filters = result);
+    if (_search.text != result.search) _search.text = result.search;
     _load();
   }
 
@@ -114,38 +126,81 @@ class _UnusualScreenState extends State<UnusualScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final fmt = DateFormat('d/M/yyyy', S.localeCode);
     return Scaffold(
       appBar: AppBar(title: Text(S.unusualReadings)),
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
             child: Row(
               children: [
                 Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _pickRange,
-                    icon: const Icon(Icons.date_range_rounded, size: 18),
-                    label: Text(
-                      _range == null
-                          ? S.rangeAllDates
-                          : '${fmt.format(_range!.start)} – ${fmt.format(_range!.end)}',
-                      overflow: TextOverflow.ellipsis,
+                  child: TextField(
+                    controller: _search,
+                    textInputAction: TextInputAction.search,
+                    contextMenuBuilder: appContextMenuBuilder,
+                    onSubmitted: (v) {
+                      setState(
+                        () => _filters = _filters.copyWith(search: v.trim()),
+                      );
+                      _load();
+                    },
+                    decoration: InputDecoration(
+                      hintText: S.searchReadings,
+                      isDense: true,
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: _search.text.isEmpty
+                          ? null
+                          : IconButton(
+                              icon: const Icon(Icons.close_rounded),
+                              onPressed: () {
+                                _search.clear();
+                                setState(
+                                  () =>
+                                      _filters = _filters.copyWith(search: ''),
+                                );
+                                _load();
+                              },
+                            ),
                     ),
                   ),
                 ),
-                if (_range != null) ...[
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: S.rangeClear,
+                const SizedBox(width: 6),
+                Badge(
+                  isLabelVisible: _filters.hasActiveFilters,
+                  child: IconButton.filledTonal(
+                    tooltip: S.filters,
+                    onPressed: _openFilters,
+                    icon: const Icon(Icons.tune_rounded),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${S.readingsCount}: ${_rows.length} · ${_rangeLabel()}',
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 12.5,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (!_filters.isEmpty)
+                  TextButton.icon(
                     onPressed: () {
-                      setState(() => _range = null);
+                      _search.clear();
+                      setState(() => _filters = const ReadingFilters());
                       _load();
                     },
-                    icon: const Icon(Icons.filter_alt_off_outlined),
+                    icon: const Icon(Icons.filter_alt_off_outlined, size: 18),
+                    label: Text(S.clearFilters),
                   ),
-                ],
               ],
             ),
           ),
@@ -158,6 +213,19 @@ class _UnusualScreenState extends State<UnusualScreen> {
         ],
       ),
     );
+  }
+
+  /// The period in words, so it's clear what the list covers.
+  String _rangeLabel() {
+    final fmt = DateFormat('d/M/yyyy', S.localeCode);
+    if (_filters.from == null && _filters.to == null) return S.rangeAllDates;
+    final from = _filters.from, to = _filters.to;
+    if (from != null && to != null) {
+      return from == to
+          ? fmt.format(from)
+          : '${fmt.format(from)} – ${fmt.format(to)}';
+    }
+    return fmt.format(from ?? to!);
   }
 
   Widget _buildBody(ColorScheme scheme) {
@@ -176,15 +244,10 @@ class _UnusualScreenState extends State<UnusualScreen> {
       );
     }
     if (_rows.isEmpty) {
+      // Nothing flagged in this filter: stay put and say so.
       return ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          const SizedBox(height: 80),
-          EmptyState(
-            icon: Icons.check_circle_outline_rounded,
-            title: S.noUnusual,
-          ),
-        ],
+        children: const [SizedBox(height: 80), AllClear()],
       );
     }
     return ListView.separated(

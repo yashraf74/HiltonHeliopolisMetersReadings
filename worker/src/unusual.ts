@@ -8,6 +8,8 @@ const HIGH_FACTOR = 2.5;
 const MIN_BASELINE = 3;
 /** A gain is never spread over more days than this. */
 const MAX_SPREAD_DAYS = 60;
+/** Extra history before the window so the first readings know their previous one. */
+const LOOKBEHIND_DAYS = 45;
 
 const DAY_MS = 86_400_000;
 
@@ -17,6 +19,7 @@ export interface UnusualRow {
   type: string;
   name: string;
   area: string;
+  number: string | null;
   photo_key: string | null;
   value: number;
   gain: number | null;
@@ -46,14 +49,20 @@ function median(values: number[]): number {
  * or far above that meter's usual daily use. Readings a moderator marked as
  * normal are never flagged; they still count towards every total, including
  * the baselines here.
+ *
+ * A reading is judged against its own meter's readings within [BASELINE_DAYS]
+ * either side of it — never against the range being asked about. Whether a
+ * reading is unusual is therefore a fact about that reading, the same answer
+ * for a one-day filter as for every date, and [from]/[to] only decide which
+ * flagged readings come back.
  */
 export function findUnusual(rows: UnusualRow[], from: string, to: string) {
-  const baselineFrom = new Date(Date.parse(to) - BASELINE_DAYS * DAY_MS).toISOString();
-  const rates = new Map<string, { id: string; rate: number }[]>();
+  const baselineMs = BASELINE_DAYS * DAY_MS;
+  const rates = new Map<string, { id: string; at: number; rate: number }[]>();
   for (const r of rows) {
-    if (r.gain === null || r.gain < 0 || r.logged_at < baselineFrom || r.logged_at > to) continue;
+    if (r.gain === null || r.gain < 0) continue;
     const list = rates.get(r.meter_id) ?? [];
-    list.push({ id: r.id, rate: r.gain / spreadDays(r) });
+    list.push({ id: r.id, at: Date.parse(r.logged_at), rate: r.gain / spreadDays(r) });
     rates.set(r.meter_id, list);
   }
 
@@ -62,7 +71,10 @@ export function findUnusual(rows: UnusualRow[], from: string, to: string) {
     if (r.gain === null || r.normal_at !== null) continue;
     if (r.logged_at < from || r.logged_at > to) continue;
     const rate = r.gain / spreadDays(r);
-    const others = (rates.get(r.meter_id) ?? []).filter((x) => x.id !== r.id).map((x) => x.rate);
+    const at = Date.parse(r.logged_at);
+    const others = (rates.get(r.meter_id) ?? [])
+      .filter((x) => x.id !== r.id && Math.abs(x.at - at) <= baselineMs)
+      .map((x) => x.rate);
     const usual = others.length >= MIN_BASELINE ? median(others) : null;
     const kind = r.gain < 0 ? "negative" : usual !== null && usual > 0 && rate > HIGH_FACTOR * usual ? "high" : null;
     if (!kind) continue;
@@ -73,6 +85,7 @@ export function findUnusual(rows: UnusualRow[], from: string, to: string) {
       name: r.name,
       type: r.type,
       area: r.area,
+      number: r.number,
       photo_key: r.photo_key,
       value: r.value,
       gain: r.gain,
@@ -93,7 +106,7 @@ export function loadRowsForUnusual(db: D1Database, innerFrom: string, to: string
   return db
     .prepare(
       `SELECT * FROM (
-         SELECT r.id, r.meter_id, m.type, m.name, m.area, m.photo_key, r.value, r.gain, r.logged_at,
+         SELECT r.id, r.meter_id, m.type, m.name, m.area, m.number, m.photo_key, r.value, r.gain, r.logged_at,
                 r.photo_key AS reading_photo_key, r.logged_by, r.normal_at, u.full_name AS logged_by_name,
                 LAG(r.logged_at) OVER (PARTITION BY r.meter_id ORDER BY r.logged_at, r.id) AS prev_at
          FROM readings r JOIN meters m ON m.id = r.meter_id JOIN users u ON u.id = r.logged_by
@@ -103,4 +116,61 @@ export function loadRowsForUnusual(db: D1Database, innerFrom: string, to: string
     )
     .bind(innerFrom, to, outerFrom)
     .all<UnusualRow>();
+}
+
+const iso = (ms: number) => new Date(ms).toISOString();
+
+/**
+ * The window of readings to load in order to judge the ones in [from, to]:
+ * far enough back for every meter's baseline, and further still so the
+ * first reading in the window knows its previous one. Judging a single day
+ * on that day's readings alone would leave every meter without a baseline,
+ * so both routes take their window from here.
+ */
+export function unusualWindow(from: string, to: string, lookaheadDays = 0) {
+  const start = Date.parse(from) - BASELINE_DAYS * DAY_MS;
+  const end = Date.parse(to) + Math.max(lookaheadDays, BASELINE_DAYS) * DAY_MS;
+  return {
+    innerFrom: iso(start - LOOKBEHIND_DAYS * DAY_MS),
+    innerTo: iso(end),
+    outerFrom: iso(start),
+  };
+}
+
+/** The readings-list filters, as far as they apply to a flagged reading. */
+export interface UnusualFilters {
+  types?: string[];
+  number?: string;
+  userId?: string;
+  search?: string;
+}
+
+type Flagged = ReturnType<typeof findUnusual>[number];
+
+const has = (value: string | null, needle: string) =>
+  (value ?? "").toLowerCase().includes(needle);
+
+/**
+ * Narrows flagged readings the way `GET /readings` narrows the list, so the
+ * unusual page shows exactly the flagged readings among the ones on screen.
+ * The filters are applied here, after the check, never to the rows it reads:
+ * whether a reading is unusual is a fact about its meter's own history and
+ * must not change because a user or a date range was picked.
+ */
+export function filterUnusual(rows: Flagged[], f: UnusualFilters): Flagged[] {
+  const types = f.types?.length ? f.types : null;
+  const number = f.number?.trim().toLowerCase();
+  const search = f.search?.trim().toLowerCase();
+  return rows.filter((r) => {
+    if (types && !types.includes(r.type)) return false;
+    if (number && !has(r.number, number)) return false;
+    if (f.userId && r.logged_by !== f.userId) return false;
+    if (
+      search &&
+      !(has(r.name, search) || has(r.area, search) || has(r.number, search) || has(r.logged_by_name, search))
+    ) {
+      return false;
+    }
+    return true;
+  });
 }

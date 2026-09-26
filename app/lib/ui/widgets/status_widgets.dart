@@ -655,27 +655,19 @@ class UnsavedChangesGuard extends StatelessWidget {
   );
 }
 
-/// Card at the top of the readings screen while any reading is flagged as
-/// unusual: a red marker, the count-free label and a chevron into the
-/// unusual readings page. Only the hint line can be dismissed, and it comes
-/// back the next time the screen is built.
+/// Card between the filters and the readings list while any reading in the
+/// current filter is flagged as unusual: a red marker, the label, a hint
+/// and a chevron into the unusual readings page.
 class UnusualCard extends StatelessWidget {
-  const UnusualCard({
-    super.key,
-    required this.hintDismissed,
-    required this.onDismissHint,
-    required this.onTap,
-  });
+  const UnusualCard({super.key, required this.onTap});
 
-  final bool hintDismissed;
-  final VoidCallback onDismissHint;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 2),
       child: Material(
         color: AppColors.failed.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
@@ -683,7 +675,7 @@ class UnusualCard extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(14),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -715,36 +707,50 @@ class UnusualCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (!hintDismissed) ...[
-                  const SizedBox(height: 4),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          S.unusualBanner,
-                          maxLines: 3,
-                          style: const TextStyle(fontSize: 12.5, height: 1.4),
-                        ),
-                      ),
-                      SizedBox(
-                        height: 28,
-                        width: 28,
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          tooltip: S.close,
-                          onPressed: onDismissHint,
-                          icon: const Icon(Icons.close_rounded, size: 16),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                const SizedBox(height: 4),
+                Text(
+                  S.unusualBanner,
+                  maxLines: 3,
+                  style: const TextStyle(fontSize: 12.5, height: 1.4),
+                ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Nothing to deal with: an oversized tick in a deeper shade of the page
+/// itself, rather than a congratulatory green, over a short message.
+class AllClear extends StatelessWidget {
+  const AllClear({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final base = DefaultTextStyle.of(context).style.fontSize ?? 14;
+    final shade =
+        Color.lerp(scheme.surface, scheme.onSurface, 0.22) ??
+        scheme.onSurfaceVariant;
+    return Column(
+      children: [
+        Icon(Icons.check_circle_rounded, size: base * 4, color: shade),
+        const SizedBox(height: 14),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Text(
+            S.allUnusualResolved,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: scheme.onSurfaceVariant,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

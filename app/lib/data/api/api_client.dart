@@ -382,17 +382,14 @@ class ApiClient {
     await _json(_http.delete(_uri('/readings/$id'), headers: _headers()));
   }
 
-  /// How many readings in the range are flagged as unusual (moderators and
-  /// engineers). Without a range it covers every reading.
-  Future<UnusualReadings> fetchUnusual({DateTime? from, DateTime? to}) async {
+  /// The readings flagged as unusual (moderators and engineers). [filters]
+  /// is the readings list's own query, so the two always agree on which
+  /// readings they are talking about; empty means every reading.
+  Future<UnusualReadings> fetchUnusual([
+    Map<String, String> filters = const {},
+  ]) async {
     final body = await _json(
-      _http.get(
-        _uri('/readings/unusual', {
-          'from': ?from?.toUtc().toIso8601String(),
-          'to': ?to?.toUtc().toIso8601String(),
-        }),
-        headers: _headers(),
-      ),
+      _http.get(_uri('/readings/unusual', filters), headers: _headers()),
     );
     return UnusualReadings(
       count: body['count'] as int,

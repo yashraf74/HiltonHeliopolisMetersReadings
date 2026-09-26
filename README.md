@@ -72,7 +72,7 @@ All routes are under `/api`. Every route except `/health` and `/auth/login` need
 | POST | `/photos` | any | raw image body (`image/jpeg`, `png`, `webp`), ≤ 3 MB → `{photoKey}`; `?kind=meter` is moderator-only, `?kind=user` needs moderator or the profile-editing switch |
 | GET | `/photos?key=` | any | streams the image; `users/…` keys are hidden from technicians except their own |
 | POST | `/readings` | any | `{id, meterId, value, photoKey, loggedAt}`; idempotent by `id` |
-| GET | `/readings/unusual` | moderator, engineer | `from`, `to` (default: every date since the system went live) → `{count, from, to, unusual[]}` for the unusual readings page |
+| GET | `/readings/unusual` | moderator, engineer | the same filters as `/readings` (`type`, `number`, `userId`, `dateFrom`, `dateTo`, `search`; none = every reading) → `{count, from, to, unusual[]}`. Whether a reading is unusual is judged against its own meter's readings within 60 days either side of it, never against the filter, so the flags don't change with the range asked for |
 | GET | `/readings` | any | technicians get only their own; filters `type` (comma list), `number`, `userId`, `dateFrom`, `dateTo`, `search`; `sort` (`default` = newest local day, then export order, `logged_at`, `value`, `meter_name`, `meter_type`, `technician`) + `dir` + `tz`; pagination `limit` (≤ 200) + `cursor`; `export=1` honours the export switch |
 | PUT | `/readings/:id` | owner or engineer/moderator | `{value}`; gains recomputed, and the reading is unflagged |
 | POST | `/readings/:id/normal` | moderator, engineer | `{normal}`; marks a flagged reading as normal so it leaves the unusual list |
@@ -111,7 +111,7 @@ ui/          login, HomeShell (role-based tabs), popups (meter / user / reading)
 
 Tabs — technician: new reading, readings. Engineer: new reading, readings, dashboard. Moderator: new reading, meters, readings, dashboard. The account menu holds the profile page, language switch, About, and (moderators) app settings and user management.
 
-Readings that look wrong (negative, or well above that meter's usual daily use) are collected on their own page, reached from a card at the top of the readings list and from the warning before an export. Each one can be edited, deleted or marked as normal; when none are left the card and the page go away.
+Readings that look wrong (negative, or well above that meter's usual daily use) are collected on their own page, reached from a card between the filters and the readings list and from the warning before an export. The card and the page follow the readings list's filters, so filtering to one day, one meter or one technician narrows the unusual readings to match and the card disappears when none of them are flagged. The page opens with those filters and then keeps its own: changing them there leaves the readings list as it was. Each reading can be edited, deleted or marked as normal.
 
 Tapping a meter, user or reading name anywhere opens a popup with its details, the full photo (pinch to zoom) and, for moderators, an edit button.
 
