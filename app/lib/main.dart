@@ -10,6 +10,7 @@ import 'core/strings.dart';
 import 'core/theme.dart';
 import 'data/api/api_client.dart';
 import 'data/db/database.dart';
+import 'state/app_events.dart';
 import 'state/app_status_controller.dart';
 import 'state/language_controller.dart';
 import 'state/connectivity_controller.dart';
@@ -103,6 +104,7 @@ class MetersApp extends StatelessWidget {
         ChangeNotifierProvider<SyncController>.value(value: sync),
         ChangeNotifierProvider<AppStatusController>.value(value: status),
         ChangeNotifierProvider<LanguageController>.value(value: language),
+        ChangeNotifierProvider<AppEvents>(create: (_) => AppEvents()),
       ],
       child: LanguageRebuilder(controller: language, builder: (_) => _app()),
     );

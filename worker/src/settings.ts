@@ -9,6 +9,7 @@ export const SETTINGS_KEYS = [
   "photo_retention_days",
   "token_lifetime_days",
   "profile_editing_enabled",
+  "export_unusual_warning_enabled",
   "export_settings",
   "price_electricity",
   "price_water",
@@ -24,6 +25,7 @@ export const DEFAULT_SETTINGS: Settings = {
   photoRetentionDays: 90,
   tokenLifetimeDays: 7,
   profileEditingEnabled: true,
+  exportUnusualWarningEnabled: true,
   export: {
     columns: [...EXPORT_COLUMNS],
     direction: "auto",
@@ -77,7 +79,7 @@ function int(v: string | null, fallback: number): number {
 
 /** One KV round-trip per request (KV is edge-cached; values are tiny). */
 export async function loadSettings(env: Env): Promise<Settings> {
-  const [minVersion, maintenance, del, exp, retention, tokenDays, profileEditing, exportJson, pElectricity, pWater, pGas] = await Promise.all(
+  const [minVersion, maintenance, del, exp, retention, tokenDays, profileEditing, unusualWarning, exportJson, pElectricity, pWater, pGas] = await Promise.all(
     SETTINGS_KEYS.map((k) => env.SETTINGS.get(k))
   );
   return {
@@ -88,6 +90,7 @@ export async function loadSettings(env: Env): Promise<Settings> {
     photoRetentionDays: int(retention, DEFAULT_SETTINGS.photoRetentionDays),
     tokenLifetimeDays: int(tokenDays, DEFAULT_SETTINGS.tokenLifetimeDays),
     profileEditingEnabled: bool(profileEditing, DEFAULT_SETTINGS.profileEditingEnabled),
+    exportUnusualWarningEnabled: bool(unusualWarning, DEFAULT_SETTINGS.exportUnusualWarningEnabled),
     export: parseExportSettings(exportJson),
     prices: { electricity: price(pElectricity), water: price(pWater), gas: price(pGas) },
   };
@@ -102,6 +105,7 @@ export async function saveSettings(env: Env, s: Settings): Promise<void> {
     env.SETTINGS.put("photo_retention_days", String(s.photoRetentionDays)),
     env.SETTINGS.put("token_lifetime_days", String(s.tokenLifetimeDays)),
     env.SETTINGS.put("profile_editing_enabled", String(s.profileEditingEnabled)),
+    env.SETTINGS.put("export_unusual_warning_enabled", String(s.exportUnusualWarningEnabled)),
     env.SETTINGS.put("export_settings", JSON.stringify(s.export)),
     env.SETTINGS.put("price_electricity", String(s.prices.electricity)),
     env.SETTINGS.put("price_water", String(s.prices.water)),

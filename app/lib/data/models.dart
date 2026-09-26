@@ -337,6 +337,7 @@ class AppConfig {
     this.readingDeleteEnabled = true,
     this.exportEnabled = true,
     this.profileEditingEnabled = true,
+    this.exportUnusualWarningEnabled = true,
     this.export = const ExportSettings(),
   });
 
@@ -348,6 +349,9 @@ class AppConfig {
   /// Users may edit their own photo, email and mobile number.
   final bool profileEditingEnabled;
 
+  /// Warn moderators and engineers about unusual readings before exporting.
+  final bool exportUnusualWarningEnabled;
+
   /// How this device builds the Excel workbook.
   final ExportSettings export;
 
@@ -357,6 +361,8 @@ class AppConfig {
     readingDeleteEnabled: j['readingDeleteEnabled'] as bool? ?? true,
     exportEnabled: j['exportEnabled'] as bool? ?? true,
     profileEditingEnabled: j['profileEditingEnabled'] as bool? ?? true,
+    exportUnusualWarningEnabled:
+        j['exportUnusualWarningEnabled'] as bool? ?? true,
     export: ExportSettings.fromJson(j['export'] as Map<String, dynamic>?),
   );
 }
@@ -370,6 +376,7 @@ class AppSettings {
     required this.photoRetentionDays,
     required this.tokenLifetimeDays,
     required this.profileEditingEnabled,
+    required this.exportUnusualWarningEnabled,
     required this.export,
     required this.prices,
     this.latestAppVersion,
@@ -386,6 +393,9 @@ class AppSettings {
 
   /// Users may edit their own photo, email and mobile number.
   final bool profileEditingEnabled;
+
+  /// Warn moderators and engineers about unusual readings before exporting.
+  final bool exportUnusualWarningEnabled;
 
   /// How the Excel export is built.
   final ExportSettings export;
@@ -404,6 +414,8 @@ class AppSettings {
     photoRetentionDays: j['photoRetentionDays'] as int,
     tokenLifetimeDays: j['tokenLifetimeDays'] as int? ?? 7,
     profileEditingEnabled: j['profileEditingEnabled'] as bool? ?? true,
+    exportUnusualWarningEnabled:
+        j['exportUnusualWarningEnabled'] as bool? ?? true,
     export: ExportSettings.fromJson(j['export'] as Map<String, dynamic>?),
     prices: pricesFromJson(j['prices'] as Map<String, dynamic>?),
     latestAppVersion: j['latestAppVersion'] as String?,
@@ -421,6 +433,7 @@ class AppSettings {
     'photoRetentionDays': photoRetentionDays,
     'tokenLifetimeDays': tokenLifetimeDays,
     'profileEditingEnabled': profileEditingEnabled,
+    'exportUnusualWarningEnabled': exportUnusualWarningEnabled,
     'export': export.toJson(),
     'prices': {for (final e in prices.entries) e.key.name: e.value},
   };

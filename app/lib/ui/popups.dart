@@ -501,6 +501,28 @@ class _ReadingSheetState extends State<_ReadingSheet> {
             ],
           ],
         ),
+        // Its own row: three buttons side by side squeeze the labels.
+        if (row['kind'] != null) ...[
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _busy
+                ? null
+                : () => _run(() async {
+                    await context.read<ApiClient>().markReadingNormal(
+                      row['id'] as String,
+                      normal: true,
+                    );
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(
+                        context,
+                      ).showSnackBar(SnackBar(content: Text(S.markedNormal)));
+                    }
+                    return true;
+                  }),
+            icon: const Icon(Icons.check_circle_outline_rounded),
+            label: Text(S.markNormal),
+          ),
+        ],
       ],
     );
   }

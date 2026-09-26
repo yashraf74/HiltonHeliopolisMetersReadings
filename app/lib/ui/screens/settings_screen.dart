@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:intl/intl.dart' hide TextDirection;
 import 'package:provider/provider.dart';
 
 import '../../core/strings.dart';
@@ -36,6 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _deleteEnabled = true;
   bool _exportEnabled = true;
   bool _profileEditing = true;
+  bool _unusualWarning = true;
   ExportSettings _export = const ExportSettings();
   String? _latestVersion;
   bool _loading = true;
@@ -47,6 +49,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// Everything the form holds, to spot edits when leaving.
   String get _current =>
       '$_maintenance|$_deleteEnabled|$_exportEnabled|$_profileEditing|'
+      '$_unusualWarning|'
       '${_minVersion.text}|${_retention.text}|${_tokenDays.text}|'
       '${jsonEncode(_export.toJson())}|'
       '${[for (final t in MeterType.values) _prices[t]!.text].join(',')}';
@@ -84,6 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _deleteEnabled = s.readingDeleteEnabled;
     _exportEnabled = s.exportEnabled;
     _profileEditing = s.profileEditingEnabled;
+    _unusualWarning = s.exportUnusualWarningEnabled;
     _export = s.export;
     _latestVersion = s.latestAppVersion ?? _latestVersion;
     for (final t in MeterType.values) {
@@ -144,6 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           photoRetentionDays: int.parse(_retention.text.trim()),
           tokenLifetimeDays: int.parse(_tokenDays.text.trim()),
           profileEditingEnabled: _profileEditing,
+          exportUnusualWarningEnabled: _unusualWarning,
           export: _export,
           prices: {
             for (final t in MeterType.values)
@@ -192,174 +197,263 @@ class _SettingsScreenState extends State<SettingsScreen> {
             : Form(
                 key: _formKey,
                 child: ListView(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                   children: [
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        S.settingMaintenance,
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      subtitle: Text(
-                        S.settingMaintenanceHint,
-                        style: TextStyle(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 12.5,
+                    _SettingsSection(
+                      icon: Icons.tune_rounded,
+                      title: S.sectionAvailability,
+                      children: [
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            S.settingMaintenance,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: Text(
+                            S.settingMaintenanceHint,
+                            style: TextStyle(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                          value: _maintenance,
+                          activeThumbColor: scheme.error,
+                          onChanged: _saving
+                              ? null
+                              : (v) => setState(() => _maintenance = v),
                         ),
-                      ),
-                      value: _maintenance,
-                      activeThumbColor: scheme.error,
-                      onChanged: _saving
-                          ? null
-                          : (v) => setState(() => _maintenance = v),
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        S.settingDeleteEnabled,
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      value: _deleteEnabled,
-                      onChanged: _saving
-                          ? null
-                          : (v) => setState(() => _deleteEnabled = v),
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        S.settingExportEnabled,
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      value: _exportEnabled,
-                      onChanged: _saving
-                          ? null
-                          : (v) => setState(() => _exportEnabled = v),
-                    ),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(
-                        S.settingProfileEditing,
-                        style: TextStyle(fontWeight: FontWeight.w700),
-                      ),
-                      subtitle: Text(
-                        S.settingProfileEditingHint,
-                        style: TextStyle(
-                          color: scheme.onSurfaceVariant,
-                          fontSize: 12.5,
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _minVersion,
+                          textDirection: TextDirection.ltr,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          inputFormatters: [
+                            FilteringTextInputFormatter.allow(
+                              RegExp(r'[0-9.]'),
+                            ),
+                          ],
+                          contextMenuBuilder: appContextMenuBuilder,
+                          decoration: InputDecoration(
+                            labelText: S.settingMinVersion,
+                            helperText: [
+                              S.settingMinVersionHint,
+                              if (_latestVersion != null)
+                                '${S.latestVersion}: $_latestVersion',
+                              '${S.thisDeviceVersion}: $version',
+                            ].join(' · '),
+                            helperMaxLines: 2,
+                          ),
+                          validator: (v) =>
+                              _versionRe.hasMatch((v ?? '').trim())
+                              ? null
+                              : S.versionInvalid,
                         ),
-                      ),
-                      value: _profileEditing,
-                      onChanged: _saving
-                          ? null
-                          : (v) => setState(() => _profileEditing = v),
-                    ),
-                    const Divider(height: 32),
-                    _ExportSection(
-                      settings: _export,
-                      enabled: !_saving,
-                      onChanged: (v) => setState(() => _export = v),
-                    ),
-                    const Divider(height: 32),
-                    TextFormField(
-                      controller: _minVersion,
-                      textDirection: TextDirection.ltr,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          controller: _tokenDays,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          contextMenuBuilder: appContextMenuBuilder,
+                          decoration: InputDecoration(
+                            labelText: S.settingTokenLifetime,
+                            helperText: S.settingTokenLifetimeHint,
+                            helperMaxLines: 2,
+                          ),
+                          validator: (v) {
+                            final n = int.tryParse((v ?? '').trim());
+                            return n == null || n < 1 || n > 365
+                                ? S.tokenLifetimeInvalid
+                                : null;
+                          },
+                        ),
                       ],
-                      contextMenuBuilder: appContextMenuBuilder,
-                      decoration: InputDecoration(
-                        labelText: S.settingMinVersion,
-                        helperText: [
-                          S.settingMinVersionHint,
-                          if (_latestVersion != null)
-                            '${S.latestVersion}: $_latestVersion',
-                          '${S.thisDeviceVersion}: $version',
-                        ].join(' · '),
-                        helperMaxLines: 2,
-                      ),
-                      validator: (v) => _versionRe.hasMatch((v ?? '').trim())
-                          ? null
-                          : S.versionInvalid,
                     ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _retention,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      contextMenuBuilder: appContextMenuBuilder,
-                      decoration: InputDecoration(
-                        labelText: S.settingRetention,
-                        helperText: S.settingRetentionHint,
-                      ),
-                      validator: (v) {
-                        final n = int.tryParse((v ?? '').trim());
-                        return n == null || n < 7 || n > 3650
-                            ? S.retentionInvalid
-                            : null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _tokenDays,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                      contextMenuBuilder: appContextMenuBuilder,
-                      decoration: InputDecoration(
-                        labelText: S.settingTokenLifetime,
-                        helperText: S.settingTokenLifetimeHint,
-                        helperMaxLines: 2,
-                      ),
-                      validator: (v) {
-                        final n = int.tryParse((v ?? '').trim());
-                        return n == null || n < 1 || n > 365
-                            ? S.tokenLifetimeInvalid
-                            : null;
-                      },
-                    ),
-                    const Divider(height: 40),
-                    Text(
-                      S.settingPrices,
-                      style: TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      S.settingPricesHint,
-                      style: TextStyle(
-                        color: scheme.onSurfaceVariant,
-                        fontSize: 12.5,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    for (final t in MeterType.values) ...[
-                      TextFormField(
-                        controller: _prices[t],
-                        textDirection: TextDirection.ltr,
-                        keyboardType: const TextInputType.numberWithOptions(
-                          decimal: true,
+                    _SettingsSection(
+                      icon: Icons.list_alt_rounded,
+                      title: S.sectionReadings,
+                      children: [
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            S.settingDeleteEnabled,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          value: _deleteEnabled,
+                          onChanged: _saving
+                              ? null
+                              : (v) => setState(() => _deleteEnabled = v),
                         ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            S.settingExportEnabled,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          value: _exportEnabled,
+                          onChanged: _saving
+                              ? null
+                              : (v) => setState(() => _exportEnabled = v),
+                        ),
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            S.settingUnusualWarning,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: Text(
+                            S.settingUnusualWarningHint,
+                            style: TextStyle(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                          value: _unusualWarning,
+                          onChanged: _saving
+                              ? null
+                              : (v) => setState(() => _unusualWarning = v),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _retention,
+                          keyboardType: TextInputType.number,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          contextMenuBuilder: appContextMenuBuilder,
+                          decoration: InputDecoration(
+                            labelText: S.settingRetention,
+                            helperText: S.settingRetentionHint,
+                            helperMaxLines: 2,
+                          ),
+                          validator: (v) {
+                            final n = int.tryParse((v ?? '').trim());
+                            return n == null || n < 7 || n > 3650
+                                ? S.retentionInvalid
+                                : null;
+                          },
+                        ),
+                      ],
+                    ),
+                    _SettingsSection(
+                      icon: Icons.table_chart_outlined,
+                      title: S.settingExport,
+                      children: [
+                        _ExportSection(
+                          settings: _export,
+                          enabled: !_saving,
+                          onChanged: (v) => setState(() => _export = v),
+                        ),
+                      ],
+                    ),
+                    _SettingsSection(
+                      icon: Icons.group_outlined,
+                      title: S.sectionAccounts,
+                      children: [
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            S.settingProfileEditing,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: Text(
+                            S.settingProfileEditingHint,
+                            style: TextStyle(
+                              color: scheme.onSurfaceVariant,
+                              fontSize: 12.5,
+                            ),
+                          ),
+                          value: _profileEditing,
+                          onChanged: _saving
+                              ? null
+                              : (v) => setState(() => _profileEditing = v),
+                        ),
+                      ],
+                    ),
+                    _SettingsSection(
+                      icon: Icons.payments_outlined,
+                      title: S.settingPrices,
+                      children: [
+                        Text(
+                          S.settingPricesHint,
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        for (final t in MeterType.values) ...[
+                          TextFormField(
+                            controller: _prices[t],
+                            textDirection: TextDirection.ltr,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'[0-9.]'),
+                              ),
+                            ],
+                            contextMenuBuilder: appContextMenuBuilder,
+                            decoration: InputDecoration(
+                              labelText:
+                                  '${t.label} (${S.currency} / ${t.unit})',
+                              prefixIcon: Icon(t.icon, color: t.color),
+                            ),
+                            validator: (v) {
+                              final n = double.tryParse((v ?? '').trim());
+                              return n == null || n < 0 || n > 100000
+                                  ? S.priceInvalid
+                                  : null;
+                            },
+                          ),
+                          const SizedBox(height: 12),
                         ],
-                        contextMenuBuilder: appContextMenuBuilder,
-                        decoration: InputDecoration(
-                          labelText: '${t.label} (${S.currency} / ${t.unit})',
-                          prefixIcon: Icon(t.icon, color: t.color),
-                        ),
-                        validator: (v) {
-                          final n = double.tryParse((v ?? '').trim());
-                          return n == null || n < 0 || n > 100000
-                              ? S.priceInvalid
-                              : null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                    ],
+                      ],
+                    ),
                   ],
                 ),
               ),
+      ),
+    );
+  }
+}
+
+/// One collapsible group of settings. Collapsed at first; children stay in
+/// the tree so the form validates them even while a section is closed.
+class _SettingsSection extends StatelessWidget {
+  const _SettingsSection({
+    required this.icon,
+    required this.title,
+    required this.children,
+  });
+
+  final IconData icon;
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Theme(
+        data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          maintainState: true,
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+          expandedCrossAxisAlignment: CrossAxisAlignment.stretch,
+          leading: Icon(icon, color: scheme.primary, size: 22),
+          title: Text(
+            title,
+            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+          ),
+          children: children,
+        ),
       ),
     );
   }
@@ -486,7 +580,13 @@ class _ExportSection extends StatelessWidget {
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
           initialValue: settings.dateFormat,
-          decoration: InputDecoration(labelText: S.exportDateFormat),
+          decoration: InputDecoration(
+            labelText: S.exportDateFormat,
+            // What today's date looks like in the chosen format.
+            helperText:
+                '${S.exportDateExample}: '
+                '${DateFormat(settings.dateFormat).format(DateTime.now())}',
+          ),
           items: [
             for (final f in ExportSettings.dateFormats)
               DropdownMenuItem(

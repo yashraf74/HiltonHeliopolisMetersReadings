@@ -9,6 +9,7 @@ import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../../data/api/api_client.dart';
 import '../../data/models.dart';
+import '../../state/app_events.dart';
 import '../../state/session_controller.dart';
 import '../popups.dart';
 import '../widgets/status_widgets.dart';
@@ -31,11 +32,61 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _loading = true;
   String? _error;
 
+  /// Unusual readings across every date, for the indicator and the banner.
+  int _unusualTotal = 0;
+  bool _bannerDismissed = false;
+
+  final _scroll = ScrollController();
+  // Held from initState: providers can't be looked up during dispose.
+  late final AppEvents _events;
+  final _unusualKey = GlobalKey();
+
   @override
   void initState() {
     super.initState();
     _setLastWeek();
+    _events = context.read<AppEvents>();
+    _events.addListener(_onAppEvent);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _events.removeListener(_onAppEvent);
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  /// Another screen asked for this dashboard: it may carry a date range (the
+  /// export warning), and arriving here brings the hint banner back.
+  void _onAppEvent() {
+    final range = _events.takeDashboardRange();
+    setState(() {
+      _bannerDismissed = false;
+      if (range != null) {
+        _from = range.start;
+        _to = DateTime(
+          range.end.year,
+          range.end.month,
+          range.end.day,
+          23,
+          59,
+          59,
+        );
+      }
+    });
+    if (range != null) _load();
+  }
+
+  Future<void> _scrollToUnusual() async {
+    final context = _unusualKey.currentContext;
+    if (context == null) return;
+    await Scrollable.ensureVisible(
+      context,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeOut,
+      alignment: 0.1,
+    );
   }
 
   void _setLastWeek() {
@@ -46,16 +97,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       now.month,
       now.day,
     ).subtract(const Duration(days: 6));
-  }
-
-  bool get _isLastWeek {
-    final now = DateTime.now();
-    final start = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).subtract(const Duration(days: 6));
-    return _from == start && _to.day == now.day && _to.month == now.month;
   }
 
   Future<void> _load() async {
@@ -69,6 +110,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return;
       }
       setState(() => _data = _Data.fromJson(json));
+      // Separate from the range above: the indicator covers every date.
+      final total = await context.read<ApiClient>().fetchUnusualCount();
+      if (mounted) setState(() => _unusualTotal = total);
     } on NetworkException {
       if (mounted) setState(() => _error = S.dashboardNeedInternet);
     } on ApiException catch (e) {
@@ -115,34 +159,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
+        controller: _scroll,
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
         children: [
-          Row(
-            children: [
-              ChoiceChip(
-                label: Text(S.rangeLastWeek),
-                selected: _isLastWeek,
-                onSelected: (_) {
-                  setState(_setLastWeek);
-                  _load();
-                },
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _pickRange,
-                  icon: const Icon(Icons.date_range_rounded, size: 18),
-                  label: Text(
-                    _isLastWeek
-                        ? S.rangeCustom
-                        : '${fmt.format(_from)} – ${fmt.format(_to)}',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-            ],
+          if (_unusualTotal > 0) ...[
+            _UnusualIndicator(onTap: _scrollToUnusual),
+            const SizedBox(height: 8),
+          ],
+          OutlinedButton.icon(
+            onPressed: _pickRange,
+            icon: const Icon(Icons.date_range_rounded, size: 18),
+            label: Text(
+              '${fmt.format(_from)} – ${fmt.format(_to)}',
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
+          if (_unusualTotal > 0 && !_bannerDismissed) ...[
+            const SizedBox(height: 10),
+            _UnusualBanner(
+              onTap: _scrollToUnusual,
+              onDismiss: () => setState(() => _bannerDismissed = true),
+            ),
+          ],
           const SizedBox(height: 14),
           if (_loading)
             const Padding(
@@ -209,7 +248,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       gap,
       _TopConsumersSection(consumers: d.consumers),
       gap,
-      _SectionHeader(S.unusualReadings, count: d.unusual.length),
+      KeyedSubtree(
+        key: _unusualKey,
+        child: _SectionHeader(S.unusualReadings, count: d.unusual.length),
+      ),
       _ExpandableCard(
         empty: S.noUnusual,
         children: [for (final u in d.unusual) _UnusualRow(u, onChanged: _load)],
@@ -411,6 +453,10 @@ FlTitlesData _titles(
   _Series series, {
   required String Function(double) left,
   required double leftInterval,
+
+  /// Draw the label at the very top of the axis (the completion chart's
+  /// 100%); elsewhere it would collide with the chart's own headroom.
+  bool showMax = false,
 }) {
   // At most ten date labels: every column up to ten, every other up to
   // twenty, and so on.
@@ -423,7 +469,8 @@ FlTitlesData _titles(
         showTitles: true,
         reservedSize: 34,
         interval: leftInterval,
-        getTitlesWidget: (v, meta) => v == meta.max || v == meta.min && v != 0
+        getTitlesWidget: (v, meta) =>
+            (v == meta.max && !showMax) || (v == meta.min && v != 0)
             ? const SizedBox.shrink()
             : Text(
                 left(v),
@@ -987,6 +1034,7 @@ class _CompletionCard extends StatelessWidget {
               series,
               left: (v) => '${v.round()}%',
               leftInterval: 50,
+              showMax: true,
             ),
             barTouchData: BarTouchData(
               touchTooltipData: _barTooltip(
@@ -1650,6 +1698,93 @@ class _OverdueRow extends StatelessWidget {
                 ),
               ],
             ),
+    );
+  }
+}
+
+/// Small red marker shown while any reading anywhere is flagged as unusual.
+/// It stays until every one is handled; tapping it jumps to the list.
+class _UnusualIndicator extends StatelessWidget {
+  const _UnusualIndicator({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 10,
+              height: 10,
+              decoration: const BoxDecoration(
+                color: AppColors.failed,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              S.unusualReadings,
+              style: const TextStyle(
+                color: AppColors.failed,
+                fontWeight: FontWeight.w800,
+                fontSize: 13,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Dismissible reminder to look at the unusual readings; comes back the next
+/// time the dashboard is opened.
+class _UnusualBanner extends StatelessWidget {
+  const _UnusualBanner({required this.onTap, required this.onDismiss});
+
+  final VoidCallback onTap;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.failed.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsetsDirectional.fromSTEB(12, 10, 4, 10),
+          child: Row(
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: AppColors.failed,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  S.unusualBanner,
+                  maxLines: 3,
+                  style: const TextStyle(fontSize: 12.5, height: 1.4),
+                ),
+              ),
+              IconButton(
+                tooltip: S.close,
+                onPressed: onDismiss,
+                icon: const Icon(Icons.close_rounded, size: 18),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

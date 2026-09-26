@@ -373,6 +373,32 @@ class ApiClient {
     await _json(_http.delete(_uri('/readings/$id'), headers: _headers()));
   }
 
+  /// How many readings in the range are flagged as unusual (moderators and
+  /// engineers). Without a range it covers every reading.
+  Future<int> fetchUnusualCount({DateTime? from, DateTime? to}) async {
+    final body = await _json(
+      _http.get(
+        _uri('/readings/unusual', {
+          'from': ?from?.toUtc().toIso8601String(),
+          'to': ?to?.toUtc().toIso8601String(),
+        }),
+        headers: _headers(),
+      ),
+    );
+    return body['count'] as int;
+  }
+
+  /// Marks an unusual reading as normal, or puts it back.
+  Future<void> markReadingNormal(String id, {required bool normal}) async {
+    await _json(
+      _http.post(
+        _uri('/readings/$id/normal'),
+        headers: _headers(contentType: 'application/json'),
+        body: jsonEncode({'normal': normal}),
+      ),
+    );
+  }
+
   // ---- users --------------------------------------------------------------
 
   Future<List<UserName>> fetchUserNames() async {

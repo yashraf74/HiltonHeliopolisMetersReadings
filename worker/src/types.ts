@@ -38,6 +38,8 @@ export interface Settings {
   tokenLifetimeDays: number;
   /** Lets every user edit their own photo, email and mobile number. */
   profileEditingEnabled: boolean;
+  /** Warn moderators and engineers about unusual readings before exporting. */
+  exportUnusualWarningEnabled: boolean;
   /** How the app builds the Excel export. */
   export: ExportSettings;
   /** EGP per kWh / m³ for the dashboard cost chart; 0 = not set. */

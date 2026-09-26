@@ -16,6 +16,7 @@ settingsRoutes.get("/config", (c) => {
     exportEnabled: s.exportEnabled,
     // Every role builds its own workbook and may edit its own profile.
     profileEditingEnabled: s.profileEditingEnabled,
+    exportUnusualWarningEnabled: s.exportUnusualWarningEnabled,
     export: s.export,
   });
 });
@@ -99,7 +100,13 @@ settingsRoutes.put("/settings", requireAuth, requireRole("moderator"), async (c)
     if (!/^\d+(\.\d+){0,2}$/.test(v)) return c.json({ error: "minAppVersion must look like 2.0.0" }, 400);
     next.minAppVersion = v;
   }
-  for (const key of ["maintenanceMode", "readingDeleteEnabled", "exportEnabled", "profileEditingEnabled"] as const) {
+  for (const key of [
+    "maintenanceMode",
+    "readingDeleteEnabled",
+    "exportEnabled",
+    "profileEditingEnabled",
+    "exportUnusualWarningEnabled",
+  ] as const) {
     if (body?.[key] !== undefined) {
       if (typeof body[key] !== "boolean") return c.json({ error: `${key} must be a boolean` }, 400);
       next[key] = body[key];

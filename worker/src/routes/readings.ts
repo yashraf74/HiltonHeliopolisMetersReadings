@@ -3,8 +3,9 @@ import type { Context } from "hono";
 import type { Env } from "../types";
 import { READINGS_ADMIN_ROLES } from "../types";
 import type { AuthedVars } from "../middleware";
-import { requireAuth } from "../middleware";
+import { requireAuth, requireRole } from "../middleware";
 import { recomputeGains } from "../gain";
+import { findUnusual, loadRowsForUnusual } from "../unusual";
 
 export const readingRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
@@ -240,6 +241,31 @@ async function loadOwned(c: ReadingContext, id: string) {
   return { row };
 }
 
+// Marks an unusual reading as normal (or unmarks it), so it stops being
+// flagged. Editing the value clears the mark again.
+readingRoutes.post("/:id/normal", requireRole("moderator", "engineer"), async (c) => {
+  const id = c.req.param("id") ?? "";
+  const body = await c.req.json().catch(() => null);
+  const normal = body?.normal !== false;
+  const { error } = await loadOwned(c, id);
+  if (error) return error;
+  await c.env.DB.prepare("UPDATE readings SET normal_at = ?, normal_by = ? WHERE id = ?")
+    .bind(normal ? new Date().toISOString() : null, normal ? c.get("user").id : null, id)
+    .run();
+  return c.json({ normal });
+});
+
+// How many readings in the range are flagged as unusual: the export warning
+// and the dashboard indicator ask for this. Without from/to it covers every
+// reading.
+readingRoutes.get("/unusual", requireRole("moderator", "engineer"), async (c) => {
+  const to = c.req.query("to") ?? new Date().toISOString();
+  const from = c.req.query("from") ?? new Date(0).toISOString();
+  const { results } = await loadRowsForUnusual(c.env.DB, new Date(0).toISOString(), to, from);
+  const unusual = findUnusual(results, from, to);
+  return c.json({ count: unusual.length, from, to });
+});
+
 // Edit the value only; gains for that meter are recomputed.
 readingRoutes.put("/:id", async (c) => {
   const id = c.req.param("id");
@@ -251,7 +277,10 @@ readingRoutes.put("/:id", async (c) => {
   const { error, row } = await loadOwned(c, id);
   if (error) return error;
 
-  await c.env.DB.prepare("UPDATE readings SET value = ? WHERE id = ?").bind(value, id).run();
+  // A changed value is judged again, so drop any "normal" mark.
+  await c.env.DB.prepare("UPDATE readings SET value = ?, normal_at = NULL, normal_by = NULL WHERE id = ?")
+    .bind(value, id)
+    .run();
   await recomputeGains(c.env.DB, row!.meter_id);
   return c.json({ ok: true });
 });

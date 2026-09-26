@@ -14,6 +14,7 @@ import '../../data/photo_store.dart';
 import '../../state/app_status_controller.dart';
 import '../../state/session_controller.dart';
 import '../../state/sync_controller.dart';
+import '../../state/app_events.dart';
 import '../popups.dart';
 import '../reading_actions.dart';
 import '../widgets/status_widgets.dart';
@@ -135,6 +136,8 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
   ReadingFilters _filters = const ReadingFilters();
   final _search = TextEditingController();
   final _scroll = ScrollController();
+  // Held from initState: providers can't be looked up during dispose.
+  late final AppEvents _events;
   List<Map<String, dynamic>> _rows = const [];
   String? _nextCursor;
   bool _loading = true;
@@ -147,6 +150,8 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
   void initState() {
     super.initState();
     _scroll.addListener(_onScroll);
+    _events = context.read<AppEvents>();
+    _events.addListener(_onUsersChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _load();
       _loadUserNames();
@@ -155,6 +160,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
 
   @override
   void dispose() {
+    _events.removeListener(_onUsersChanged);
     _scroll.dispose();
     _search.dispose();
     super.dispose();
@@ -168,6 +174,9 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
       _loadMore();
     }
   }
+
+  /// A moderator may have added, removed or hidden an account.
+  void _onUsersChanged() => _loadUserNames();
 
   Future<void> _loadUserNames() async {
     final user = context.read<SessionController>().user;
@@ -295,12 +304,74 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
   /// Exports every reading matching the current filters (not just the pages
   /// loaded so far), then saves the file on the device, emails it to the
   /// user, or both, as they choose.
+  /// Warns moderators and engineers when the readings they're about to
+  /// export contain unusual ones, offering to review them on the dashboard
+  /// (with the same period applied). Returns false to stop the export.
+  Future<bool> _confirmUnusual() async {
+    final user = context.read<SessionController>().user;
+    final config = context.read<AppStatusController>().config;
+    if (user == null ||
+        !user.canSeeAllReadings ||
+        !config.exportUnusualWarningEnabled) {
+      return true;
+    }
+    final int count;
+    try {
+      count = await context.read<ApiClient>().fetchUnusualCount(
+        from: _filters.from,
+        to: _filters.to,
+      );
+    } catch (_) {
+      // Can't check (offline, say): don't stand in the way of the export.
+      return true;
+    }
+    if (count == 0 || !mounted) return true;
+
+    final events = context.read<AppEvents>();
+    final choice = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(S.unusualBeforeExport),
+        content: Text(S.unusualBeforeExportBody(count)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(S.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(S.exportAnyway),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size(0, 44)),
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(S.reviewUnusual),
+          ),
+        ],
+      ),
+    );
+    if (choice == true) return true;
+    if (choice == false) {
+      // Review: open the dashboard over the period being exported. Without
+      // a date filter that's everything, so show the widest range offered.
+      final now = DateTime.now();
+      events.openDashboard(
+        DateTimeRange(
+          start: _filters.from ?? DateTime(now.year - 3, now.month, now.day),
+          end: _filters.to ?? now,
+        ),
+      );
+    }
+    return false;
+  }
+
   Future<void> _export() async {
     if (_rows.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(S.exportNothing)));
       return;
     }
+    if (!await _confirmUnusual() || !mounted) return;
     final target = await showModalBottomSheet<_ExportTarget>(
       context: context,
       useSafeArea: true,
