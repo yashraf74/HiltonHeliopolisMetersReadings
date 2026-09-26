@@ -7,12 +7,12 @@ import '../core/strings.dart';
 import '../data/api/api_client.dart';
 import '../data/db/database.dart';
 import '../data/models.dart';
+import '../state/app_events.dart';
 import '../state/app_status_controller.dart';
 import '../state/connectivity_controller.dart';
 import '../state/meters_controller.dart';
 import '../state/session_controller.dart';
 import '../state/sync_controller.dart';
-import '../state/app_events.dart';
 import '../state/language_controller.dart';
 import 'screens/about_screen.dart';
 import 'screens/profile_screen.dart';
@@ -43,31 +43,18 @@ class HomeShell extends StatefulWidget {
 
 class _HomeShellState extends State<HomeShell> with WidgetsBindingObserver {
   int _index = 0;
-  // Held from initState: providers can't be looked up during dispose.
-  late final AppEvents _events;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _events = context.read<AppEvents>();
-    _events.addListener(_onAppEvent);
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshAll());
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _events.removeListener(_onAppEvent);
     super.dispose();
-  }
-
-  /// Another screen asked to show the dashboard (the export warning).
-  void _onAppEvent() {
-    if (!_events.wantsDashboard) return;
-    final tabs = _tabsFor(context.read<SessionController>().user!);
-    final index = tabs.indexWhere((t) => t.body is DashboardScreen);
-    if (index >= 0 && index != _index) setState(() => _index = index);
   }
 
   void _refreshAll() {

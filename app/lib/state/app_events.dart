@@ -15,21 +15,14 @@ class AppEvents extends ChangeNotifier {
     notifyListeners();
   }
 
-  DateTimeRange? _dashboardRange;
+  int _unusualRevision = 0;
 
-  /// Asks the shell to open the dashboard, showing [range] (used by the
-  /// export warning, so the unusual readings it counted are on screen).
-  void openDashboard(DateTimeRange range) {
-    _dashboardRange = range;
+  /// Bumped when a reading is marked normal, edited or deleted, so the card
+  /// on the readings screen recounts.
+  int get unusualRevision => _unusualRevision;
+
+  void unusualChanged() {
+    _unusualRevision++;
     notifyListeners();
-  }
-
-  bool get wantsDashboard => _dashboardRange != null;
-
-  /// The dashboard takes the requested range once and applies it.
-  DateTimeRange? takeDashboardRange() {
-    final range = _dashboardRange;
-    _dashboardRange = null;
-    return range;
   }
 }

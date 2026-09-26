@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:provider/provider.dart';
 
+import '../../core/config.dart';
 import '../../core/strings.dart';
 import '../../core/theme.dart';
 import '../../data/api/api_client.dart';
 import '../../data/models.dart';
-import '../../state/app_events.dart';
 import '../../state/session_controller.dart';
 import '../popups.dart';
 import '../widgets/status_widgets.dart';
@@ -26,77 +26,40 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  late DateTime _from;
-  late DateTime _to;
+  /// null means every date since the system went live.
+  DateTimeRange? _range = _lastWeek();
   _Data? _data;
   bool _loading = true;
   String? _error;
 
-  /// Unusual readings across every date, for the indicator and the banner.
-  int _unusualTotal = 0;
-  bool _bannerDismissed = false;
-
   final _scroll = ScrollController();
-  // Held from initState: providers can't be looked up during dispose.
-  late final AppEvents _events;
-  final _unusualKey = GlobalKey();
+
+  static DateTimeRange _lastWeek() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    return DateTimeRange(
+      start: today.subtract(const Duration(days: 6)),
+      end: today,
+    );
+  }
+
+  DateTime get _from => _range?.start ?? BuildConfig.dataStart;
+
+  DateTime get _to {
+    final end = _range?.end ?? DateTime.now();
+    return DateTime(end.year, end.month, end.day, 23, 59, 59);
+  }
 
   @override
   void initState() {
     super.initState();
-    _setLastWeek();
-    _events = context.read<AppEvents>();
-    _events.addListener(_onAppEvent);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   @override
   void dispose() {
-    _events.removeListener(_onAppEvent);
     _scroll.dispose();
     super.dispose();
-  }
-
-  /// Another screen asked for this dashboard: it may carry a date range (the
-  /// export warning), and arriving here brings the hint banner back.
-  void _onAppEvent() {
-    final range = _events.takeDashboardRange();
-    setState(() {
-      _bannerDismissed = false;
-      if (range != null) {
-        _from = range.start;
-        _to = DateTime(
-          range.end.year,
-          range.end.month,
-          range.end.day,
-          23,
-          59,
-          59,
-        );
-      }
-    });
-    if (range != null) _load();
-  }
-
-  Future<void> _scrollToUnusual() async {
-    final context = _unusualKey.currentContext;
-    if (context == null) return;
-    await Scrollable.ensureVisible(
-      context,
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeOut,
-      alignment: 0.1,
-    );
-  }
-
-  void _setLastWeek() {
-    final now = DateTime.now();
-    _to = DateTime(now.year, now.month, now.day, 23, 59, 59);
-    _from = DateTime(
-      now.year,
-      now.month,
-      now.day,
-    ).subtract(const Duration(days: 6));
   }
 
   Future<void> _load() async {
@@ -110,9 +73,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return;
       }
       setState(() => _data = _Data.fromJson(json));
-      // Separate from the range above: the indicator covers every date.
-      final total = await context.read<ApiClient>().fetchUnusualCount();
-      if (mounted) setState(() => _unusualTotal = total);
     } on NetworkException {
       if (mounted) setState(() => _error = S.dashboardNeedInternet);
     } on ApiException catch (e) {
@@ -128,28 +88,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
+  /// Period picker: the usual last 7 days, every date, or a range chosen on
+  /// the calendar (which never goes back past the system's first day).
   Future<void> _pickRange() async {
-    final now = DateTime.now();
-    final range = await showDateRangePicker(
+    final choice = await showModalBottomSheet<_RangeChoice>(
       context: context,
-      firstDate: DateTime(now.year - 3),
-      lastDate: now,
-      initialDateRange: DateTimeRange(start: _from, end: _to),
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (_) => const _RangeSheet(),
     );
-    if (range == null) {
-      return;
+    if (choice == null || !mounted) return;
+    switch (choice) {
+      case _RangeChoice.lastWeek:
+        setState(() => _range = _lastWeek());
+      case _RangeChoice.allDates:
+        setState(() => _range = null);
+      case _RangeChoice.custom:
+        final now = DateTime.now();
+        final picked = await showDateRangePicker(
+          context: context,
+          firstDate: BuildConfig.dataStart,
+          lastDate: now,
+          initialDateRange: _range,
+        );
+        if (picked == null || !mounted) return;
+        setState(() => _range = picked);
     }
-    setState(() {
-      _from = DateTime(range.start.year, range.start.month, range.start.day);
-      _to = DateTime(
-        range.end.year,
-        range.end.month,
-        range.end.day,
-        23,
-        59,
-        59,
-      );
-    });
     _load();
   }
 
@@ -163,25 +127,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
         children: [
-          if (_unusualTotal > 0) ...[
-            _UnusualIndicator(onTap: _scrollToUnusual),
-            const SizedBox(height: 8),
-          ],
           OutlinedButton.icon(
             onPressed: _pickRange,
             icon: const Icon(Icons.date_range_rounded, size: 18),
             label: Text(
-              '${fmt.format(_from)} – ${fmt.format(_to)}',
+              _range == null
+                  ? S.rangeAllDates
+                  : '${fmt.format(_from)} – ${fmt.format(_to)}',
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          if (_unusualTotal > 0 && !_bannerDismissed) ...[
-            const SizedBox(height: 10),
-            _UnusualBanner(
-              onTap: _scrollToUnusual,
-              onDismiss: () => setState(() => _bannerDismissed = true),
-            ),
-          ],
           const SizedBox(height: 14),
           if (_loading)
             const Padding(
@@ -247,15 +202,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _CostCard(series: series, prices: d.prices, canManage: canManage),
       gap,
       _TopConsumersSection(consumers: d.consumers),
-      gap,
-      KeyedSubtree(
-        key: _unusualKey,
-        child: _SectionHeader(S.unusualReadings, count: d.unusual.length),
-      ),
-      _ExpandableCard(
-        empty: S.noUnusual,
-        children: [for (final u in d.unusual) _UnusualRow(u, onChanged: _load)],
-      ),
       gap,
       _SectionHeader(
         S.overdueMeters,
@@ -733,28 +679,20 @@ class _MeterPhoto extends StatelessWidget {
 }
 
 /// Name + "type · area" beside a meter photo, with a trailing widget. The
-/// whole row is tappable: [onTap] defaults to the meter popup; the chevron
-/// after the name is the only cue.
+/// whole row is tappable and opens the meter popup; the chevron after the
+/// name is the only cue.
 class _MeterRow extends StatelessWidget {
-  const _MeterRow({
-    required this.meter,
-    required this.trailing,
-    this.caption,
-    this.subtitle,
-    this.onTap,
-  });
+  const _MeterRow({required this.meter, required this.trailing, this.caption});
 
   final _MeterRef meter;
   final Widget trailing;
   final String? caption;
-  final String? subtitle;
-  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final muted = TextStyle(color: scheme.onSurfaceVariant, fontSize: 12);
-    final open = onTap ?? () => showMeterPopup(context, meter.id);
+    void open() => showMeterPopup(context, meter.id);
     return InkWell(
       onTap: open,
       borderRadius: BorderRadius.circular(10),
@@ -793,10 +731,9 @@ class _MeterRow extends StatelessWidget {
                   ],
                 ),
                 Text(
-                  subtitle ??
-                      (meter.area.isEmpty
-                          ? meter.type.label
-                          : '${meter.type.label} · ${meter.area}'),
+                  meter.area.isEmpty
+                      ? meter.type.label
+                      : '${meter.type.label} · ${meter.area}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: muted,
@@ -1609,54 +1546,6 @@ class _ExpandableCardState extends State<_ExpandableCard> {
   }
 }
 
-class _UnusualRow extends StatelessWidget {
-  const _UnusualRow(this.row, {required this.onChanged});
-
-  final _Json row;
-
-  /// Reloads the dashboard after the reading was edited or deleted.
-  final VoidCallback onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final meter = _MeterRef(row);
-    final negative = row['kind'] == 'negative';
-    final gain = row['gain'] as num;
-    final usual = row['usual'] as num?;
-    final daily = row['daily'] as num;
-    final color = negative ? AppColors.failed : AppColors.pending;
-    final when = DateFormat(
-      'd/M HH:mm',
-      S.localeCode,
-    ).format(DateTime.parse(row['logged_at'] as String).toLocal());
-    return _MeterRow(
-      onTap: () => showReadingPopup(context, row, onChanged: onChanged),
-      meter: meter,
-      subtitle: '${meter.area.isEmpty ? meter.type.label : meter.area} · $when',
-      trailing: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Text(
-            negative || usual == null || usual <= 0
-                ? S.unusualNegative
-                : '${(daily / usual).toStringAsFixed(1)} ${S.timesUsual}',
-            style: TextStyle(
-              color: color,
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          GainText(
-            num.parse(gain.toStringAsFixed(1)),
-            unit: meter.type.unit,
-            fontSize: 12.5,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _OverdueRow extends StatelessWidget {
   const _OverdueRow(this.row);
 
@@ -1702,88 +1591,34 @@ class _OverdueRow extends StatelessWidget {
   }
 }
 
-/// Small red marker shown while any reading anywhere is flagged as unusual.
-/// It stays until every one is handled; tapping it jumps to the list.
-class _UnusualIndicator extends StatelessWidget {
-  const _UnusualIndicator({required this.onTap});
+/// What the period picker offers.
+enum _RangeChoice { lastWeek, allDates, custom }
 
-  final VoidCallback onTap;
+class _RangeSheet extends StatelessWidget {
+  const _RangeSheet();
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: const BoxDecoration(
-                color: AppColors.failed,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              S.unusualReadings,
-              style: const TextStyle(
-                color: AppColors.failed,
-                fontWeight: FontWeight.w800,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
+    final scheme = Theme.of(context).colorScheme;
+    Widget option(_RangeChoice choice, IconData icon, String label) => ListTile(
+      leading: Icon(icon, color: scheme.primary),
+      title: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+      onTap: () => Navigator.pop(context, choice),
     );
-  }
-}
-
-/// Dismissible reminder to look at the unusual readings; comes back the next
-/// time the dashboard is opened.
-class _UnusualBanner extends StatelessWidget {
-  const _UnusualBanner({required this.onTap, required this.onDismiss});
-
-  final VoidCallback onTap;
-  final VoidCallback onDismiss;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.failed.withValues(alpha: 0.08),
-      borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsetsDirectional.fromSTEB(12, 10, 4, 10),
-          child: Row(
-            children: [
-              const Icon(
-                Icons.error_outline_rounded,
-                color: AppColors.failed,
-                size: 20,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  S.unusualBanner,
-                  maxLines: 3,
-                  style: const TextStyle(fontSize: 12.5, height: 1.4),
-                ),
-              ),
-              IconButton(
-                tooltip: S.close,
-                onPressed: onDismiss,
-                icon: const Icon(Icons.close_rounded, size: 18),
-              ),
-            ],
+    return SafeArea(
+      top: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          option(_RangeChoice.lastWeek, Icons.today_rounded, S.rangeLast7),
+          option(
+            _RangeChoice.allDates,
+            Icons.filter_alt_off_outlined,
+            S.rangeAllDates,
           ),
-        ),
+          option(_RangeChoice.custom, Icons.date_range_rounded, S.rangeCustom),
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }

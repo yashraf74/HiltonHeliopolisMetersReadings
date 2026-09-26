@@ -48,6 +48,15 @@ class LoginResult {
 /// Thin typed wrapper over the Worker's REST API. Holds no state except
 /// callbacks supplying the bearer token and reporting connectivity / gate
 /// events (upgrade required, maintenance).
+/// Readings flagged as unusual in a period: [count] is the total, [rows] the
+/// newest of them (the server caps the list).
+class UnusualReadings {
+  const UnusualReadings({required this.count, required this.rows});
+
+  final int count;
+  final List<Map<String, dynamic>> rows;
+}
+
 class ApiClient {
   ApiClient({
     required String Function() tokenProvider,
@@ -375,7 +384,7 @@ class ApiClient {
 
   /// How many readings in the range are flagged as unusual (moderators and
   /// engineers). Without a range it covers every reading.
-  Future<int> fetchUnusualCount({DateTime? from, DateTime? to}) async {
+  Future<UnusualReadings> fetchUnusual({DateTime? from, DateTime? to}) async {
     final body = await _json(
       _http.get(
         _uri('/readings/unusual', {
@@ -385,7 +394,11 @@ class ApiClient {
         headers: _headers(),
       ),
     );
-    return body['count'] as int;
+    return UnusualReadings(
+      count: body['count'] as int,
+      rows: ((body['unusual'] as List<dynamic>?) ?? const [])
+          .cast<Map<String, dynamic>>(),
+    );
   }
 
   /// Marks an unusual reading as normal, or puts it back.

@@ -7,4 +7,8 @@ class BuildConfig {
   );
 
   static const requestTimeout = Duration(seconds: 20);
+
+  /// The day this system went live. No reading predates it, so every date
+  /// picker starts here and "all dates" means from this day until now.
+  static final dataStart = DateTime(2026, 9, 15);
 }

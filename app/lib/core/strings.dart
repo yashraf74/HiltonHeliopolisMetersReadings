@@ -744,6 +744,13 @@ class S {
   );
   static String get reviewUnusual => _t('مراجعة', 'Review');
   static String get exportAnyway => _t('تصدير على أي حال', 'Export anyway');
+  static String get rangeAllDates => _t('كل التواريخ', 'All dates');
+  static String get rangeClear => _t('مسح التحديد', 'Clear selection');
+  static String get rangeLast7 => _t('آخر 7 أيام', 'Last 7 days');
+  static String get allUnusualResolved => _t(
+    'تمت معالجة كل القراءات غير المعتادة',
+    'All unusual readings have been dealt with',
+  );
   static String get unusualBanner => _t(
     'توجد قراءات غير معتادة تحتاج مراجعة (كل التواريخ). اضغط للانتقال إليها.',
     'Some readings look unusual and need a check (all dates). Tap to jump to them.',

@@ -1,3 +1,9 @@
+/**
+ * The day this system went live: no reading predates it, so "all dates"
+ * starts here rather than at the epoch.
+ */
+export const DATA_START = "2026-09-15T00:00:00.000Z";
+
 export type Role = "moderator" | "engineer" | "technician";
 
 export interface Env {

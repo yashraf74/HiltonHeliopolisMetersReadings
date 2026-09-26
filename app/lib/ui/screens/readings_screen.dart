@@ -15,7 +15,9 @@ import '../../state/app_status_controller.dart';
 import '../../state/session_controller.dart';
 import '../../state/sync_controller.dart';
 import '../../state/app_events.dart';
+import '../../core/config.dart';
 import '../popups.dart';
+import 'unusual_screen.dart';
 import '../reading_actions.dart';
 import '../widgets/status_widgets.dart';
 
@@ -155,6 +157,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _load();
       _loadUserNames();
+      _loadUnusualCount();
     });
   }
 
@@ -175,8 +178,27 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     }
   }
 
-  /// A moderator may have added, removed or hidden an account.
-  void _onUsersChanged() => _loadUserNames();
+  /// A moderator may have added, removed or hidden an account; a reading may
+  /// have stopped being unusual.
+  void _onUsersChanged() {
+    _loadUserNames();
+    _loadUnusualCount();
+  }
+
+  /// Unusual readings across every date, for the card at the top.
+  int _unusualTotal = 0;
+  bool _unusualHintDismissed = false;
+
+  Future<void> _loadUnusualCount() async {
+    final user = context.read<SessionController>().user;
+    if (user == null || !user.canSeeAllReadings) return;
+    try {
+      final result = await context.read<ApiClient>().fetchUnusual();
+      if (mounted) setState(() => _unusualTotal = result.count);
+    } catch (_) {
+      // Offline or refused: the card just stays as it is.
+    }
+  }
 
   Future<void> _loadUserNames() async {
     final user = context.read<SessionController>().user;
@@ -317,17 +339,16 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
     }
     final int count;
     try {
-      count = await context.read<ApiClient>().fetchUnusualCount(
+      count = (await context.read<ApiClient>().fetchUnusual(
         from: _filters.from,
         to: _filters.to,
-      );
+      )).count;
     } catch (_) {
       // Can't check (offline, say): don't stand in the way of the export.
       return true;
     }
     if (count == 0 || !mounted) return true;
 
-    final events = context.read<AppEvents>();
     final choice = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -351,15 +372,14 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
       ),
     );
     if (choice == true) return true;
-    if (choice == false) {
-      // Review: open the dashboard over the period being exported. Without
-      // a date filter that's everything, so show the widest range offered.
-      final now = DateTime.now();
-      events.openDashboard(
-        DateTimeRange(
-          start: _filters.from ?? DateTime(now.year - 3, now.month, now.day),
-          end: _filters.to ?? now,
-        ),
+    if (choice == false && mounted) {
+      // Review: the unusual readings page, over the period being exported
+      // (no date filter means every date).
+      await UnusualScreen.open(
+        context,
+        range: _filters.from != null && _filters.to != null
+            ? DateTimeRange(start: _filters.from!, end: _filters.to!)
+            : null,
       );
     }
     return false;
@@ -439,6 +459,15 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
 
     return Column(
       children: [
+        if (_unusualTotal > 0)
+          UnusualCard(
+            hintDismissed: _unusualHintDismissed,
+            onDismissHint: () => setState(() => _unusualHintDismissed = true),
+            onTap: () async {
+              await UnusualScreen.open(context);
+              if (mounted) _loadUnusualCount();
+            },
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
           child: Row(
@@ -1093,7 +1122,7 @@ class _FilterSheetState extends State<_FilterSheet> {
     final now = DateTime.now();
     final range = await showDateRangePicker(
       context: context,
-      firstDate: DateTime(now.year - 3),
+      firstDate: BuildConfig.dataStart,
       lastDate: DateTime(now.year + 1),
       initialDateRange: _f.from != null && _f.to != null
           ? DateTimeRange(start: _f.from!, end: _f.to!)

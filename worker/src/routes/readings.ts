@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import type { Env } from "../types";
-import { READINGS_ADMIN_ROLES } from "../types";
+import { DATA_START, READINGS_ADMIN_ROLES } from "../types";
 import type { AuthedVars } from "../middleware";
 import { requireAuth, requireRole } from "../middleware";
 import { recomputeGains } from "../gain";
@@ -54,6 +54,8 @@ readingRoutes.post("/", async (c) => {
   return c.json({ id, syncedAt: row?.synced_at ?? now });
 });
 
+/** Most unusual readings returned at once; the page shows the newest. */
+const MAX_UNUSUAL = 200;
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
 
@@ -255,15 +257,15 @@ readingRoutes.post("/:id/normal", requireRole("moderator", "engineer"), async (c
   return c.json({ normal });
 });
 
-// How many readings in the range are flagged as unusual: the export warning
-// and the dashboard indicator ask for this. Without from/to it covers every
-// reading.
+// The unusual readings in a range, for the unusual-readings page, the card
+// on the readings screen and the warning before an export. Without from/to
+// it covers every reading since the system went live.
 readingRoutes.get("/unusual", requireRole("moderator", "engineer"), async (c) => {
   const to = c.req.query("to") ?? new Date().toISOString();
-  const from = c.req.query("from") ?? new Date(0).toISOString();
-  const { results } = await loadRowsForUnusual(c.env.DB, new Date(0).toISOString(), to, from);
+  const from = c.req.query("from") ?? DATA_START;
+  const { results } = await loadRowsForUnusual(c.env.DB, DATA_START, to, from);
   const unusual = findUnusual(results, from, to);
-  return c.json({ count: unusual.length, from, to });
+  return c.json({ count: unusual.length, from, to, unusual: unusual.slice(0, MAX_UNUSUAL) });
 });
 
 // Edit the value only; gains for that meter are recomputed.

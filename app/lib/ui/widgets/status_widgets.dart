@@ -654,3 +654,97 @@ class UnsavedChangesGuard extends StatelessWidget {
     child: child,
   );
 }
+
+/// Card at the top of the readings screen while any reading is flagged as
+/// unusual: a red marker, the count-free label and a chevron into the
+/// unusual readings page. Only the hint line can be dismissed, and it comes
+/// back the next time the screen is built.
+class UnusualCard extends StatelessWidget {
+  const UnusualCard({
+    super.key,
+    required this.hintDismissed,
+    required this.onDismissHint,
+    required this.onTap,
+  });
+
+  final bool hintDismissed;
+  final VoidCallback onDismissHint;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Material(
+        color: AppColors.failed.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                        color: AppColors.failed,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        S.unusualReadings,
+                        style: const TextStyle(
+                          color: AppColors.failed,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13.5,
+                        ),
+                      ),
+                    ),
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+                if (!hintDismissed) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          S.unusualBanner,
+                          maxLines: 3,
+                          style: const TextStyle(fontSize: 12.5, height: 1.4),
+                        ),
+                      ),
+                      SizedBox(
+                        height: 28,
+                        width: 28,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          tooltip: S.close,
+                          onPressed: onDismissHint,
+                          icon: const Icon(Icons.close_rounded, size: 16),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
