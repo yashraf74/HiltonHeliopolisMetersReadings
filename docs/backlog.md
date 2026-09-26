@@ -50,6 +50,32 @@ Fix options: refetch the names inside `_load()` (simplest); or have the user
 form return a flag and refresh the list when user management closes; or move
 the names into a small controller that user edits can invalidate.
 
+## The all-dates unusual check scans every reading (raise this soon)
+
+The dashboard's red indicator and the export warning both call
+`GET /api/readings/unusual` without a date range, and the shared check in
+`worker/src/unusual.ts` loads every reading (with a window function for each
+one's previous reading) and recomputes medians on the fly. The dashboard
+does this on every load.
+
+At 70 meters read daily that's about 25,000 readings a year, so the scan
+grows steadily: more D1 rows read per dashboard load, and a slower response.
+It is fine at today's size (hundreds) but will not stay that way.
+
+Fix, in order of preference:
+
+1. **Store the verdict with the reading**, the way `gain` already is: add an
+   `unusual` column written by the same recompute that runs after every
+   insert, edit and delete. Counting then becomes an indexed `COUNT(*)`
+   instead of a full scan, and the dashboard list can be a plain query.
+2. **Cache the all-dates count** in KV for a few minutes. Much cheaper to
+   build, but only hides the cost.
+3. **Bound the window** (say 12 months). Simplest, but the indicator would
+   no longer mean "any date", which is what it promises today.
+
+Raise this with the next batch of enhancements rather than waiting for it to
+hurt.
+
 ## A safer way to test against production
 
 The idea of a "test user" flag (their readings hidden from lists, exports and
