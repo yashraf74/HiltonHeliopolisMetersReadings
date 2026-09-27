@@ -113,22 +113,29 @@ dashboardRoutes.get("/", async (c) => {
       legacyDaily.set(key, ld);
       legacyTotals.set(r.type, lt);
     }
-    // Consumption, cost and top consumers count main meters only: a
-    // sub-meter measures electricity its main meter already counted.
-    if (r.gain === null || !r.is_main) continue;
+    if (r.gain === null) continue;
     const n = spreadDays(r);
     const share = r.gain / n;
     for (let k = 0; k < n; k++) {
       const i = dayIndex.get(addDays(day, -k));
       if (i === undefined) continue;
-      consumption[r.type][i] = (consumption[r.type][i] ?? 0) + share;
-      perMeter.set(r.meter_id, (perMeter.get(r.meter_id) ?? 0) + share);
+      // Totals (and the cost built from them) come from main meters
+      // only: a sub-meter measures what its main meter already counted.
+      // Top consumers are the other way round — the point there is to
+      // see which sub-meter is behind the bill, so mains are left out.
+      if (r.is_main) {
+        consumption[r.type][i] = (consumption[r.type][i] ?? 0) + share;
+      } else {
+        perMeter.set(r.meter_id, (perMeter.get(r.meter_id) ?? 0) + share);
+      }
     }
   }
 
   const activeMeters = meters.length;
   // Consumption is only as complete as the main meters behind it.
   const mainMeters = meters.filter((m) => m.is_main).length;
+  // Top consumers are the sub-meters.
+  const subMeters = activeMeters - mainMeters;
   const completion = readDay.map((s) => (activeMeters ? Math.min(100, (s.size / activeMeters) * 100) : 0));
 
   const meterInfo = new Map<string, Pick<Row, "name" | "type" | "area" | "photo_key">>();
@@ -168,6 +175,7 @@ dashboardRoutes.get("/", async (c) => {
     metersRead: metersRead.size,
     activeMeters,
     mainMeters,
+    subMeters,
     most: highlight(meters[0]),
     least: highlight(meters[meters.length - 1]),
     consumption,

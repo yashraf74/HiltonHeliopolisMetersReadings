@@ -716,12 +716,16 @@ class S {
   static String get mainMeter => _t('عداد رئيسي', 'Main meter');
   static String get yes => _t('نعم', 'Yes');
   static String get mainMeterHint => _t(
-    'العدادات الرئيسية وحدها تدخل في رسوم الاستهلاك والتكلفة والأعلى استهلاكًا',
-    'Only main meters count towards the consumption, cost and top-consumer charts',
+    'العدادات الرئيسية وحدها تدخل في رسوم الاستهلاك والتكلفة. أما الأعلى استهلاكًا فيحسب العدادات الفرعية فقط.',
+    'Only main meters count towards the consumption and cost charts. Top consumers counts the sub-meters instead.',
   );
   static String get noMainMeters => _t(
     'لم يُحدَّد أي عداد كعداد رئيسي بعد',
     'No meter is marked as a main meter yet',
+  );
+  static String get noSubMeters => _t(
+    'كل العدادات محددة كعدادات رئيسية',
+    'Every meter is marked as a main meter',
   );
   static String get emailNeededForExport => _t(
     'أضف بريدًا إلكترونيًا لحسابك لتفعيل الإرسال بالبريد',

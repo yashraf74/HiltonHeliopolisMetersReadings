@@ -210,7 +210,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       _CostCard(series: series, prices: d.prices, canManage: canManage),
       gap,
-      _TopConsumersSection(consumers: d.consumers),
+      _TopConsumersSection(
+        consumers: d.consumers,
+        note: d.subMeters == 0 ? S.noSubMeters : null,
+      ),
       gap,
       _SectionHeader(
         S.overdueMeters,
@@ -252,6 +255,7 @@ class _Data {
       metersRead = j['metersRead'] as int,
       activeMeters = j['activeMeters'] as int,
       mainMeters = j['mainMeters'] as int? ?? 0,
+      subMeters = j['subMeters'] as int? ?? 0,
       most = j['most'] == null ? null : (j['most'] as _Json),
       least = j['least'] == null ? null : (j['least'] as _Json),
       consumption = {
@@ -274,9 +278,10 @@ class _Data {
   final int metersRead;
   final int activeMeters;
 
-  /// Consumption, cost and top consumers count main meters only; with none
-  /// marked, those charts have nothing to show.
+  /// Consumption and cost count main meters only, top consumers counts
+  /// the sub-meters; with none of either, those sections say so.
   final int mainMeters;
+  final int subMeters;
   final _Json? most;
   final _Json? least;
   final Map<MeterType, List<double?>> consumption;
@@ -1331,9 +1336,12 @@ class _CostCard extends StatelessWidget {
 // ---- lists ------------------------------------------------------------------
 
 class _TopConsumersSection extends StatefulWidget {
-  const _TopConsumersSection({required this.consumers});
+  const _TopConsumersSection({required this.consumers, this.note});
 
   final List<_Json> consumers;
+
+  /// Why the list may be empty, when it isn't about the date range.
+  final String? note;
 
   @override
   State<_TopConsumersSection> createState() => _TopConsumersSectionState();
@@ -1383,6 +1391,7 @@ class _TopConsumersSectionState extends State<_TopConsumersSection> {
       children: [
         _SectionHeader(
           S.topConsumers,
+          subtitle: widget.note,
           trailing: SegmentedButton<bool>(
             showSelectedIcon: false,
             style: const ButtonStyle(
@@ -1422,7 +1431,7 @@ class _TopConsumersSectionState extends State<_TopConsumersSection> {
                 ),
                 const SizedBox(height: 6),
                 if (rows.isEmpty)
-                  const _NoData(height: 56)
+                  _NoData(text: widget.note, height: 56)
                 else
                   for (final (label, subtitle, amount, meter) in rows)
                     InkWell(
