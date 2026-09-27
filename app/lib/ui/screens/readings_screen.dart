@@ -296,33 +296,30 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
   }
 
   Future<void> _export() async {
-    setState(() => _exporting = true);
     if (_rows.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(S.exportNothing)));
-      setState(() => _exporting = false);
       return;
     }
-    if (!await _confirmUnusual() || !mounted) {
-      setState(() => _exporting = false);
-      return;
-    }
-    final target = await showModalBottomSheet<_ExportTarget>(
-      context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (_) => const _ExportTargetSheet(),
-    );
-    if (target == null || !mounted) {
-      setState(() => _exporting = false);
-      return;
-    }
-
+    // The spinner runs from the tap: checking for unusual readings takes a
+    // round trip, and the sheet that follows is part of the same action.
+    // Every way out of here passes through the finally below, which is the
+    // only place the flag is cleared — and only while still mounted.
+    setState(() => _exporting = true);
     final messenger = ScaffoldMessenger.of(context);
-    final api = context.read<ApiClient>();
-    final exportSettings = context.read<AppStatusController>().config.export;
     final results = <String>[];
     try {
+      if (!await _confirmUnusual() || !mounted) return;
+      final target = await showModalBottomSheet<_ExportTarget>(
+        context: context,
+        useSafeArea: true,
+        showDragHandle: true,
+        builder: (_) => const _ExportTargetSheet(),
+      );
+      if (target == null || !mounted) return;
+
+      final api = context.read<ApiClient>();
+      final exportSettings = context.read<AppStatusController>().config.export;
       final all = await api.fetchAllReadings(_filters.toReadingsQuery());
       final bytes = buildReadingsWorkbook(all, settings: exportSettings);
       final stamp = DateFormat('yyyy-MM-dd_HHmm').format(DateTime.now());
