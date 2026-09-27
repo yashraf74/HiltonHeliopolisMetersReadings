@@ -3,7 +3,6 @@ import type { Env, Language, Role } from "../types";
 import { defaultLanguage } from "../types";
 import type { AuthedVars } from "../middleware";
 import { requireAuth } from "../middleware";
-import { PLACEHOLDER_EMAIL } from "./users";
 
 export const exportRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
@@ -39,7 +38,7 @@ exportRoutes.post("/email", async (c) => {
   const user = await c.env.DB.prepare("SELECT email, full_name, language, role FROM users WHERE id = ?")
     .bind(c.get("user").id)
     .first<{ email: string; full_name: string; language: Language | null; role: Role }>();
-  if (!user || user.email === PLACEHOLDER_EMAIL) {
+  if (!user || !user.email) {
     return c.json({ error: "No email address is set for your account", code: "no_email" }, 400);
   }
 

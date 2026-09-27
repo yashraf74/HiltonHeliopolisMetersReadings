@@ -189,16 +189,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _SectionHeader(S.completion, subtitle: S.completionHint),
       _CompletionCard(series: series),
       gap,
-      _SectionHeader(S.consumption, subtitle: series.bucket.label),
+      _SectionHeader(
+        S.consumption,
+        subtitle: d.mainMeters == 0 ? S.noMainMeters : series.bucket.label,
+      ),
       for (final t in MeterType.values) ...[
         _ConsumptionCard(type: t, series: series),
         if (t != MeterType.values.last) const SizedBox(height: 10),
       ],
       gap,
-      _SectionHeader(S.changeVsAverage, subtitle: S.changeVsAverageHint),
+      _SectionHeader(
+        S.changeVsAverage,
+        subtitle: d.mainMeters == 0 ? S.noMainMeters : S.changeVsAverageHint,
+      ),
       _ChangeCard(series: series),
       gap,
-      _SectionHeader(S.cost),
+      _SectionHeader(
+        S.cost,
+        subtitle: d.mainMeters == 0 ? S.noMainMeters : null,
+      ),
       _CostCard(series: series, prices: d.prices, canManage: canManage),
       gap,
       _TopConsumersSection(consumers: d.consumers),
@@ -242,6 +251,7 @@ class _Data {
       readings = j['readings'] as int,
       metersRead = j['metersRead'] as int,
       activeMeters = j['activeMeters'] as int,
+      mainMeters = j['mainMeters'] as int? ?? 0,
       most = j['most'] == null ? null : (j['most'] as _Json),
       least = j['least'] == null ? null : (j['least'] as _Json),
       consumption = {
@@ -263,6 +273,10 @@ class _Data {
   final int readings;
   final int metersRead;
   final int activeMeters;
+
+  /// Consumption, cost and top consumers count main meters only; with none
+  /// marked, those charts have nothing to show.
+  final int mainMeters;
   final _Json? most;
   final _Json? least;
   final Map<MeterType, List<double?>> consumption;

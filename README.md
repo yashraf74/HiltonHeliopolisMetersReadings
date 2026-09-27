@@ -32,10 +32,12 @@ Flutter app ── REST + JWT ──▶ Cloudflare Worker ──▶ D1 (SQLite):
 - **Local-first.** Every reading is written to the on-device database first. A sync engine drains the queue on app start, on reconnect, after each save, every two minutes, and on demand. Reading ids are generated on the device, so a retried upload is a no-op on the server, never a duplicate.
 - **Auth.** Passwords are PBKDF2-SHA256 hashes; sessions are HS256 JWTs carrying a token version so a role change can force a one-time re-login, stored in secure storage. Session length is a setting (default 7 days). The app stays usable offline with a stored session; a rejected token shows a re-login banner without losing local data.
 - **Photos** are downscaled on the device (1600 px, quality 70) and capped at 3 MB on both sides: reading photos under `readings/`, meter reference photos under `meters/`, user photos under `users/`. A weekly cron (Friday 10:00 UTC) purges reading photos older than the retention setting and nulls their key; the app then shows an "expired" placeholder. Meter and user photos are never purged. Technicians can load their own user photo but no one else's.
+- **Main meters.** A meter can be marked as a main meter (off by default). Only main meters count towards the dashboard's consumption, change-against-average, cost and top-consumer views, so a sub-meter never double-counts what its main meter already measured. Everything else — completion, most/least read, overdue, unusual — spans every meter.
 - **Gain.** Every reading stores its difference from the previous reading of the same meter (`gain`, NULL for a meter's first reading). The server recomputes a meter's gains after every insert, edit and delete, so out-of-order syncs and corrections never leave a stale value. Units: kWh for electricity, m³ for water and gas.
+- **Backdated readings.** Engineers and moderators can switch a new reading to an earlier date and time (a round done on paper); the picker and the server both hold it between the system's first day and the current moment. Technicians always log at "now".
 - **Dashboard.** For a date range: readings logged, meters read, most/least read meter, reading completion, consumption per type, change against the period average, cost (when unit prices are set), top consumers by meter or area, and overdue meters. The period picker offers the last 7 days, every date since the system went live, or a custom range. A gain is spread over the days since that meter's previous reading, so a missed day doesn't read as zero followed by a spike. Columns group by day, week or month to stay within 21 of them.
 - **Language.** Every string exists in Arabic and English (`app/lib/core/strings.dart`). Each user's choice is stored on their account (default: English for moderators, Arabic otherwise) and follows them to any phone; the login screen uses the device's last choice.
-- **Runtime settings** live in a Workers KV namespace and are edited from the app by moderators: minimum app version (older builds get 426 and an update screen), maintenance mode (503 for non-moderators), reading delete, Excel export, photo retention days, session length, unit prices, whether users may edit their own profile, and how the Excel export is built. Every switch is enforced by the API. Two keys are KV-only and never shown in the app: `developer_title` and `developer_username` (the About page).
+- **Runtime settings** live in a Workers KV namespace and are edited from the app by moderators: minimum app version (older builds get 426 and an update screen), maintenance mode (503 for non-moderators), reading delete, Excel export, photo retention days, session length, unit prices, whether users may edit their own profile, and how the Excel export is built (columns and their order, the file's language, date and number formats, a sheet per meter type). Every switch is enforced by the API. Two keys are KV-only and never shown in the app: `developer_title` and `developer_username` (the About page).
 - **Once a reading reaches the server it leaves the phone.** The local database is purely the upload queue; the readings tab reads from the server, with still-queued readings pinned on top.
 - **Names are never denormalised.** Readings reference `users.id`; names are joined at read time, so renaming an account updates history.
 
@@ -66,34 +68,34 @@ All routes are under `/api`. Every route except `/health` and `/auth/login` need
 | GET | `/about` | any | About page: `developerTitle`, `developerPhotoKey` (from KV `developer_title` / `developer_username`) |
 | GET | `/about/photo` | any | the developer's photo, readable by every role |
 | GET | `/meters` | any | active meters with `last_logged_at`, `last_value`, `todo_order`, `export_order`; moderators may add `?includeInactive=1` |
-| POST | `/meters` | moderator | `{name, area, type, number?, photoKey?, todoOrder?, exportOrder?}`; duplicate (name, number, area) → 409 |
-| PUT | `/meters/:id` | moderator | partial update; `photoKey: null` clears the photo, `number: ""` clears the number, `todoOrder/exportOrder: null` clear |
+| POST | `/meters` | moderator | `{name, area, type, number?, photoKey?, todoOrder?, exportOrder?, isMain?}`; duplicate (name, number, area) → 409 |
+| PUT | `/meters/:id` | moderator | partial update, including `isMain`; `photoKey: null` clears the photo, `number: ""` clears the number, `todoOrder/exportOrder: null` clear |
 | DELETE | `/meters/:id` | moderator | soft delete (hidden from technicians, readings kept) |
 | POST | `/photos` | any | raw image body (`image/jpeg`, `png`, `webp`), ≤ 3 MB → `{photoKey}`; `?kind=meter` is moderator-only, `?kind=user` needs moderator or the profile-editing switch |
 | GET | `/photos?key=` | any | streams the image; `users/…` keys are hidden from technicians except their own |
-| POST | `/readings` | any | `{id, meterId, value, photoKey, loggedAt}`; idempotent by `id` |
+| POST | `/readings` | any | `{id, meterId, value, photoKey, loggedAt}`; idempotent by `id`. `loggedAt` must fall between the system's first day and now (plus clock skew) |
 | GET | `/readings/unusual` | moderator, engineer | the same filters as `/readings` (`type`, `number`, `userId`, `dateFrom`, `dateTo`, `search`; none = every reading) → `{count, from, to, unusual[]}`. Whether a reading is unusual is judged against its own meter's readings within 60 days either side of it, never against the filter, so the flags don't change with the range asked for |
 | GET | `/readings` | any | technicians get only their own; filters `type` (comma list), `number`, `userId`, `dateFrom`, `dateTo`, `search`; `sort` (`default` = newest local day, then export order, `logged_at`, `value`, `meter_name`, `meter_type`, `technician`) + `dir` + `tz`; pagination `limit` (≤ 200) + `cursor`; `export=1` honours the export switch |
 | PUT | `/readings/:id` | owner or engineer/moderator | `{value}`; gains recomputed, and the reading is unflagged |
 | POST | `/readings/:id/normal` | moderator, engineer | `{normal}`; marks a flagged reading as normal so it leaves the unusual list |
 | DELETE | `/readings/:id` | owner or engineer/moderator | when enabled in settings; removes the row and its photo, gains recomputed |
 | POST | `/exports/email` | any | `{fileName, content}` (base64 .xlsx ≤ 10 MB) → emails it to the caller's own address through Mailjet |
-| GET | `/dashboard` | moderator, engineer | `from`, `to` (ISO), `tz` (minutes): counts, most/least-read meter, per-type consumption per day, completion, consumers, unusual readings, overdue meters, prices |
+| GET | `/dashboard` | moderator, engineer | `from`, `to` (ISO), `tz` (minutes): counts, most/least-read meter, per-type consumption per day (main meters only), completion, consumers, unusual readings, overdue meters, prices |
 | GET | `/users/names` | moderator, engineer | `{id, fullName}` list for the "by user" filter |
 | GET | `/users/me` | any | the caller's own record (profile page and account menu) |
 | PUT | `/users/me/profile` | any | `{email?, phone?, photoKey?}` while profile editing is enabled |
 | PUT | `/users/me/language` | any | `{language}` (`ar` / `en`) |
 | GET | `/users/:id` | moderator, engineer | one user's card for the user popup |
 | GET | `/users` | moderator | active accounts, moderators first |
-| POST | `/users` | moderator | `{username, password, fullName, email, role, phone?, photoKey?}`; re-creating a deleted username revives the same account |
-| PUT | `/users/:id` | moderator | `{fullName?, email?, phone?, photoKey?, role?, isActive?, password?}`; `isActive: false` is the delete; cannot delete/demote yourself |
+| POST | `/users` | moderator | `{username, password, fullName, role, email?, phone?, photoKey?}`; re-creating a deleted username revives the same account |
+| PUT | `/users/:id` | moderator | `{fullName?, email?, phone?, photoKey?, role?, isActive?, password?}`; `isActive: false` is the delete; cannot delete/demote yourself. Email, phone and photo: absent leaves them, `""`/null clears them |
 
 ## Database
 
 `worker/migrations/` is the source of truth; applied in order with `wrangler d1 migrations apply`.
 
-- **users** — id, username (unique), password_hash, full_name, email, phone, photo_key, language (null = role default), role (`moderator`/`engineer`/`technician`), is_active
-- **meters** — id, name, area, number, type, photo_key, todo_order, export_order, is_active, created_by; unique `(name, number, area)` among active meters
+- **users** — id, username (unique), password_hash, full_name, email (optional; without one, exports can only be saved to the phone), phone, photo_key, language (null = role default), role (`moderator`/`engineer`/`technician`), is_active
+- **meters** — id, name, area, number, type, photo_key, todo_order, export_order, is_main, is_active, created_by; unique `(name, number, area)` among active meters
 - **readings** — id (device-generated uuid), meter_id, value, gain (null for the first reading), photo_key (null once purged), logged_by → users, logged_at (device time), synced_at (server time)
 - **KV `SETTINGS`** — `min_app_version`, `maintenance_mode`, `reading_delete_enabled`, `export_enabled`, `photo_retention_days`, `token_lifetime_days`, `profile_editing_enabled`, `export_settings` (JSON), `price_electricity`, `price_water`, `price_gas`, `developer_title`, `developer_username`
 

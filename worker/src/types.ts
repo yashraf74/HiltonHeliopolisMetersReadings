@@ -6,6 +6,9 @@
  */
 export const ALL_DATES_FROM = "1970-01-01T00:00:00.000Z";
 
+/** The first day this system was used; no reading may be dated before it. */
+export const DATA_START = "2026-09-15T00:00:00.000Z";
+
 export type Role = "moderator" | "engineer" | "technician";
 
 export interface Env {
@@ -70,20 +73,35 @@ export const EXPORT_COLUMNS = [
 ] as const;
 export type ExportColumn = (typeof EXPORT_COLUMNS)[number];
 
-/** Date patterns offered for export cells (intl/Excel-friendly). */
+/**
+ * Date patterns offered for export cells (intl/Excel-friendly). The ones
+ * with MMMM spell the month out, in the language the file is exported in.
+ */
 export const EXPORT_DATE_FORMATS = [
   "yyyy-MM-dd HH:mm",
   "dd/MM/yyyy HH:mm",
   "MM/dd/yyyy HH:mm",
   "yyyy-MM-dd",
   "dd/MM/yyyy",
+  "d MMMM yyyy HH:mm",
+  "d MMMM yyyy",
+  "MMMM yyyy",
 ] as const;
+
+/** The language an exported file is written in. */
+export const EXPORT_LANGUAGES = ["auto", "ar", "en"] as const;
+export type ExportLanguage = (typeof EXPORT_LANGUAGES)[number];
 
 export interface ExportSettings {
   /** Selected columns, in export order. */
   columns: ExportColumn[];
-  /** Sheet direction: follow the exporter's language, or force one. */
-  direction: "auto" | "rtl" | "ltr";
+  /**
+   * Language of everything translatable in the file (headers, meter types,
+   * spelled-out months); "auto" follows the exporter's own language. Names,
+   * areas and meter numbers are written as they are stored, whatever this
+   * says, and the sheet direction follows from it.
+   */
+  language: ExportLanguage;
   dateFormat: string;
   /** Decimal places for reading values (0-3). */
   decimals: number;

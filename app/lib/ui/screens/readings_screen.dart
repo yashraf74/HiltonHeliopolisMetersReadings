@@ -781,7 +781,6 @@ class _ReadingCardState extends State<_ReadingCard> {
         ? DateTime.parse(row['synced_at'] as String).toLocal()
         : null;
     final fmt = DateFormat('d/M/yyyy · HH:mm', S.localeCode);
-    final numFmt = NumberFormat.decimalPattern('en');
     final api = context.read<ApiClient>();
     final photoKey = row['photo_key'] as String?;
     final image = photoKey == null
@@ -790,7 +789,6 @@ class _ReadingCardState extends State<_ReadingCard> {
             api.photoUri(photoKey).toString(),
             headers: api.authHeaders,
           );
-    final number = row['meter_number'] as String?;
     final gain = row['gain'] as num?;
 
     return Card(
@@ -805,7 +803,7 @@ class _ReadingCardState extends State<_ReadingCard> {
             style: const TextStyle(fontWeight: FontWeight.w700),
           ),
           subtitle: Text(
-            '${row['meter_area'] ?? ''} · ${row['logged_by_name']} · ${fmt.format(loggedAt)}',
+            '${row['logged_by_name']} · ${fmt.format(loggedAt)}',
             style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
           ),
           trailing: Column(
@@ -830,17 +828,6 @@ class _ReadingCardState extends State<_ReadingCard> {
                   ),
                   DetailRow(S.meterType, type.label),
                   DetailRow(S.meterArea, (row['meter_area'] as String?) ?? ''),
-                  if (number?.isNotEmpty == true)
-                    DetailRow(S.meterNumber, number!),
-                  DetailRow(
-                    S.colValue,
-                    '${numFmt.format(row['value'] as num)} ${type.unit}',
-                  ),
-                  if (gain != null)
-                    DetailRow(
-                      S.gainLabel,
-                      '${numFmt.format(gain)} ${type.unit}',
-                    ),
                   DetailRow(
                     S.loggedBy,
                     row['logged_by_name'] as String,
@@ -852,7 +839,6 @@ class _ReadingCardState extends State<_ReadingCard> {
                   DetailRow(S.loggedAt, fmt.format(loggedAt)),
                   if (syncedAt != null)
                     DetailRow(S.syncedAtLabel, fmt.format(syncedAt)),
-                  DetailRow(S.readingId, row['id'] as String, mono: true),
                   const SizedBox(height: 12),
                   ReadingPhoto(image: image),
                   const SizedBox(height: 12),
@@ -909,21 +895,34 @@ class _ExportTargetSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final email = context.read<SessionController>().user?.email;
-    Widget option(_ExportTarget target, IconData icon, String title) =>
-        ListTile(
-          leading: Icon(icon, color: scheme.primary),
-          title: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-          subtitle: Text(switch (target) {
-            _ExportTarget.device => S.exportDeviceHint,
-            _ExportTarget.email => S.exportEmailHint(email),
-            _ExportTarget.both => S.exportBothHint(email),
-          }),
-          onTap: () => Navigator.pop(context, target),
-        );
+    // Watched, not read: the moment an email is added or removed (here or
+    // by a moderator, picked up by the startup refresh), the two email
+    // options follow.
+    final user = context.watch<SessionController>().user;
+    final email = user?.email;
+    final canEmail = user?.hasEmail ?? false;
+    Widget option(_ExportTarget target, IconData icon, String title) {
+      final enabled = target == _ExportTarget.device || canEmail;
+      return ListTile(
+        enabled: enabled,
+        leading: Icon(
+          icon,
+          color: enabled ? scheme.primary : scheme.onSurfaceVariant,
+        ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text(
+          enabled
+              ? switch (target) {
+                  _ExportTarget.device => S.exportDeviceHint,
+                  _ExportTarget.email => S.exportEmailHint(email),
+                  _ExportTarget.both => S.exportBothHint(email),
+                }
+              : S.emailNeededForExport,
+        ),
+        onTap: enabled ? () => Navigator.pop(context, target) : null,
+      );
+    }
+
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         12,

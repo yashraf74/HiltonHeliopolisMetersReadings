@@ -101,6 +101,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _busy = true);
     final api = context.read<ApiClient>();
+    final session = context.read<SessionController>();
     final messenger = ScaffoldMessenger.of(context);
     final password = _password.text;
     final email = _email.text.trim().toLowerCase();
@@ -127,6 +128,15 @@ class _UserFormScreenState extends State<UserFormScreen> {
           clearPhoto: _removePhoto && uploadedKey == null,
           hiddenFromFilter: _hiddenFromFilter,
         );
+        // Editing your own account here: keep the session in step, so the
+        // account menu and the export options reflect it straight away.
+        if (widget.existing!.id == session.user?.id) {
+          await session.updateProfile(
+            email: email,
+            phone: phone.isEmpty ? null : phone,
+            photoKey: uploadedKey ?? (_removePhoto ? null : _photoKey),
+          );
+        }
       } else {
         await api.createUser(
           username: _username.text.trim().toLowerCase(),
@@ -281,11 +291,14 @@ class _UserFormScreenState extends State<UserFormScreen> {
                 ],
                 decoration: InputDecoration(
                   labelText: S.email,
+                  helperText: S.emailOptional,
                   prefixIcon: Icon(Icons.email_outlined),
                 ),
                 validator: (v) {
+                  // Optional: without one, this account just can't be
+                  // emailed an export.
                   final value = (v ?? '').trim();
-                  if (value.isEmpty) return S.fieldRequired;
+                  if (value.isEmpty) return null;
                   return AppUser.emailPattern.hasMatch(value)
                       ? null
                       : S.emailInvalid;

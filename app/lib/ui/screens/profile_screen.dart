@@ -238,11 +238,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                       decoration: InputDecoration(
                         labelText: S.email,
+                        helperText: S.emailNeededForExport,
                         prefixIcon: const Icon(Icons.email_outlined),
                       ),
                       validator: (v) {
+                        // Optional: without one, exports can only be saved
+                        // to the phone.
                         final value = (v ?? '').trim();
-                        if (value.isEmpty) return S.fieldRequired;
+                        if (value.isEmpty) return null;
                         return AppUser.emailPattern.hasMatch(value)
                             ? null
                             : S.emailInvalid;

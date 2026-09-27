@@ -340,7 +340,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     _SettingsSection(
                       icon: Icons.table_chart_outlined,
-                      title: S.settingExport,
+                      title: S.exportSectionTitle,
                       children: [
                         _ExportSection(
                           settings: _export,
@@ -508,12 +508,6 @@ class _ExportSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          S.settingExport,
-          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
-        ),
-        Text(S.settingExportHint, style: muted),
-        const SizedBox(height: 14),
-        Text(
           S.exportColumns,
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
@@ -546,11 +540,12 @@ class _ExportSection extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          S.exportDirection,
+          S.exportLanguage,
           style: const TextStyle(fontWeight: FontWeight.w700),
         ),
+        Text(S.exportLanguageHint, style: muted),
         const SizedBox(height: 6),
-        SegmentedButton<ExportDirection>(
+        SegmentedButton<ExportLanguage>(
           showSelectedIcon: false,
           style: const ButtonStyle(
             visualDensity: VisualDensity(horizontal: -2, vertical: -2),
@@ -560,21 +555,21 @@ class _ExportSection extends StatelessWidget {
           ),
           segments: [
             ButtonSegment(
-              value: ExportDirection.auto,
-              label: Text(S.exportDirectionAuto),
+              value: ExportLanguage.auto,
+              label: Text(S.exportLanguageAuto),
             ),
             ButtonSegment(
-              value: ExportDirection.rtl,
-              label: Text(S.exportDirectionRtl),
+              value: ExportLanguage.ar,
+              label: Text(S.exportLanguageAr),
             ),
             ButtonSegment(
-              value: ExportDirection.ltr,
-              label: Text(S.exportDirectionLtr),
+              value: ExportLanguage.en,
+              label: Text(S.exportLanguageEn),
             ),
           ],
-          selected: {settings.direction},
+          selected: {settings.language},
           onSelectionChanged: enabled
-              ? (s) => onChanged(settings.copyWith(direction: s.first))
+              ? (s) => onChanged(settings.copyWith(language: s.first))
               : null,
         ),
         const SizedBox(height: 16),
@@ -585,7 +580,7 @@ class _ExportSection extends StatelessWidget {
             // What today's date looks like in the chosen format.
             helperText:
                 '${S.exportDateExample}: '
-                '${DateFormat(settings.dateFormat).format(DateTime.now())}',
+                '${DateFormat(settings.dateFormat, settings.language.resolve().name).format(DateTime.now())}',
           ),
           items: [
             for (final f in ExportSettings.dateFormats)

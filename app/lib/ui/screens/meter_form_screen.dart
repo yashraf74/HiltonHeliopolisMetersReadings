@@ -36,6 +36,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
   late final TextEditingController _number;
   late final TextEditingController _todoOrder;
   late final TextEditingController _exportOrder;
+  late bool _isMain;
   bool _busy = false;
 
   // Photo state: an existing server key, a newly picked file, or a request
@@ -49,7 +50,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
   /// Everything the form holds, to spot edits when leaving.
   String get _current =>
       '${_type.name}|${_name.text}|${_area.text}|${_number.text}|'
-      '${_todoOrder.text}|${_exportOrder.text}|$_photoKey|'
+      '${_todoOrder.text}|${_exportOrder.text}|$_isMain|$_photoKey|'
       '${_newPhoto?.path}|$_removePhoto';
   String _saved = '';
 
@@ -65,6 +66,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     _exportOrder = TextEditingController(
       text: m?.exportOrder?.toString() ?? '',
     );
+    _isMain = m?.isMain ?? false;
     _photoKey = m?.photoKey;
     for (final c in [_name, _area, _number, _todoOrder, _exportOrder]) {
       c.addListener(() => setState(() {}));
@@ -123,6 +125,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
             clearPhoto: _removePhoto && uploadedKey == null,
             todoOrder: todoOrder,
             exportOrder: exportOrder,
+            isMain: _isMain,
           )
         : await meters.createMeter(
             type: _type,
@@ -132,6 +135,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
             photoKey: uploadedKey,
             todoOrder: todoOrder,
             exportOrder: exportOrder,
+            isMain: _isMain,
           );
     if (!mounted) return;
     setState(() => _busy = false);
@@ -353,6 +357,23 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                value: _isMain,
+                onChanged: (v) => setState(() => _isMain = v),
+                title: Text(
+                  S.mainMeter,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: Text(
+                  S.mainMeterHint,
+                  style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
+                ),
               ),
               const SizedBox(height: 4),
               Text(

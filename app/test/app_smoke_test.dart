@@ -130,6 +130,7 @@ void main() {
       type: 'water',
       area: 'Pool',
       isActive: true,
+      isMain: false,
       updatedAt: '2026-09-24T00:00:00Z',
     );
 

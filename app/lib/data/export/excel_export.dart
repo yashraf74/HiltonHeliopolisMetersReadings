@@ -9,20 +9,37 @@ import '../models.dart';
 /// Builds an .xlsx workbook from the (possibly filtered) readings list.
 /// Rows are the raw API objects from GET /api/readings. [settings] comes
 /// from the server (a moderator sets it) and decides the columns and their
-/// order, the sheet direction, date and number formats, and whether each
+/// order, the file's language, date and number formats, and whether each
 /// meter type gets its own sheet.
+///
+/// The file is written in the language [settings] asks for, which is not
+/// necessarily the one the app is in: everything translatable reads from
+/// [S], so the build runs with that language in place and puts the app's
+/// own back afterwards. It is synchronous, so nothing else can observe the
+/// swap. Meter names, areas and numbers come from the data and are written
+/// exactly as they are stored, in either language.
 Uint8List buildReadingsWorkbook(
   List<Map<String, dynamic>> readings, {
   ExportSettings settings = const ExportSettings(),
 }) {
+  final appLanguage = S.language;
+  S.language = settings.language.resolve();
+  try {
+    return _buildWorkbook(readings, settings);
+  } finally {
+    S.language = appLanguage;
+  }
+}
+
+Uint8List _buildWorkbook(
+  List<Map<String, dynamic>> readings,
+  ExportSettings settings,
+) {
   final excel = Excel.createExcel();
   final columns = settings.columns;
-  final dateFmt = DateFormat(settings.dateFormat);
-  final rtl = switch (settings.direction) {
-    ExportDirection.auto => !S.isEnglish,
-    ExportDirection.rtl => true,
-    ExportDirection.ltr => false,
-  };
+  // The locale spells out month names (MMMM) in the file's language.
+  final dateFmt = DateFormat(settings.dateFormat, S.localeCode);
+  final rtl = !S.isEnglish;
   final headerStyle = CellStyle(bold: true);
   // "#,##0.00" style code from the chosen decimals / separator.
   final decimals = settings.decimals == 0 ? '' : '.${'0' * settings.decimals}';

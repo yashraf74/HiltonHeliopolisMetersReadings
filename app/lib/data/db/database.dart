@@ -20,6 +20,10 @@ class Meters extends Table {
   IntColumn get todoOrder => integer().nullable()();
   IntColumn get exportOrder => integer().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+
+  /// A main meter measures a whole supply; only these count towards the
+  /// dashboard's consumption, cost and top-consumer views.
+  BoolColumn get isMain => boolean().withDefault(const Constant(false))();
   TextColumn get updatedAt => text()();
 
   @override
@@ -53,7 +57,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'meters_app'));
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -94,6 +98,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from == 7) {
         await m.addColumn(meters, meters.lastValue);
+      }
+      if (from < 9) {
+        await m.addColumn(meters, meters.isMain);
       }
     },
   );

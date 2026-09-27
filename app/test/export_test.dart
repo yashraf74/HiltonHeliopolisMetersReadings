@@ -1,11 +1,18 @@
 import 'package:excel/excel.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:meters_app/data/export/excel_export.dart';
 import 'package:meters_app/core/strings.dart';
 import 'package:meters_app/data/models.dart';
 import 'package:meters_app/ui/screens/reading_filters.dart';
 
 void main() {
+  // Month names in either language, as main() sets up on a real device.
+  setUpAll(() async {
+    await initializeDateFormatting('ar');
+    await initializeDateFormatting('en');
+  });
+
   test(
     'workbook has one Arabic sheet with a header and one row per reading',
     () {
@@ -156,5 +163,48 @@ void main() {
       excel.sheets[S.sheetName]!.rows[1][0]?.value.toString(),
       '2026-09-13',
     );
+  });
+
+  test('the file is written in the language the setting asks for', () {
+    S.language = AppLanguage.ar;
+    final rows = [
+      {
+        'id': 'r1',
+        'value': 10.0,
+        'gain': 1.0,
+        'logged_by': 'u1',
+        'logged_by_name': 'Adham',
+        'logged_at': '2026-09-26T09:00:00.000Z',
+        'synced_at': '2026-09-26T09:01:00.000Z',
+        'meter_id': 'm1',
+        'meter_name': 'مطبخ الحفلات',
+        'meter_type': 'water',
+        'meter_area': 'المطبخ',
+        'meter_number': 'W-9',
+      },
+    ];
+    final english = Excel.decodeBytes(
+      buildReadingsWorkbook(
+        rows,
+        settings: const ExportSettings(
+          language: ExportLanguage.en,
+          dateFormat: 'd MMMM yyyy',
+        ),
+      ),
+    );
+    final sheet = english.tables[english.tables.keys.first]!;
+    final header = [for (final c in sheet.rows.first) c?.value.toString()];
+    final body = [for (final c in sheet.rows[1]) c?.value.toString()];
+    // Headers and the meter type are translated...
+    expect(header, contains('Meter name'));
+    expect(body, contains('Water'));
+    // ...the month is spelled out in the file's language...
+    expect(body.any((v) => v?.contains('September') ?? false), isTrue);
+    // ...and the data itself is untouched.
+    expect(body, contains('مطبخ الحفلات'));
+    expect(body, contains('المطبخ'));
+    expect(body, contains('W-9'));
+    // The app's own language is left as it was.
+    expect(S.language, AppLanguage.ar);
   });
 }

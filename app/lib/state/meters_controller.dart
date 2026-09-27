@@ -66,6 +66,7 @@ class MetersController extends ChangeNotifier {
     String? photoKey,
     int? todoOrder,
     int? exportOrder,
+    bool isMain = false,
   }) => _mutate(
     () => _api.createMeter(
       type: type,
@@ -75,6 +76,7 @@ class MetersController extends ChangeNotifier {
       photoKey: photoKey,
       todoOrder: todoOrder,
       exportOrder: exportOrder,
+      isMain: isMain,
     ),
   );
 
@@ -88,6 +90,7 @@ class MetersController extends ChangeNotifier {
     bool clearPhoto = false,
     int? todoOrder,
     int? exportOrder,
+    bool? isMain,
   }) => _mutate(
     () => _api.updateMeter(
       id,
@@ -99,6 +102,7 @@ class MetersController extends ChangeNotifier {
       clearPhoto: clearPhoto,
       todoOrder: todoOrder,
       exportOrder: exportOrder,
+      isMain: isMain,
     ),
   );
 

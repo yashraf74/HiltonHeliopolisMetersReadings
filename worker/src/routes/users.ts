@@ -10,16 +10,18 @@ const USERNAME_RE = /^[a-z0-9_.]{3,32}$/;
 const MIN_PASSWORD_LENGTH = 6;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_EMAIL_LENGTH = 254;
-/** Given to users created before emails existed; treated as "no email". */
-export const PLACEHOLDER_EMAIL = "null@hilton.com";
-
-/** Trimmed, lower-cased email, or null when it isn't a valid address. */
-function normalizeEmail(v: unknown): string | null {
-  if (typeof v !== "string") return null;
-  const email = v.trim().toLowerCase();
-  return email.length <= MAX_EMAIL_LENGTH && EMAIL_RE.test(email) ? email : null;
-}
+/** An address is optional, but when given it has to look like one. */
+const isEmail = (v: string) => v.length <= MAX_EMAIL_LENGTH && EMAIL_RE.test(v);
 const EMAIL_ERROR = "email must be a valid address like name@example.com";
+
+/**
+ * Absent = leave it alone, empty or null = no address at all (that user
+ * simply can't be emailed an export), anything else has to be valid.
+ */
+function emailField(body: Record<string, unknown> | null) {
+  const v = optionalField(body, "email", isEmail);
+  return v === undefined || v === "invalid" ? v : (v ?? "").toLowerCase();
+}
 /** Egyptian mobile: 01xxxxxxxxx or +201xxxxxxxxx. */
 const PHONE_RE = /^(01\d{9}|\+20\d{10})$/;
 const PHONE_ERROR = "phone must look like 01xxxxxxxxx or +20xxxxxxxxxx";
@@ -94,8 +96,8 @@ userRoutes.put("/me/profile", async (c) => {
     return c.json({ error: "Editing your profile is disabled", code: "profile_editing_disabled" }, 403);
   }
   const body = await c.req.json().catch(() => null);
-  const email = body?.email === undefined ? null : normalizeEmail(body.email);
-  if (body?.email !== undefined && !email) return c.json({ error: EMAIL_ERROR }, 400);
+  const email = emailField(body);
+  if (email === "invalid") return c.json({ error: EMAIL_ERROR }, 400);
   const phone = optionalField(body, "phone", (v) => PHONE_RE.test(v));
   if (phone === "invalid") return c.json({ error: PHONE_ERROR }, 400);
   const photoKey = optionalField(body, "photoKey", (v) => v.startsWith("users/"));
@@ -103,12 +105,20 @@ userRoutes.put("/me/profile", async (c) => {
 
   await c.env.DB.prepare(
     `UPDATE users SET
-       email = COALESCE(?, email),
+       email = CASE WHEN ? THEN ? ELSE email END,
        phone = CASE WHEN ? THEN ? ELSE phone END,
        photo_key = CASE WHEN ? THEN ? ELSE photo_key END
      WHERE id = ?`
   )
-    .bind(email, phone !== undefined ? 1 : 0, phone ?? null, photoKey !== undefined ? 1 : 0, photoKey ?? null, c.get("user").id)
+    .bind(
+      email !== undefined ? 1 : 0,
+      email ?? "",
+      phone !== undefined ? 1 : 0,
+      phone ?? null,
+      photoKey !== undefined ? 1 : 0,
+      photoKey ?? null,
+      c.get("user").id
+    )
     .run();
 
   const user = await c.env.DB.prepare(`SELECT ${USER_COLUMNS} FROM users WHERE id = ?`)
@@ -161,7 +171,7 @@ userRoutes.post("/", async (c) => {
   const username = typeof body?.username === "string" ? body.username.trim().toLowerCase() : "";
   const password = typeof body?.password === "string" ? body.password : "";
   const fullName = typeof body?.fullName === "string" ? body.fullName.trim() : "";
-  const email = normalizeEmail(body?.email);
+  const email = emailField(body);
   const phone = optionalField(body, "phone", (v) => PHONE_RE.test(v));
   const photoKey = optionalField(body, "photoKey", (v) => v.startsWith("users/"));
   const hiddenFromFilter = body?.hiddenFromFilter === true ? 1 : 0;
@@ -174,7 +184,7 @@ userRoutes.post("/", async (c) => {
     return c.json({ error: `password must be at least ${MIN_PASSWORD_LENGTH} characters` }, 400);
   }
   if (!fullName) return c.json({ error: "fullName is required" }, 400);
-  if (!email) return c.json({ error: EMAIL_ERROR }, 400);
+  if (email === "invalid") return c.json({ error: EMAIL_ERROR }, 400);
   if (phone === "invalid") return c.json({ error: PHONE_ERROR }, 400);
   if (photoKey === "invalid") return c.json({ error: "photoKey must be an uploaded user photo" }, 400);
   if (!ROLES.includes(role)) return c.json({ error: "role must be engineer or technician" }, 400);
@@ -189,7 +199,7 @@ userRoutes.post("/", async (c) => {
     await c.env.DB.prepare(
       "UPDATE users SET password_hash = ?, full_name = ?, email = ?, phone = ?, photo_key = ?, hidden_from_filter = ?, role = ?, is_active = 1 WHERE id = ?"
     )
-      .bind(await hashPassword(password), fullName, email, phone ?? null, photoKey ?? null, hiddenFromFilter, role, existing.id)
+      .bind(await hashPassword(password), fullName, email ?? "", phone ?? null, photoKey ?? null, hiddenFromFilter, role, existing.id)
       .run();
     return c.json({ id: existing.id }, 201);
   }
@@ -199,7 +209,7 @@ userRoutes.post("/", async (c) => {
   await c.env.DB.prepare(
     "INSERT INTO users (id, username, password_hash, full_name, email, phone, photo_key, hidden_from_filter, role, is_active, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)"
   )
-    .bind(id, username, await hashPassword(password), fullName, email, phone ?? null, photoKey ?? null, hiddenFromFilter, role, now)
+    .bind(id, username, await hashPassword(password), fullName, email ?? "", phone ?? null, photoKey ?? null, hiddenFromFilter, role, now)
     .run();
 
   return c.json({ id }, 201);
@@ -218,8 +228,8 @@ userRoutes.put("/:id", async (c) => {
   if (!target) return c.json({ error: "User not found" }, 404);
 
   const fullName = typeof body?.fullName === "string" && body.fullName.trim() ? body.fullName.trim() : null;
-  const email = body?.email === undefined ? null : normalizeEmail(body.email);
-  if (body?.email !== undefined && !email) return c.json({ error: EMAIL_ERROR }, 400);
+  const email = emailField(body);
+  if (email === "invalid") return c.json({ error: EMAIL_ERROR }, 400);
   const phone = optionalField(body, "phone", (v) => PHONE_RE.test(v));
   if (phone === "invalid") return c.json({ error: PHONE_ERROR }, 400);
   const photoKey = optionalField(body, "photoKey", (v) => v.startsWith("users/"));
@@ -244,7 +254,7 @@ userRoutes.put("/:id", async (c) => {
   await c.env.DB.prepare(
     `UPDATE users SET
        full_name = COALESCE(?, full_name),
-       email = COALESCE(?, email),
+       email = CASE WHEN ? THEN ? ELSE email END,
        phone = CASE WHEN ? THEN ? ELSE phone END,
        photo_key = CASE WHEN ? THEN ? ELSE photo_key END,
        hidden_from_filter = COALESCE(?, hidden_from_filter),
@@ -255,7 +265,8 @@ userRoutes.put("/:id", async (c) => {
   )
     .bind(
       fullName,
-      email,
+      email !== undefined ? 1 : 0,
+      email ?? "",
       phone !== undefined ? 1 : 0,
       phone ?? null,
       photoKey !== undefined ? 1 : 0,

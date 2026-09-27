@@ -238,6 +238,7 @@ class _MeterSheet extends StatelessWidget {
           const SizedBox(height: 14),
         ],
         DetailRow(S.meterType, type.label),
+        if (meter.isMain) DetailRow(S.mainMeter, S.yes),
         if (meter.area.isNotEmpty) DetailRow(S.meterArea, meter.area),
         if (number != null && number.isNotEmpty)
           DetailRow(S.meterNumber, number),

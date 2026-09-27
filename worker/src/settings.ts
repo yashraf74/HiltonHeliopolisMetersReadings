@@ -1,5 +1,5 @@
 import type { Env, ExportColumn, ExportSettings, Settings } from "./types";
-import { EXPORT_COLUMNS, EXPORT_DATE_FORMATS } from "./types";
+import { EXPORT_COLUMNS, EXPORT_DATE_FORMATS, EXPORT_LANGUAGES } from "./types";
 
 export const SETTINGS_KEYS = [
   "min_app_version",
@@ -28,7 +28,7 @@ export const DEFAULT_SETTINGS: Settings = {
   exportUnusualWarningEnabled: true,
   export: {
     columns: [...EXPORT_COLUMNS],
-    direction: "auto",
+    language: "auto",
     dateFormat: EXPORT_DATE_FORMATS[0],
     decimals: 2,
     thousandsSeparator: true,
@@ -62,7 +62,7 @@ export function parseExportSettings(raw: string | null): ExportSettings {
   const decimals = Number(value.decimals);
   return {
     columns: columns.length ? [...new Set(columns)] : [...fallback.columns],
-    direction: value.direction === "rtl" || value.direction === "ltr" ? value.direction : "auto",
+    language: (EXPORT_LANGUAGES as readonly string[]).includes(value.language ?? "") ? value.language! : fallback.language,
     dateFormat: (EXPORT_DATE_FORMATS as readonly string[]).includes(value.dateFormat ?? "")
       ? value.dateFormat!
       : fallback.dateFormat,

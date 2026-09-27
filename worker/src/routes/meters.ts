@@ -13,7 +13,7 @@ const DUPLICATE_METER = "A meter with the same name, number and area already exi
 
 // `location` mirrors area for 2.0.0 apps, which still require the field.
 const METER_COLUMNS =
-  "m.id, m.name, m.type, m.area, m.area AS location, m.number, m.is_active, m.photo_key, m.todo_order, m.export_order, m.created_by, m.created_at, m.updated_at";
+  "m.id, m.name, m.type, m.area, m.area AS location, m.number, m.is_active, m.is_main, m.photo_key, m.todo_order, m.export_order, m.created_by, m.created_at, m.updated_at";
 
 export const meterRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
@@ -59,6 +59,7 @@ meterRoutes.post("/", requireRole("moderator"), async (c) => {
   const photoKey = typeof body?.photoKey === "string" && body.photoKey.startsWith("meters/") ? body.photoKey : null;
   const todoOrder = order(body?.todoOrder);
   const exportOrder = order(body?.exportOrder);
+  const isMain = body?.isMain === true ? 1 : 0;
 
   if (!METER_TYPES.includes(type)) {
     return c.json({ error: "type must be one of: electricity, water, gas" }, 400);
@@ -75,10 +76,10 @@ meterRoutes.post("/", requireRole("moderator"), async (c) => {
 
   try {
     await c.env.DB.prepare(
-      `INSERT INTO meters (id, name, type, area, number, photo_key, todo_order, export_order, is_active, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
+      `INSERT INTO meters (id, name, type, area, number, photo_key, todo_order, export_order, is_main, is_active, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
     )
-      .bind(id, name, type, area, number, photoKey, todoOrder, exportOrder, c.get("user").id, now, now)
+      .bind(id, name, type, area, number, photoKey, todoOrder, exportOrder, isMain, c.get("user").id, now, now)
       .run();
   } catch (err) {
     if (isUniqueViolation(err)) return c.json({ error: DUPLICATE_METER }, 409);
@@ -118,6 +119,7 @@ meterRoutes.put("/:id", requireRole("moderator"), async (c) => {
     return c.json({ error: "todoOrder and exportOrder must be non-negative integers" }, 400);
   }
   const photoKey = has("photoKey") && typeof body.photoKey === "string" && body.photoKey.startsWith("meters/") ? body.photoKey : null;
+  const isMain = typeof body?.isMain === "boolean" ? (body.isMain ? 1 : 0) : null;
   const now = new Date().toISOString();
 
   try {
@@ -130,6 +132,7 @@ meterRoutes.put("/:id", requireRole("moderator"), async (c) => {
          photo_key = CASE WHEN ? THEN ? ELSE photo_key END,
          todo_order = CASE WHEN ? THEN ? ELSE todo_order END,
          export_order = CASE WHEN ? THEN ? ELSE export_order END,
+         is_main = COALESCE(?, is_main),
          updated_at = ?
        WHERE id = ?`
     )
@@ -139,6 +142,7 @@ meterRoutes.put("/:id", requireRole("moderator"), async (c) => {
         has("photoKey") ? 1 : 0, photoKey,
         has("todoOrder") ? 1 : 0, todoOrder,
         has("exportOrder") ? 1 : 0, exportOrder,
+        isMain,
         now, id
       )
       .run();

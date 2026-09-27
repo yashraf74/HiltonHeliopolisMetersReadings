@@ -26,6 +26,7 @@ type MeterRow = {
   name: string;
   type: MeterType;
   area: string;
+  is_main: number;
   photo_key: string | null;
   readings: number;
   last_logged_at: string | null;
@@ -58,7 +59,7 @@ dashboardRoutes.get("/", async (c) => {
     loadRowsForUnusual(db, window.innerFrom, window.innerTo, window.outerFrom),
     db
       .prepare(
-        `SELECT m.id, m.name, m.type, m.area, m.photo_key,
+        `SELECT m.id, m.name, m.type, m.area, m.is_main, m.photo_key,
                 (SELECT COUNT(*) FROM readings r WHERE r.meter_id = m.id AND r.logged_at >= ? AND r.logged_at <= ?) AS readings,
                 (SELECT MAX(r.logged_at) FROM readings r WHERE r.meter_id = m.id) AS last_logged_at
          FROM meters m
@@ -112,7 +113,9 @@ dashboardRoutes.get("/", async (c) => {
       legacyDaily.set(key, ld);
       legacyTotals.set(r.type, lt);
     }
-    if (r.gain === null) continue;
+    // Consumption, cost and top consumers count main meters only: a
+    // sub-meter measures electricity its main meter already counted.
+    if (r.gain === null || !r.is_main) continue;
     const n = spreadDays(r);
     const share = r.gain / n;
     for (let k = 0; k < n; k++) {
@@ -124,6 +127,8 @@ dashboardRoutes.get("/", async (c) => {
   }
 
   const activeMeters = meters.length;
+  // Consumption is only as complete as the main meters behind it.
+  const mainMeters = meters.filter((m) => m.is_main).length;
   const completion = readDay.map((s) => (activeMeters ? Math.min(100, (s.size / activeMeters) * 100) : 0));
 
   const meterInfo = new Map<string, Pick<Row, "name" | "type" | "area" | "photo_key">>();
@@ -162,6 +167,7 @@ dashboardRoutes.get("/", async (c) => {
     readings: readingCount,
     metersRead: metersRead.size,
     activeMeters,
+    mainMeters,
     most: highlight(meters[0]),
     least: highlight(meters[meters.length - 1]),
     consumption,

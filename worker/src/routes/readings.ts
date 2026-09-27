@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import type { Env } from "../types";
-import { ALL_DATES_FROM, READINGS_ADMIN_ROLES } from "../types";
+import { ALL_DATES_FROM, DATA_START, READINGS_ADMIN_ROLES } from "../types";
 import type { AuthedVars } from "../middleware";
 import { requireAuth, requireRole } from "../middleware";
 import { recomputeGains } from "../gain";
@@ -32,6 +32,13 @@ readingRoutes.post("/", async (c) => {
     return c.json({ error: "id, meterId, value, photoKey and loggedAt are required" }, 400);
   }
 
+  // Engineers and moderators may log a reading for an earlier moment; it
+  // still can't predate the system or be dated into the future.
+  const loggedMs = Date.parse(loggedAt);
+  if (Number.isNaN(loggedMs) || loggedMs < Date.parse(DATA_START) || loggedMs > Date.now() + CLOCK_SKEW_MS) {
+    return c.json({ error: "loggedAt must be between the system's first day and now", code: "bad_logged_at" }, 400);
+  }
+
   const meter = await c.env.DB.prepare("SELECT id FROM meters WHERE id = ?").bind(meterId).first();
   if (!meter) return c.json({ error: "Unknown meterId" }, 400);
 
@@ -53,6 +60,9 @@ readingRoutes.post("/", async (c) => {
 
   return c.json({ id, syncedAt: row?.synced_at ?? now });
 });
+
+/** A phone's clock may run ahead of ours; don't refuse a reading over it. */
+const CLOCK_SKEW_MS = 12 * 60 * 60 * 1000;
 
 /** Most unusual readings returned at once; the page shows the newest. */
 const MAX_UNUSUAL = 200;

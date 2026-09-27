@@ -193,6 +193,7 @@ class ApiClient {
     String? photoKey,
     int? todoOrder,
     int? exportOrder,
+    bool isMain = false,
   }) async {
     final body = await _json(
       _http.post(
@@ -206,6 +207,7 @@ class ApiClient {
           'photoKey': ?photoKey,
           'todoOrder': todoOrder,
           'exportOrder': exportOrder,
+          'isMain': isMain,
         }),
       ),
     );
@@ -225,6 +227,7 @@ class ApiClient {
     bool clearPhoto = false,
     int? todoOrder,
     int? exportOrder,
+    bool? isMain,
   }) async {
     await _json(
       _http.put(
@@ -238,6 +241,7 @@ class ApiClient {
           if (photoKey != null || clearPhoto) 'photoKey': photoKey,
           'todoOrder': todoOrder,
           'exportOrder': exportOrder,
+          'isMain': ?isMain,
         }),
       ),
     );
@@ -582,6 +586,7 @@ class ApiClient {
     todoOrder: j['todo_order'] as int?,
     exportOrder: j['export_order'] as int?,
     isActive: (j['is_active'] as int) == 1,
+    isMain: (j['is_main'] as int? ?? 0) == 1,
     updatedAt: j['updated_at'] as String,
   );
 }

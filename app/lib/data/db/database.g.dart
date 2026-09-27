@@ -125,6 +125,19 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _isMainMeta = const VerificationMeta('isMain');
+  @override
+  late final GeneratedColumn<bool> isMain = GeneratedColumn<bool>(
+    'is_main',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_main" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _updatedAtMeta = const VerificationMeta(
     'updatedAt',
   );
@@ -149,6 +162,7 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     todoOrder,
     exportOrder,
     isActive,
+    isMain,
     updatedAt,
   ];
   @override
@@ -236,6 +250,12 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
         isActive.isAcceptableOrUnknown(data['is_active']!, _isActiveMeta),
       );
     }
+    if (data.containsKey('is_main')) {
+      context.handle(
+        _isMainMeta,
+        isMain.isAcceptableOrUnknown(data['is_main']!, _isMainMeta),
+      );
+    }
     if (data.containsKey('updated_at')) {
       context.handle(
         _updatedAtMeta,
@@ -297,6 +317,10 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
       )!,
+      isMain: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_main'],
+      )!,
       updatedAt: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}updated_at'],
@@ -322,6 +346,10 @@ class Meter extends DataClass implements Insertable<Meter> {
   final int? todoOrder;
   final int? exportOrder;
   final bool isActive;
+
+  /// A main meter measures a whole supply; only these count towards the
+  /// dashboard's consumption, cost and top-consumer views.
+  final bool isMain;
   final String updatedAt;
   const Meter({
     required this.id,
@@ -335,6 +363,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     this.todoOrder,
     this.exportOrder,
     required this.isActive,
+    required this.isMain,
     required this.updatedAt,
   });
   @override
@@ -363,6 +392,7 @@ class Meter extends DataClass implements Insertable<Meter> {
       map['export_order'] = Variable<int>(exportOrder);
     }
     map['is_active'] = Variable<bool>(isActive);
+    map['is_main'] = Variable<bool>(isMain);
     map['updated_at'] = Variable<String>(updatedAt);
     return map;
   }
@@ -392,6 +422,7 @@ class Meter extends DataClass implements Insertable<Meter> {
           ? const Value.absent()
           : Value(exportOrder),
       isActive: Value(isActive),
+      isMain: Value(isMain),
       updatedAt: Value(updatedAt),
     );
   }
@@ -413,6 +444,7 @@ class Meter extends DataClass implements Insertable<Meter> {
       todoOrder: serializer.fromJson<int?>(json['todoOrder']),
       exportOrder: serializer.fromJson<int?>(json['exportOrder']),
       isActive: serializer.fromJson<bool>(json['isActive']),
+      isMain: serializer.fromJson<bool>(json['isMain']),
       updatedAt: serializer.fromJson<String>(json['updatedAt']),
     );
   }
@@ -431,6 +463,7 @@ class Meter extends DataClass implements Insertable<Meter> {
       'todoOrder': serializer.toJson<int?>(todoOrder),
       'exportOrder': serializer.toJson<int?>(exportOrder),
       'isActive': serializer.toJson<bool>(isActive),
+      'isMain': serializer.toJson<bool>(isMain),
       'updatedAt': serializer.toJson<String>(updatedAt),
     };
   }
@@ -447,6 +480,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     Value<int?> todoOrder = const Value.absent(),
     Value<int?> exportOrder = const Value.absent(),
     bool? isActive,
+    bool? isMain,
     String? updatedAt,
   }) => Meter(
     id: id ?? this.id,
@@ -460,6 +494,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     todoOrder: todoOrder.present ? todoOrder.value : this.todoOrder,
     exportOrder: exportOrder.present ? exportOrder.value : this.exportOrder,
     isActive: isActive ?? this.isActive,
+    isMain: isMain ?? this.isMain,
     updatedAt: updatedAt ?? this.updatedAt,
   );
   Meter copyWithCompanion(MetersCompanion data) {
@@ -479,6 +514,7 @@ class Meter extends DataClass implements Insertable<Meter> {
           ? data.exportOrder.value
           : this.exportOrder,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
+      isMain: data.isMain.present ? data.isMain.value : this.isMain,
       updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
     );
   }
@@ -497,6 +533,7 @@ class Meter extends DataClass implements Insertable<Meter> {
           ..write('todoOrder: $todoOrder, ')
           ..write('exportOrder: $exportOrder, ')
           ..write('isActive: $isActive, ')
+          ..write('isMain: $isMain, ')
           ..write('updatedAt: $updatedAt')
           ..write(')'))
         .toString();
@@ -515,6 +552,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     todoOrder,
     exportOrder,
     isActive,
+    isMain,
     updatedAt,
   );
   @override
@@ -532,6 +570,7 @@ class Meter extends DataClass implements Insertable<Meter> {
           other.todoOrder == this.todoOrder &&
           other.exportOrder == this.exportOrder &&
           other.isActive == this.isActive &&
+          other.isMain == this.isMain &&
           other.updatedAt == this.updatedAt);
 }
 
@@ -547,6 +586,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
   final Value<int?> todoOrder;
   final Value<int?> exportOrder;
   final Value<bool> isActive;
+  final Value<bool> isMain;
   final Value<String> updatedAt;
   final Value<int> rowid;
   const MetersCompanion({
@@ -561,6 +601,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     this.todoOrder = const Value.absent(),
     this.exportOrder = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.isMain = const Value.absent(),
     this.updatedAt = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -576,6 +617,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     this.todoOrder = const Value.absent(),
     this.exportOrder = const Value.absent(),
     this.isActive = const Value.absent(),
+    this.isMain = const Value.absent(),
     required String updatedAt,
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -593,6 +635,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     Expression<int>? todoOrder,
     Expression<int>? exportOrder,
     Expression<bool>? isActive,
+    Expression<bool>? isMain,
     Expression<String>? updatedAt,
     Expression<int>? rowid,
   }) {
@@ -608,6 +651,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
       if (todoOrder != null) 'todo_order': todoOrder,
       if (exportOrder != null) 'export_order': exportOrder,
       if (isActive != null) 'is_active': isActive,
+      if (isMain != null) 'is_main': isMain,
       if (updatedAt != null) 'updated_at': updatedAt,
       if (rowid != null) 'rowid': rowid,
     });
@@ -625,6 +669,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     Value<int?>? todoOrder,
     Value<int?>? exportOrder,
     Value<bool>? isActive,
+    Value<bool>? isMain,
     Value<String>? updatedAt,
     Value<int>? rowid,
   }) {
@@ -640,6 +685,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
       todoOrder: todoOrder ?? this.todoOrder,
       exportOrder: exportOrder ?? this.exportOrder,
       isActive: isActive ?? this.isActive,
+      isMain: isMain ?? this.isMain,
       updatedAt: updatedAt ?? this.updatedAt,
       rowid: rowid ?? this.rowid,
     );
@@ -681,6 +727,9 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
+    if (isMain.present) {
+      map['is_main'] = Variable<bool>(isMain.value);
+    }
     if (updatedAt.present) {
       map['updated_at'] = Variable<String>(updatedAt.value);
     }
@@ -704,6 +753,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
           ..write('todoOrder: $todoOrder, ')
           ..write('exportOrder: $exportOrder, ')
           ..write('isActive: $isActive, ')
+          ..write('isMain: $isMain, ')
           ..write('updatedAt: $updatedAt, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -1399,6 +1449,7 @@ typedef $$MetersTableCreateCompanionBuilder = MetersCompanion Function({
   Value<int?> todoOrder,
   Value<int?> exportOrder,
   Value<bool> isActive,
+  Value<bool> isMain,
   required String updatedAt,
   Value<int> rowid,
 });
@@ -1414,6 +1465,7 @@ typedef $$MetersTableUpdateCompanionBuilder = MetersCompanion Function({
   Value<int?> todoOrder,
   Value<int?> exportOrder,
   Value<bool> isActive,
+  Value<bool> isMain,
   Value<String> updatedAt,
   Value<int> rowid,
 });
@@ -1479,6 +1531,11 @@ class $$MetersTableFilterComposer
 
   ColumnFilters<bool> get isActive => $composableBuilder(
     column: $table.isActive,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isMain => $composableBuilder(
+    column: $table.isMain,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1552,6 +1609,11 @@ class $$MetersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isMain => $composableBuilder(
+    column: $table.isMain,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get updatedAt => $composableBuilder(
     column: $table.updatedAt,
     builder: (column) => ColumnOrderings(column),
@@ -1604,6 +1666,9 @@ class $$MetersTableAnnotationComposer
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
 
+  GeneratedColumn<bool> get isMain =>
+      $composableBuilder(column: $table.isMain, builder: (column) => column);
+
   GeneratedColumn<String> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
 }
@@ -1647,6 +1712,7 @@ class $$MetersTableTableManager
                 Value<int?> todoOrder = const Value.absent(),
                 Value<int?> exportOrder = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<bool> isMain = const Value.absent(),
                 Value<String> updatedAt = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MetersCompanion(
@@ -1661,6 +1727,7 @@ class $$MetersTableTableManager
                 todoOrder: todoOrder,
                 exportOrder: exportOrder,
                 isActive: isActive,
+                isMain: isMain,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),
@@ -1677,6 +1744,7 @@ class $$MetersTableTableManager
                 Value<int?> todoOrder = const Value.absent(),
                 Value<int?> exportOrder = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
+                Value<bool> isMain = const Value.absent(),
                 required String updatedAt,
                 Value<int> rowid = const Value.absent(),
               }) => MetersCompanion.insert(
@@ -1691,6 +1759,7 @@ class $$MetersTableTableManager
                 todoOrder: todoOrder,
                 exportOrder: exportOrder,
                 isActive: isActive,
+                isMain: isMain,
                 updatedAt: updatedAt,
                 rowid: rowid,
               ),

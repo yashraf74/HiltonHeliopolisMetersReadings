@@ -16,6 +16,7 @@ void main() {
       todoOrder: 3,
       exportOrder: 4,
       isActive: true,
+      isMain: false,
       updatedAt: '2026-09-17T00:00:00Z',
     );
     await db.replaceMeters([base]);
@@ -26,6 +27,7 @@ void main() {
         type: 'water',
         area: 'Pool',
         isActive: true,
+        isMain: false,
         updatedAt: '2026-09-17T01:00:00Z',
       ),
     ]);

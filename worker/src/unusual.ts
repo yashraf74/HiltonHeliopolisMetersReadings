@@ -20,6 +20,8 @@ export interface UnusualRow {
   name: string;
   area: string;
   number: string | null;
+  /** 1 for a main meter: the only ones the consumption views count. */
+  is_main: number;
   photo_key: string | null;
   value: number;
   gain: number | null;
@@ -106,7 +108,7 @@ export function loadRowsForUnusual(db: D1Database, innerFrom: string, to: string
   return db
     .prepare(
       `SELECT * FROM (
-         SELECT r.id, r.meter_id, m.type, m.name, m.area, m.number, m.photo_key, r.value, r.gain, r.logged_at,
+         SELECT r.id, r.meter_id, m.type, m.name, m.area, m.number, m.is_main, m.photo_key, r.value, r.gain, r.logged_at,
                 r.photo_key AS reading_photo_key, r.logged_by, r.normal_at, u.full_name AS logged_by_name,
                 LAG(r.logged_at) OVER (PARTITION BY r.meter_id ORDER BY r.logged_at, r.id) AS prev_at
          FROM readings r JOIN meters m ON m.id = r.meter_id JOIN users u ON u.id = r.logged_by

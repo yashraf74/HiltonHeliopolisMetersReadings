@@ -383,24 +383,105 @@ class ReadingPhoto extends StatelessWidget {
   }
 }
 
-class PhotoViewerScreen extends StatelessWidget {
+/// Full-screen photo: pinch to zoom anywhere on the screen, drag it away
+/// in any direction to dismiss, or use the close button.
+class PhotoViewerScreen extends StatefulWidget {
   const PhotoViewerScreen({super.key, required this.image});
 
   final ImageProvider image;
 
   @override
+  State<PhotoViewerScreen> createState() => _PhotoViewerScreenState();
+}
+
+class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
+  final _transform = TransformationController();
+
+  /// How far the photo has been dragged from the middle, and whether a
+  /// finger is still on it (a released drag animates back).
+  Offset _drag = Offset.zero;
+  bool _dragging = false;
+
+  /// Dragging dismisses only at rest; once zoomed in, a drag pans instead.
+  bool _zoomed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _transform.addListener(() {
+      final zoomed = _transform.value.getMaxScaleOnAxis() > 1.01;
+      if (zoomed != _zoomed) setState(() => _zoomed = zoomed);
+    });
+  }
+
+  @override
+  void dispose() {
+    _transform.dispose();
+    super.dispose();
+  }
+
+  /// Distance dragged as a fraction of the screen, for the fade.
+  double _progress(Size screen) =>
+      (_drag.distance / (screen.shortestSide * 0.6)).clamp(0.0, 1.0);
+
+  void _onEnd(DragEndDetails details, Size screen) {
+    final flung = details.velocity.pixelsPerSecond.distance > 700;
+    if (flung || _progress(screen) >= 0.5) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    setState(() {
+      _dragging = false;
+      _drag = Offset.zero;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final screen = MediaQuery.sizeOf(context);
+    final progress = _progress(screen);
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.black.withValues(alpha: 1 - progress * 0.7),
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
+        leading: IconButton(
+          tooltip: S.close,
+          icon: const Icon(Icons.close_rounded),
+          onPressed: () => Navigator.of(context).maybePop(),
+        ),
       ),
-      body: Center(
-        child: InteractiveViewer(
-          minScale: 1,
-          maxScale: 5,
-          child: Image(image: image, fit: BoxFit.contain),
+      body: GestureDetector(
+        // Only when at rest: zoomed in, the viewer itself pans.
+        onPanStart: _zoomed ? null : (_) => setState(() => _dragging = true),
+        onPanUpdate: _zoomed ? null : (d) => setState(() => _drag += d.delta),
+        onPanEnd: _zoomed ? null : (d) => _onEnd(d, screen),
+        child: AnimatedSlide(
+          // Follows the finger exactly, then springs back when let go.
+          duration: _dragging
+              ? Duration.zero
+              : const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          offset: Offset(_drag.dx / screen.width, _drag.dy / screen.height),
+          child: AnimatedOpacity(
+            duration: _dragging
+                ? Duration.zero
+                : const Duration(milliseconds: 180),
+            opacity: 1 - progress * 0.4,
+            // The viewer fills the screen, so zooming scales the photo
+            // across the whole of it instead of inside the letterbox the
+            // image would otherwise sit in.
+            child: InteractiveViewer(
+              transformationController: _transform,
+              minScale: 1,
+              maxScale: 5,
+              panEnabled: _zoomed,
+              child: SizedBox.expand(
+                child: Image(image: widget.image, fit: BoxFit.contain),
+              ),
+            ),
+          ),
         ),
       ),
     );

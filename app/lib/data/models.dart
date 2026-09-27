@@ -102,6 +102,13 @@ class AuthUser {
   final String? phone;
   final String? photoKey;
 
+  /// Exports can only be emailed to an account that has an address; the
+  /// old placeholder counts as none.
+  bool get hasEmail {
+    final e = email?.trim() ?? '';
+    return e.isNotEmpty && e != AppUser.placeholderEmail;
+  }
+
   /// The signed-in user after they edited their own profile.
   AuthUser withProfile({String? email, String? phone, String? photoKey}) =>
       AuthUser(
@@ -249,13 +256,26 @@ enum ExportColumn {
 }
 
 /// Sheet direction for the export: follow the exporter's language, or force.
-enum ExportDirection { auto, rtl, ltr }
+/// Language an exported file is written in; `auto` follows the exporter's
+/// own app language. The sheet direction follows from it.
+enum ExportLanguage {
+  auto,
+  ar,
+  en;
+
+  /// The language the file ends up in for this exporter.
+  AppLanguage resolve() => switch (this) {
+    auto => S.language,
+    ar => AppLanguage.ar,
+    en => AppLanguage.en,
+  };
+}
 
 /// How the Excel export is built (set by a moderator, used by every device).
 class ExportSettings {
   const ExportSettings({
     this.columns = ExportColumn.values,
-    this.direction = ExportDirection.auto,
+    this.language = ExportLanguage.auto,
     this.dateFormat = defaultDateFormat,
     this.decimals = 2,
     this.thousandsSeparator = true,
@@ -265,16 +285,20 @@ class ExportSettings {
   static const defaultDateFormat = 'yyyy-MM-dd HH:mm';
 
   /// Patterns offered for date cells.
+  /// Patterns with MMMM spell the month out in the file's language.
   static const dateFormats = [
     'yyyy-MM-dd HH:mm',
     'dd/MM/yyyy HH:mm',
     'MM/dd/yyyy HH:mm',
     'yyyy-MM-dd',
     'dd/MM/yyyy',
+    'd MMMM yyyy HH:mm',
+    'd MMMM yyyy',
+    'MMMM yyyy',
   ];
 
   final List<ExportColumn> columns;
-  final ExportDirection direction;
+  final ExportLanguage language;
   final String dateFormat;
   final int decimals;
   final bool thousandsSeparator;
@@ -288,9 +312,9 @@ class ExportSettings {
     final columns = [for (final id in ids) ?ExportColumn.fromId(id)];
     return ExportSettings(
       columns: columns.isEmpty ? ExportColumn.values : columns,
-      direction: ExportDirection.values.firstWhere(
-        (d) => d.name == j['direction'],
-        orElse: () => ExportDirection.auto,
+      language: ExportLanguage.values.firstWhere(
+        (l) => l.name == j['language'],
+        orElse: () => ExportLanguage.auto,
       ),
       dateFormat: dateFormats.contains(j['dateFormat'])
           ? j['dateFormat'] as String
@@ -306,7 +330,7 @@ class ExportSettings {
 
   Map<String, dynamic> toJson() => {
     'columns': [for (final c in columns) c.id],
-    'direction': direction.name,
+    'language': language.name,
     'dateFormat': dateFormat,
     'decimals': decimals,
     'thousandsSeparator': thousandsSeparator,
@@ -315,14 +339,14 @@ class ExportSettings {
 
   ExportSettings copyWith({
     List<ExportColumn>? columns,
-    ExportDirection? direction,
+    ExportLanguage? language,
     String? dateFormat,
     int? decimals,
     bool? thousandsSeparator,
     bool? sheetPerType,
   }) => ExportSettings(
     columns: columns ?? this.columns,
-    direction: direction ?? this.direction,
+    language: language ?? this.language,
     dateFormat: dateFormat ?? this.dateFormat,
     decimals: decimals ?? this.decimals,
     thousandsSeparator: thousandsSeparator ?? this.thousandsSeparator,

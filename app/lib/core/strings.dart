@@ -670,11 +670,8 @@ class S {
   static String get version => _t('الإصدار', 'Version');
 
   // Export settings (moderator) and profiles
-  static String get settingExport => _t('إعدادات ملف Excel', 'Excel export');
-  static String get settingExportHint => _t(
-    'تُطبَّق على كل من يصدّر القراءات',
-    'Applies to everyone who exports readings',
-  );
+  static String get exportSectionTitle =>
+      _t('إعدادات ملف Excel', 'Excel export');
   static String get exportColumns =>
       _t('الأعمدة وترتيبها', 'Columns and order');
   static String get exportColumnsHint => _t(
@@ -683,12 +680,14 @@ class S {
   );
   static String get exportAtLeastOneColumn =>
       _t('اختر عمودًا واحدًا على الأقل', 'Choose at least one column');
-  static String get exportDirection => _t('اتجاه الورقة', 'Sheet direction');
-  static String get exportDirectionAuto => _t('حسب اللغة', 'Follow language');
-  static String get exportDirectionRtl =>
-      _t('من اليمين لليسار', 'Right to left');
-  static String get exportDirectionLtr =>
-      _t('من اليسار لليمين', 'Left to right');
+  static String get exportLanguage => _t('لغة الملف', 'File language');
+  static String get exportLanguageHint => _t(
+    'تُترجَم العناوين وأنواع العدادات وأسماء الشهور. أسماء العدادات والمناطق والأرقام تبقى كما هي، واتجاه الورقة يتبع اللغة.',
+    'Headers, meter types and month names are translated. Meter names, areas and numbers stay as they are, and the sheet direction follows the language.',
+  );
+  static String get exportLanguageAuto => _t('حسب لغتي', 'Follow my language');
+  static String get exportLanguageAr => _t('العربية', 'Arabic');
+  static String get exportLanguageEn => _t('الإنجليزية', 'English');
   static String get exportDateFormat => _t('تنسيق التاريخ', 'Date format');
   static String get exportDecimals => _t('الأرقام العشرية', 'Decimal places');
   static String get exportThousands =>
@@ -713,6 +712,35 @@ class S {
   );
   static String get changingLanguage =>
       _t('جارٍ تغيير اللغة…', 'Changing language…');
+
+  // Main meters, optional email, backdated readings
+  static String get mainMeter => _t('عداد رئيسي', 'Main meter');
+  static String get yes => _t('نعم', 'Yes');
+  static String get mainMeterHint => _t(
+    'العدادات الرئيسية وحدها تدخل في رسوم الاستهلاك والتكلفة والأعلى استهلاكًا',
+    'Only main meters count towards the consumption, cost and top-consumer charts',
+  );
+  static String get noMainMeters => _t(
+    'لم يُحدَّد أي عداد كعداد رئيسي بعد',
+    'No meter is marked as a main meter yet',
+  );
+  static String get emailOptional => _t('اختياري', 'Optional');
+  static String get emailNeededForExport => _t(
+    'أضف بريدًا إلكترونيًا لحسابك لتفعيل الإرسال بالبريد',
+    'Add an email to your account to enable sending by email',
+  );
+  static String get backdatedReading =>
+      _t('قراءة بتاريخ سابق', 'Backdated reading');
+  static String get backdatedReadingHint => _t(
+    'سجّل القراءة بتاريخ ووقت سابقين بدلًا من الآن',
+    'Log this reading at an earlier date and time instead of now',
+  );
+  static String get readingDateTime =>
+      _t('تاريخ ووقت القراءة', 'Reading date and time');
+  static String get readingDateTooOld => _t(
+    'التاريخ خارج المدى المسموح به',
+    'That date is outside the allowed range',
+  );
 
   static String get hiddenFromFilter =>
       _t('إخفاء من فلتر القراءات', 'Hide from the readings filter');

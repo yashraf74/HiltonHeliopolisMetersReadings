@@ -7,6 +7,7 @@ import 'package:intl/intl.dart' hide TextDirection;
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../core/config.dart';
 import '../../core/strings.dart';
 import '../../data/db/database.dart';
 import '../../data/models.dart';
@@ -42,6 +43,11 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
   String? _valueError;
   bool _saving = false;
 
+  /// Engineers and moderators may log a reading for an earlier moment (a
+  /// round done on paper, say). Off means "now", as always.
+  bool _backdated = false;
+  DateTime _loggedAt = DateTime.now();
+
   @override
   void dispose() {
     _search.dispose();
@@ -55,7 +61,38 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
       _photo = null;
       _value.clear();
       _valueError = null;
+      _backdated = false;
+      _loggedAt = DateTime.now();
     });
+  }
+
+  /// Date then time, bounded by the system's first day and this moment.
+  Future<void> _pickLoggedAt() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _loggedAt.isAfter(now) ? now : _loggedAt,
+      firstDate: BuildConfig.dataStart,
+      lastDate: now,
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_loggedAt),
+    );
+    if (time == null) return;
+    final picked = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+    // The time picker can push a today-date past this moment.
+    setState(
+      () =>
+          _loggedAt = picked.isAfter(DateTime.now()) ? DateTime.now() : picked,
+    );
   }
 
   static bool _isToday(String? iso) {
@@ -114,7 +151,9 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
         value: value,
         localPhotoPath: Value(storedPath),
         loggedBy: user.id,
-        loggedAt: DateTime.now().toUtc().toIso8601String(),
+        loggedAt: (_backdated ? _loggedAt : DateTime.now())
+            .toUtc()
+            .toIso8601String(),
       ),
     );
     sync.sync();
@@ -435,9 +474,42 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
                   ),
                 ),
               ),
+              if (user.canSeeAllReadings) ...[
+                const SizedBox(height: 6),
+                SwitchListTile.adaptive(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  value: _backdated,
+                  onChanged: (v) => setState(() {
+                    _backdated = v;
+                    if (v) _loggedAt = DateTime.now();
+                  }),
+                  title: Text(
+                    S.backdatedReading,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    S.backdatedReadingHint,
+                    style: TextStyle(
+                      color: scheme.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                if (_backdated)
+                  OutlinedButton.icon(
+                    onPressed: _pickLoggedAt,
+                    icon: const Icon(Icons.event_rounded, size: 18),
+                    label: Text(
+                      '${S.readingDateTime}: '
+                      '${DateFormat('d/M/yyyy HH:mm', S.localeCode).format(_loggedAt)}',
+                    ),
+                  ),
+              ],
               const SizedBox(height: 12),
               Text(
-                '${S.willBeLoggedAs} ${user.fullName} · ${DateFormat('d/M/yyyy HH:mm', S.localeCode).format(DateTime.now())}',
+                '${S.willBeLoggedAs} ${user.fullName} · '
+                '${DateFormat('d/M/yyyy HH:mm', S.localeCode).format(_backdated ? _loggedAt : DateTime.now())}',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: scheme.onSurfaceVariant,
