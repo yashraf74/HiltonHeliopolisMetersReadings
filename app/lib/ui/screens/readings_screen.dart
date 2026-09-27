@@ -296,21 +296,28 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
   }
 
   Future<void> _export() async {
+    setState(() => _exporting = true);
     if (_rows.isEmpty) {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(S.exportNothing)));
+      setState(() => _exporting = false);
       return;
     }
-    if (!await _confirmUnusual() || !mounted) return;
+    if (!await _confirmUnusual() || !mounted) {
+      setState(() => _exporting = false);
+      return;
+    }
     final target = await showModalBottomSheet<_ExportTarget>(
       context: context,
       useSafeArea: true,
       showDragHandle: true,
       builder: (_) => const _ExportTargetSheet(),
     );
-    if (target == null || !mounted) return;
+    if (target == null || !mounted) {
+      setState(() => _exporting = false);
+      return;
+    }
 
-    setState(() => _exporting = true);
     final messenger = ScaffoldMessenger.of(context);
     final api = context.read<ApiClient>();
     final exportSettings = context.read<AppStatusController>().config.export;
