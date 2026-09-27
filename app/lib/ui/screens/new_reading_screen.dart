@@ -476,25 +476,14 @@ class _NewReadingScreenState extends State<NewReadingScreen> {
               ),
               if (user.canSeeAllReadings) ...[
                 const SizedBox(height: 6),
-                SwitchListTile.adaptive(
-                  contentPadding: EdgeInsets.zero,
-                  dense: true,
+                AppSwitch(
+                  title: S.backdatedReading,
+                  subtitle: S.backdatedReadingHint,
                   value: _backdated,
                   onChanged: (v) => setState(() {
                     _backdated = v;
                     if (v) _loggedAt = DateTime.now();
                   }),
-                  title: Text(
-                    S.backdatedReading,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  subtitle: Text(
-                    S.backdatedReadingHint,
-                    style: TextStyle(
-                      color: scheme.onSurfaceVariant,
-                      fontSize: 12,
-                    ),
-                  ),
                 ),
                 if (_backdated)
                   OutlinedButton.icon(

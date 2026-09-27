@@ -238,7 +238,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ],
                       decoration: InputDecoration(
                         labelText: S.email,
-                        helperText: S.emailNeededForExport,
+                        helperText: S.phoneOptional,
                         prefixIcon: const Icon(Icons.email_outlined),
                       ),
                       validator: (v) {

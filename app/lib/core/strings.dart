@@ -355,7 +355,6 @@ class S {
     'أدخل بريدًا إلكترونيًا صحيحًا مثل name@example.com',
     'Enter a valid email like name@example.com',
   );
-  static String get emailMissing => _t('لا يوجد بريد إلكتروني', 'No email');
   static String get activeUsers => _t('الحسابات النشطة', 'Active accounts');
   static String get inactiveUsers =>
       _t('الحسابات الموقوفة', 'Suspended accounts');
@@ -682,10 +681,10 @@ class S {
       _t('اختر عمودًا واحدًا على الأقل', 'Choose at least one column');
   static String get exportLanguage => _t('لغة الملف', 'File language');
   static String get exportLanguageHint => _t(
-    'تُترجَم العناوين وأنواع العدادات وأسماء الشهور. أسماء العدادات والمناطق والأرقام تبقى كما هي، واتجاه الورقة يتبع اللغة.',
-    'Headers, meter types and month names are translated. Meter names, areas and numbers stay as they are, and the sheet direction follows the language.',
+    '"حسب اللغة" تعني لغة المستخدم الذي يصدّر الملف. تُترجَم العناوين وأنواع العدادات وأسماء الشهور، بينما تبقى أسماء العدادات والمناطق والأرقام كما هي، واتجاه الورقة يتبع اللغة.',
+    '"Follow language" means the language of the signed-in user doing the export. Headers, meter types and month names are translated, while meter names, areas and numbers stay as they are, and the sheet direction follows the language.',
   );
-  static String get exportLanguageAuto => _t('حسب لغتي', 'Follow my language');
+  static String get exportLanguageAuto => _t('حسب اللغة', 'Follow language');
   static String get exportLanguageAr => _t('العربية', 'Arabic');
   static String get exportLanguageEn => _t('الإنجليزية', 'English');
   static String get exportDateFormat => _t('تنسيق التاريخ', 'Date format');
@@ -724,7 +723,6 @@ class S {
     'لم يُحدَّد أي عداد كعداد رئيسي بعد',
     'No meter is marked as a main meter yet',
   );
-  static String get emailOptional => _t('اختياري', 'Optional');
   static String get emailNeededForExport => _t(
     'أضف بريدًا إلكترونيًا لحسابك لتفعيل الإرسال بالبريد',
     'Add an email to your account to enable sending by email',

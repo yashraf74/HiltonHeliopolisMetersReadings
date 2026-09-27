@@ -291,7 +291,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                 ],
                 decoration: InputDecoration(
                   labelText: S.email,
-                  helperText: S.emailOptional,
+                  helperText: S.phoneOptional,
                   prefixIcon: Icon(Icons.email_outlined),
                 ),
                 validator: (v) {
@@ -379,19 +379,9 @@ class _UserFormScreenState extends State<UserFormScreen> {
                     ),
                 ],
               ),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(
-                  S.hiddenFromFilter,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                subtitle: Text(
-                  S.hiddenFromFilterHint,
-                  style: TextStyle(
-                    color: scheme.onSurfaceVariant,
-                    fontSize: 12.5,
-                  ),
-                ),
+              AppSwitch(
+                title: S.hiddenFromFilter,
+                subtitle: S.hiddenFromFilterHint,
                 value: _hiddenFromFilter,
                 onChanged: _busy
                     ? null

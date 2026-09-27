@@ -190,21 +190,22 @@ class _UserTile extends StatelessWidget {
                           fontSize: 13,
                         ),
                       ),
-                      Text(
-                        user.hasEmail ? user.email : S.emailMissing,
-                        textDirection: user.hasEmail ? TextDirection.ltr : null,
-                        textAlign: S.isEnglish
-                            ? TextAlign.left
-                            : TextAlign.right,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: user.hasEmail
-                              ? scheme.onSurfaceVariant
-                              : scheme.error,
-                          fontSize: 12.5,
+                      // Having no email is a normal state now, not an
+                      // error to flag in red: the line is simply absent.
+                      if (user.hasEmail)
+                        Text(
+                          user.email,
+                          textDirection: TextDirection.ltr,
+                          textAlign: S.isEnglish
+                              ? TextAlign.left
+                              : TextAlign.right,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: scheme.onSurfaceVariant,
+                            fontSize: 12.5,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),

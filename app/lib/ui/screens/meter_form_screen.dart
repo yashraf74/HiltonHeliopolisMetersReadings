@@ -358,29 +358,14 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
+              const SizedBox(height: 8),
+              AppSwitch(
+                title: S.mainMeter,
+                subtitle: S.mainMeterHint,
                 value: _isMain,
                 onChanged: (v) => setState(() => _isMain = v),
-                title: Text(
-                  S.mainMeter,
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                subtitle: Text(
-                  S.mainMeterHint,
-                  style: TextStyle(
-                    color: scheme.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
-                ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '${S.todoOrderHint}\n${S.exportOrderHint}',
-                style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 12),
               _buildPhotoSection(context),
             ],
           ),

@@ -317,7 +317,7 @@ class _UserSheetState extends State<_UserSheet> {
               leading: UserAvatar(user: user, size: 64, zoomOnTap: true),
             ),
             const SizedBox(height: 14),
-            DetailRow(S.email, user.hasEmail ? user.email : S.emailMissing),
+            if (user.hasEmail) DetailRow(S.email, user.email),
             if (phone != null && phone.isNotEmpty) DetailRow(S.phone, phone),
             if (widget.onEdit != null)
               _EditButton(

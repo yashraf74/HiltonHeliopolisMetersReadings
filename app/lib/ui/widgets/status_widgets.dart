@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 import 'package:provider/provider.dart';
@@ -383,6 +384,43 @@ class ReadingPhoto extends StatelessWidget {
   }
 }
 
+/// The app's switch row: bold title, muted hint under it, no padding of
+/// its own. Every toggle in the app is this one, so they all look and
+/// behave alike — use it rather than a bare (or adaptive) SwitchListTile.
+class AppSwitch extends StatelessWidget {
+  const AppSwitch({
+    super.key,
+    required this.title,
+    required this.value,
+    required this.onChanged,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final bool value;
+
+  /// null disables the row, as with any Material control.
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SwitchListTile(
+      contentPadding: EdgeInsets.zero,
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: subtitle == null
+          ? null
+          : Text(
+              subtitle!,
+              style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12.5),
+            ),
+      value: value,
+      onChanged: onChanged,
+    );
+  }
+}
+
 /// Full-screen photo: pinch to zoom anywhere on the screen, drag it away
 /// in any direction to dismiss, or use the close button.
 class PhotoViewerScreen extends StatefulWidget {
@@ -405,6 +443,14 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   /// Dragging dismisses only at rest; once zoomed in, a drag pans instead.
   bool _zoomed = false;
 
+  /// Raw pointers rather than a drag gesture: the viewer's own scale
+  /// recogniser claims single-finger drags in the gesture arena, which
+  /// left dismissing to work only with two fingers. A [Listener] sees
+  /// every pointer without competing for it.
+  int _pointers = 0;
+  int? _dragPointer;
+  VelocityTracker? _velocity;
+
   @override
   void initState() {
     super.initState();
@@ -424,16 +470,49 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   double _progress(Size screen) =>
       (_drag.distance / (screen.shortestSide * 0.6)).clamp(0.0, 1.0);
 
-  void _onEnd(DragEndDetails details, Size screen) {
-    final flung = details.velocity.pixelsPerSecond.distance > 700;
-    if (flung || _progress(screen) >= 0.5) {
-      Navigator.of(context).maybePop();
-      return;
-    }
+  void _cancelDrag() {
+    _dragPointer = null;
+    _velocity = null;
     setState(() {
       _dragging = false;
       _drag = Offset.zero;
     });
+  }
+
+  void _onDown(PointerDownEvent event) {
+    _pointers++;
+    if (_pointers > 1) {
+      // A second finger means a pinch, not a dismissal.
+      if (_dragPointer != null) _cancelDrag();
+      return;
+    }
+    if (_zoomed) return;
+    _dragPointer = event.pointer;
+    _velocity = VelocityTracker.withKind(event.kind)
+      ..addPosition(event.timeStamp, event.position);
+  }
+
+  void _onMove(PointerMoveEvent event) {
+    if (event.pointer != _dragPointer || _pointers != 1) return;
+    _velocity?.addPosition(event.timeStamp, event.position);
+    setState(() {
+      _dragging = true;
+      _drag += event.delta;
+    });
+  }
+
+  void _onUp(PointerEvent event, Size screen) {
+    _pointers = (_pointers - 1).clamp(0, 10);
+    if (event.pointer != _dragPointer) return;
+    final speed = _velocity?.getVelocity().pixelsPerSecond.distance ?? 0;
+    final away = speed > 700 || _progress(screen) >= 0.35;
+    _dragPointer = null;
+    _velocity = null;
+    if (away) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    _cancelDrag();
   }
 
   @override
@@ -452,11 +531,14 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
           onPressed: () => Navigator.of(context).maybePop(),
         ),
       ),
-      body: GestureDetector(
-        // Only when at rest: zoomed in, the viewer itself pans.
-        onPanStart: _zoomed ? null : (_) => setState(() => _dragging = true),
-        onPanUpdate: _zoomed ? null : (d) => setState(() => _drag += d.delta),
-        onPanEnd: _zoomed ? null : (d) => _onEnd(d, screen),
+      body: Listener(
+        onPointerDown: _onDown,
+        onPointerMove: _onMove,
+        onPointerUp: (e) => _onUp(e, screen),
+        onPointerCancel: (e) {
+          _pointers = (_pointers - 1).clamp(0, 10);
+          if (e.pointer == _dragPointer) _cancelDrag();
+        },
         child: AnimatedSlide(
           // Follows the finger exactly, then springs back when let go.
           duration: _dragging
