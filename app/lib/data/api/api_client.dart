@@ -189,7 +189,8 @@ class ApiClient {
     required MeterType type,
     required String name,
     required String area,
-    String? number,
+    int? number,
+    String? group,
     String? photoKey,
     int? todoOrder,
     int? exportOrder,
@@ -203,7 +204,10 @@ class ApiClient {
           'type': type.name,
           'name': name,
           'area': area,
-          'number': number ?? '',
+          // Sent as text, which servers from before whole-number meter
+          // numbers also accept.
+          'number': number?.toString() ?? '',
+          'group': group ?? '',
           'photoKey': ?photoKey,
           'todoOrder': todoOrder,
           'exportOrder': exportOrder,
@@ -216,13 +220,14 @@ class ApiClient {
 
   /// [photoKey]: pass a key to set, `null` with [clearPhoto] to remove,
   /// omit both to leave the photo unchanged. Order numbers are always sent
-  /// (null clears).
+  /// (null clears). [number] and [group]: `''` clears, null leaves as is.
   Future<void> updateMeter(
     String id, {
     MeterType? type,
     String? name,
     String? area,
     String? number,
+    String? group,
     String? photoKey,
     bool clearPhoto = false,
     int? todoOrder,
@@ -238,6 +243,7 @@ class ApiClient {
           'name': ?name,
           'area': ?area,
           'number': ?number,
+          'group': ?group,
           if (photoKey != null || clearPhoto) 'photoKey': photoKey,
           'todoOrder': todoOrder,
           'exportOrder': exportOrder,
@@ -579,7 +585,8 @@ class ApiClient {
     name: j['name'] as String,
     type: j['type'] as String,
     area: j['area'] as String? ?? '',
-    number: j['number'] as String?,
+    number: parseMeterNumber(j['number']),
+    groupName: j['group_name'] as String?,
     photoKey: j['photo_key'] as String?,
     lastLoggedAt: j['last_logged_at'] as String?,
     lastValue: (j['last_value'] as num?)?.toDouble(),

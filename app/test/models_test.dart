@@ -41,4 +41,30 @@ void main() {
     expect(S.daysUnit(2), 'يومان');
     expect(S.daysUnit(4), 'أيام');
   });
+
+  test('meter numbers parse from text or a number, and nothing else', () {
+    expect(parseMeterNumber('12'), 12);
+    expect(parseMeterNumber(' 7 '), 7);
+    expect(parseMeterNumber(112), 112);
+    expect(parseMeterNumber(null), isNull);
+    expect(parseMeterNumber(''), isNull);
+    expect(parseMeterNumber('SN-7'), isNull);
+  });
+
+  test('export settings keep the transposed options through JSON', () {
+    const s = ExportSettings(transpose: true, groupHeaders: true, totals: true);
+    final back = ExportSettings.fromJson(s.toJson());
+    expect(
+      (back.transpose, back.groupHeaders, back.totals),
+      (true, true, true),
+    );
+    // A server that doesn't know them yet: all off.
+    final old = ExportSettings.fromJson({
+      'columns': ['value'],
+    });
+    expect(
+      (old.transpose, old.groupHeaders, old.totals),
+      (false, false, false),
+    );
+  });
 }

@@ -447,7 +447,7 @@ class _ReadingsScreenState extends State<ReadingsScreen> {
                 Expanded(
                   child: Text(
                     '${S.readingsCount}: ${_rows.length}${_nextCursor != null ? '+' : ''}'
-                    ' · ${S.sortBy}: ${_filters.sort.label} ${_filters.descending ? '↓' : '↑'}',
+                    ' · ${S.sortBy}: ${_filters.sortLabel}',
                     style: TextStyle(
                       color: scheme.onSurfaceVariant,
                       fontSize: 12.5,
@@ -678,8 +678,8 @@ class _PendingReadingCard extends StatelessWidget {
                         ),
                         DetailRow(S.meterType, type.label),
                         DetailRow(S.meterArea, meter.area),
-                        if (meter.number?.isNotEmpty == true)
-                          DetailRow(S.meterNumber, meter.number!),
+                        if (meter.number case final number?)
+                          DetailRow(S.meterNumber, '$number'),
                       ],
                       DetailRow(S.loggedAt, fmt.format(loggedAt)),
                       DetailRow(S.readingId, reading.id, mono: true),

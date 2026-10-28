@@ -26,6 +26,19 @@ enum UserRole {
   bool get canSeeDashboard => this != technician;
 }
 
+/// Meter numbers are whole numbers of up to this many digits (as the server
+/// enforces).
+const maxMeterNumberDigits = 9;
+
+/// A meter number from the API. The server sends it as text so that apps
+/// from before it became a whole number can still read it; newer servers
+/// may send a JSON number. Either way it comes out as an int (null = none).
+int? parseMeterNumber(Object? value) => switch (value) {
+  final int n => n,
+  final String s => int.tryParse(s.trim()),
+  _ => null,
+};
+
 enum MeterType {
   electricity,
   water,
@@ -280,6 +293,9 @@ class ExportSettings {
     this.decimals = 2,
     this.thousandsSeparator = true,
     this.sheetPerType = false,
+    this.transpose = false,
+    this.groupHeaders = false,
+    this.totals = false,
   });
 
   static const defaultDateFormat = 'yyyy-MM-dd HH:mm';
@@ -306,6 +322,16 @@ class ExportSettings {
   /// One sheet per meter type, each tab named after the type.
   final bool sheetPerType;
 
+  /// Dates down the side and meters across the top (by meter type, then
+  /// export order) instead of one row per reading.
+  final bool transpose;
+
+  /// Transposed only: meters that share a group sit under its header.
+  final bool groupHeaders;
+
+  /// Transposed only: a total row under each consumption column.
+  final bool totals;
+
   factory ExportSettings.fromJson(Map<String, dynamic>? j) {
     if (j == null) return const ExportSettings();
     final ids = (j['columns'] as List<dynamic>?)?.cast<String>() ?? const [];
@@ -325,6 +351,9 @@ class ExportSettings {
       },
       thousandsSeparator: j['thousandsSeparator'] as bool? ?? true,
       sheetPerType: j['sheetPerType'] as bool? ?? false,
+      transpose: j['transpose'] as bool? ?? false,
+      groupHeaders: j['groupHeaders'] as bool? ?? false,
+      totals: j['totals'] as bool? ?? false,
     );
   }
 
@@ -335,6 +364,9 @@ class ExportSettings {
     'decimals': decimals,
     'thousandsSeparator': thousandsSeparator,
     'sheetPerType': sheetPerType,
+    'transpose': transpose,
+    'groupHeaders': groupHeaders,
+    'totals': totals,
   };
 
   ExportSettings copyWith({
@@ -344,6 +376,9 @@ class ExportSettings {
     int? decimals,
     bool? thousandsSeparator,
     bool? sheetPerType,
+    bool? transpose,
+    bool? groupHeaders,
+    bool? totals,
   }) => ExportSettings(
     columns: columns ?? this.columns,
     language: language ?? this.language,
@@ -351,6 +386,9 @@ class ExportSettings {
     decimals: decimals ?? this.decimals,
     thousandsSeparator: thousandsSeparator ?? this.thousandsSeparator,
     sheetPerType: sheetPerType ?? this.sheetPerType,
+    transpose: transpose ?? this.transpose,
+    groupHeaders: groupHeaders ?? this.groupHeaders,
+    totals: totals ?? this.totals,
   );
 }
 

@@ -48,8 +48,19 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
   );
   static const VerificationMeta _numberMeta = const VerificationMeta('number');
   @override
-  late final GeneratedColumn<String> number = GeneratedColumn<String>(
+  late final GeneratedColumn<int> number = GeneratedColumn<int>(
     'number',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _groupNameMeta = const VerificationMeta(
+    'groupName',
+  );
+  @override
+  late final GeneratedColumn<String> groupName = GeneratedColumn<String>(
+    'group_name',
     aliasedName,
     true,
     type: DriftSqlType.string,
@@ -156,6 +167,7 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
     type,
     area,
     number,
+    groupName,
     photoKey,
     lastLoggedAt,
     lastValue,
@@ -206,6 +218,12 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
       context.handle(
         _numberMeta,
         number.isAcceptableOrUnknown(data['number']!, _numberMeta),
+      );
+    }
+    if (data.containsKey('group_name')) {
+      context.handle(
+        _groupNameMeta,
+        groupName.isAcceptableOrUnknown(data['group_name']!, _groupNameMeta),
       );
     }
     if (data.containsKey('photo_key')) {
@@ -290,8 +308,12 @@ class $MetersTable extends Meters with TableInfo<$MetersTable, Meter> {
         data['${effectivePrefix}area'],
       )!,
       number: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
+        DriftSqlType.int,
         data['${effectivePrefix}number'],
+      ),
+      groupName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}group_name'],
       ),
       photoKey: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -339,7 +361,12 @@ class Meter extends DataClass implements Insertable<Meter> {
   final String name;
   final String type;
   final String area;
-  final String? number;
+
+  /// A whole number (text before schema 10).
+  final int? number;
+
+  /// The header a meter sits under in the transposed export; null = none.
+  final String? groupName;
   final String? photoKey;
   final String? lastLoggedAt;
   final double? lastValue;
@@ -357,6 +384,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     required this.type,
     required this.area,
     this.number,
+    this.groupName,
     this.photoKey,
     this.lastLoggedAt,
     this.lastValue,
@@ -374,7 +402,10 @@ class Meter extends DataClass implements Insertable<Meter> {
     map['type'] = Variable<String>(type);
     map['area'] = Variable<String>(area);
     if (!nullToAbsent || number != null) {
-      map['number'] = Variable<String>(number);
+      map['number'] = Variable<int>(number);
+    }
+    if (!nullToAbsent || groupName != null) {
+      map['group_name'] = Variable<String>(groupName);
     }
     if (!nullToAbsent || photoKey != null) {
       map['photo_key'] = Variable<String>(photoKey);
@@ -406,6 +437,9 @@ class Meter extends DataClass implements Insertable<Meter> {
       number: number == null && nullToAbsent
           ? const Value.absent()
           : Value(number),
+      groupName: groupName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(groupName),
       photoKey: photoKey == null && nullToAbsent
           ? const Value.absent()
           : Value(photoKey),
@@ -437,7 +471,8 @@ class Meter extends DataClass implements Insertable<Meter> {
       name: serializer.fromJson<String>(json['name']),
       type: serializer.fromJson<String>(json['type']),
       area: serializer.fromJson<String>(json['area']),
-      number: serializer.fromJson<String?>(json['number']),
+      number: serializer.fromJson<int?>(json['number']),
+      groupName: serializer.fromJson<String?>(json['groupName']),
       photoKey: serializer.fromJson<String?>(json['photoKey']),
       lastLoggedAt: serializer.fromJson<String?>(json['lastLoggedAt']),
       lastValue: serializer.fromJson<double?>(json['lastValue']),
@@ -456,7 +491,8 @@ class Meter extends DataClass implements Insertable<Meter> {
       'name': serializer.toJson<String>(name),
       'type': serializer.toJson<String>(type),
       'area': serializer.toJson<String>(area),
-      'number': serializer.toJson<String?>(number),
+      'number': serializer.toJson<int?>(number),
+      'groupName': serializer.toJson<String?>(groupName),
       'photoKey': serializer.toJson<String?>(photoKey),
       'lastLoggedAt': serializer.toJson<String?>(lastLoggedAt),
       'lastValue': serializer.toJson<double?>(lastValue),
@@ -473,7 +509,8 @@ class Meter extends DataClass implements Insertable<Meter> {
     String? name,
     String? type,
     String? area,
-    Value<String?> number = const Value.absent(),
+    Value<int?> number = const Value.absent(),
+    Value<String?> groupName = const Value.absent(),
     Value<String?> photoKey = const Value.absent(),
     Value<String?> lastLoggedAt = const Value.absent(),
     Value<double?> lastValue = const Value.absent(),
@@ -488,6 +525,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     type: type ?? this.type,
     area: area ?? this.area,
     number: number.present ? number.value : this.number,
+    groupName: groupName.present ? groupName.value : this.groupName,
     photoKey: photoKey.present ? photoKey.value : this.photoKey,
     lastLoggedAt: lastLoggedAt.present ? lastLoggedAt.value : this.lastLoggedAt,
     lastValue: lastValue.present ? lastValue.value : this.lastValue,
@@ -504,6 +542,7 @@ class Meter extends DataClass implements Insertable<Meter> {
       type: data.type.present ? data.type.value : this.type,
       area: data.area.present ? data.area.value : this.area,
       number: data.number.present ? data.number.value : this.number,
+      groupName: data.groupName.present ? data.groupName.value : this.groupName,
       photoKey: data.photoKey.present ? data.photoKey.value : this.photoKey,
       lastLoggedAt: data.lastLoggedAt.present
           ? data.lastLoggedAt.value
@@ -527,6 +566,7 @@ class Meter extends DataClass implements Insertable<Meter> {
           ..write('type: $type, ')
           ..write('area: $area, ')
           ..write('number: $number, ')
+          ..write('groupName: $groupName, ')
           ..write('photoKey: $photoKey, ')
           ..write('lastLoggedAt: $lastLoggedAt, ')
           ..write('lastValue: $lastValue, ')
@@ -546,6 +586,7 @@ class Meter extends DataClass implements Insertable<Meter> {
     type,
     area,
     number,
+    groupName,
     photoKey,
     lastLoggedAt,
     lastValue,
@@ -564,6 +605,7 @@ class Meter extends DataClass implements Insertable<Meter> {
           other.type == this.type &&
           other.area == this.area &&
           other.number == this.number &&
+          other.groupName == this.groupName &&
           other.photoKey == this.photoKey &&
           other.lastLoggedAt == this.lastLoggedAt &&
           other.lastValue == this.lastValue &&
@@ -579,7 +621,8 @@ class MetersCompanion extends UpdateCompanion<Meter> {
   final Value<String> name;
   final Value<String> type;
   final Value<String> area;
-  final Value<String?> number;
+  final Value<int?> number;
+  final Value<String?> groupName;
   final Value<String?> photoKey;
   final Value<String?> lastLoggedAt;
   final Value<double?> lastValue;
@@ -595,6 +638,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     this.type = const Value.absent(),
     this.area = const Value.absent(),
     this.number = const Value.absent(),
+    this.groupName = const Value.absent(),
     this.photoKey = const Value.absent(),
     this.lastLoggedAt = const Value.absent(),
     this.lastValue = const Value.absent(),
@@ -611,6 +655,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     required String type,
     this.area = const Value.absent(),
     this.number = const Value.absent(),
+    this.groupName = const Value.absent(),
     this.photoKey = const Value.absent(),
     this.lastLoggedAt = const Value.absent(),
     this.lastValue = const Value.absent(),
@@ -628,7 +673,8 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     Expression<String>? name,
     Expression<String>? type,
     Expression<String>? area,
-    Expression<String>? number,
+    Expression<int>? number,
+    Expression<String>? groupName,
     Expression<String>? photoKey,
     Expression<String>? lastLoggedAt,
     Expression<double>? lastValue,
@@ -645,6 +691,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
       if (type != null) 'type': type,
       if (area != null) 'area': area,
       if (number != null) 'number': number,
+      if (groupName != null) 'group_name': groupName,
       if (photoKey != null) 'photo_key': photoKey,
       if (lastLoggedAt != null) 'last_logged_at': lastLoggedAt,
       if (lastValue != null) 'last_value': lastValue,
@@ -662,7 +709,8 @@ class MetersCompanion extends UpdateCompanion<Meter> {
     Value<String>? name,
     Value<String>? type,
     Value<String>? area,
-    Value<String?>? number,
+    Value<int?>? number,
+    Value<String?>? groupName,
     Value<String?>? photoKey,
     Value<String?>? lastLoggedAt,
     Value<double?>? lastValue,
@@ -679,6 +727,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
       type: type ?? this.type,
       area: area ?? this.area,
       number: number ?? this.number,
+      groupName: groupName ?? this.groupName,
       photoKey: photoKey ?? this.photoKey,
       lastLoggedAt: lastLoggedAt ?? this.lastLoggedAt,
       lastValue: lastValue ?? this.lastValue,
@@ -707,7 +756,10 @@ class MetersCompanion extends UpdateCompanion<Meter> {
       map['area'] = Variable<String>(area.value);
     }
     if (number.present) {
-      map['number'] = Variable<String>(number.value);
+      map['number'] = Variable<int>(number.value);
+    }
+    if (groupName.present) {
+      map['group_name'] = Variable<String>(groupName.value);
     }
     if (photoKey.present) {
       map['photo_key'] = Variable<String>(photoKey.value);
@@ -747,6 +799,7 @@ class MetersCompanion extends UpdateCompanion<Meter> {
           ..write('type: $type, ')
           ..write('area: $area, ')
           ..write('number: $number, ')
+          ..write('groupName: $groupName, ')
           ..write('photoKey: $photoKey, ')
           ..write('lastLoggedAt: $lastLoggedAt, ')
           ..write('lastValue: $lastValue, ')
@@ -1442,7 +1495,8 @@ typedef $$MetersTableCreateCompanionBuilder = MetersCompanion Function({
   Value<String> name,
   required String type,
   Value<String> area,
-  Value<String?> number,
+  Value<int?> number,
+  Value<String?> groupName,
   Value<String?> photoKey,
   Value<String?> lastLoggedAt,
   Value<double?> lastValue,
@@ -1458,7 +1512,8 @@ typedef $$MetersTableUpdateCompanionBuilder = MetersCompanion Function({
   Value<String> name,
   Value<String> type,
   Value<String> area,
-  Value<String?> number,
+  Value<int?> number,
+  Value<String?> groupName,
   Value<String?> photoKey,
   Value<String?> lastLoggedAt,
   Value<double?> lastValue,
@@ -1499,8 +1554,13 @@ class $$MetersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<String> get number => $composableBuilder(
+  ColumnFilters<int> get number => $composableBuilder(
     column: $table.number,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get groupName => $composableBuilder(
+    column: $table.groupName,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1574,8 +1634,13 @@ class $$MetersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get number => $composableBuilder(
+  ColumnOrderings<int> get number => $composableBuilder(
     column: $table.number,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get groupName => $composableBuilder(
+    column: $table.groupName,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -1641,8 +1706,11 @@ class $$MetersTableAnnotationComposer
   GeneratedColumn<String> get area =>
       $composableBuilder(column: $table.area, builder: (column) => column);
 
-  GeneratedColumn<String> get number =>
+  GeneratedColumn<int> get number =>
       $composableBuilder(column: $table.number, builder: (column) => column);
+
+  GeneratedColumn<String> get groupName =>
+      $composableBuilder(column: $table.groupName, builder: (column) => column);
 
   GeneratedColumn<String> get photoKey =>
       $composableBuilder(column: $table.photoKey, builder: (column) => column);
@@ -1705,7 +1773,8 @@ class $$MetersTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<String> area = const Value.absent(),
-                Value<String?> number = const Value.absent(),
+                Value<int?> number = const Value.absent(),
+                Value<String?> groupName = const Value.absent(),
                 Value<String?> photoKey = const Value.absent(),
                 Value<String?> lastLoggedAt = const Value.absent(),
                 Value<double?> lastValue = const Value.absent(),
@@ -1721,6 +1790,7 @@ class $$MetersTableTableManager
                 type: type,
                 area: area,
                 number: number,
+                groupName: groupName,
                 photoKey: photoKey,
                 lastLoggedAt: lastLoggedAt,
                 lastValue: lastValue,
@@ -1737,7 +1807,8 @@ class $$MetersTableTableManager
                 Value<String> name = const Value.absent(),
                 required String type,
                 Value<String> area = const Value.absent(),
-                Value<String?> number = const Value.absent(),
+                Value<int?> number = const Value.absent(),
+                Value<String?> groupName = const Value.absent(),
                 Value<String?> photoKey = const Value.absent(),
                 Value<String?> lastLoggedAt = const Value.absent(),
                 Value<double?> lastValue = const Value.absent(),
@@ -1753,6 +1824,7 @@ class $$MetersTableTableManager
                 type: type,
                 area: area,
                 number: number,
+                groupName: groupName,
                 photoKey: photoKey,
                 lastLoggedAt: lastLoggedAt,
                 lastValue: lastValue,

@@ -67,12 +67,27 @@ void main() {
     expect(const ReadingFilters().isDefaultSort, isTrue);
     expect(f.hasActiveFilters, isTrue);
     expect(
-      const ReadingFilters(
-        sort: ReadingSort.value,
-        descending: true,
-      ).toReadingsQuery()['dir'],
+      const ReadingFilters(descending: true).toReadingsQuery()['dir'],
       'desc',
     );
+    // One level is what older servers take: a single field and direction.
+    final one = const ReadingFilters(
+      sort: [SortLevel(ReadingSortField.value, descending: true)],
+    ).toReadingsQuery();
+    expect((one['sort'], one['dir']), ('value', 'desc'));
+    // Several levels go as matching comma lists, in level order.
+    final three = const ReadingFilters(
+      sort: [
+        SortLevel(ReadingSortField.meterType),
+        SortLevel(ReadingSortField.meterNumber, descending: true),
+        SortLevel(ReadingSortField.day),
+      ],
+    );
+    expect(three.toReadingsQuery()['sort'], 'meter_type,meter_number,day');
+    expect(three.toReadingsQuery()['dir'], 'asc,desc,asc');
+    expect(three.isDefaultSort, isFalse);
+    S.language = AppLanguage.en;
+    expect(three.sortLabel, 'Meter type ↑, Meter number ↓, Day ↑');
   });
 
   test('a one-day filter covers that whole local day', () {
@@ -206,5 +221,15 @@ void main() {
     expect(body, contains('W-9'));
     // The app's own language is left as it was.
     expect(S.language, AppLanguage.ar);
+    // English reads left to right; Arabic, the app's language here, right
+    // to left, on every sheet.
+    expect(sheet.isRTL, isFalse);
+    final arabic = Excel.decodeBytes(
+      buildReadingsWorkbook(
+        rows,
+        settings: const ExportSettings(sheetPerType: true),
+      ),
+    );
+    expect(arabic.sheets.values.map((s) => s.isRTL), everyElement(isTrue));
   });
 }

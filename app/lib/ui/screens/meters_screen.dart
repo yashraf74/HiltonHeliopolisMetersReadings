@@ -19,8 +19,7 @@ class MetersScreen extends StatefulWidget {
   State<MetersScreen> createState() => _MetersScreenState();
 }
 
-/// Sort options for the meter management list. Meter numbers compare
-/// numerically when both are numbers.
+/// Sort options for the meter management list.
 enum MeterSort {
   todoOrder,
   exportOrder,
@@ -41,7 +40,7 @@ enum MeterSort {
     exportOrder => _compareNullable(a.exportOrder, b.exportOrder),
     name => _compareText(a.name, b.name),
     area => _compareText(a.area, b.area),
-    number => _compareNumber(a.number, b.number),
+    number => _compareNullable(a.number, b.number),
   };
 
   // Empty values are ranked separately (see _sorted), so these only order
@@ -51,13 +50,6 @@ enum MeterSort {
 
   static int _compareText(String a, String b) =>
       a.toLowerCase().compareTo(b.toLowerCase());
-
-  static int _compareNumber(String? a, String? b) {
-    final na = int.tryParse(a ?? '');
-    final nb = int.tryParse(b ?? '');
-    if (na != null && nb != null) return na.compareTo(nb);
-    return _compareText(a ?? '', b ?? '');
-  }
 }
 
 class _MetersScreenState extends State<MetersScreen> {
@@ -72,7 +64,7 @@ class _MetersScreenState extends State<MetersScreen> {
       MeterSort.exportOrder => m.exportOrder == null ? 1 : 0,
       MeterSort.name => m.name.isEmpty ? 1 : 0,
       MeterSort.area => m.area.isEmpty ? 1 : 0,
-      MeterSort.number => (m.number ?? '').isEmpty ? 1 : 0,
+      MeterSort.number => m.number == null ? 1 : 0,
     };
     return [...meters]..sort((a, b) {
       final empty = emptyRank(a) - emptyRank(b);
@@ -261,7 +253,7 @@ class MeterTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       '${meter.area}'
-                      '${number?.isNotEmpty == true ? ' · ${S.meterNumber} $number' : ''}',
+                      '${number != null ? ' · ${S.meterNumber} $number' : ''}',
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

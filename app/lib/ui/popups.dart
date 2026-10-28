@@ -240,8 +240,8 @@ class _MeterSheet extends StatelessWidget {
         DetailRow(S.meterType, type.label),
         if (meter.isMain) DetailRow(S.mainMeter, S.yes),
         if (meter.area.isNotEmpty) DetailRow(S.meterArea, meter.area),
-        if (number != null && number.isNotEmpty)
-          DetailRow(S.meterNumber, number),
+        if (number != null) DetailRow(S.meterNumber, '$number'),
+        if (meter.groupName case final group?) DetailRow(S.meterGroup, group),
         if (last != null)
           DetailRow(
             S.lastReading,

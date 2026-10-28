@@ -62,7 +62,8 @@ class MetersController extends ChangeNotifier {
     required MeterType type,
     required String name,
     required String area,
-    String? number,
+    int? number,
+    String? group,
     String? photoKey,
     int? todoOrder,
     int? exportOrder,
@@ -73,6 +74,7 @@ class MetersController extends ChangeNotifier {
       name: name,
       area: area,
       number: number,
+      group: group,
       photoKey: photoKey,
       todoOrder: todoOrder,
       exportOrder: exportOrder,
@@ -85,7 +87,8 @@ class MetersController extends ChangeNotifier {
     required MeterType type,
     required String name,
     required String area,
-    String? number,
+    int? number,
+    String? group,
     String? photoKey,
     bool clearPhoto = false,
     int? todoOrder,
@@ -97,7 +100,9 @@ class MetersController extends ChangeNotifier {
       type: type,
       name: name,
       area: area,
-      number: number ?? '',
+      // Always sent, so emptying either field clears it.
+      number: number?.toString() ?? '',
+      group: group ?? '',
       photoKey: photoKey,
       clearPhoto: clearPhoto,
       todoOrder: todoOrder,
@@ -116,6 +121,7 @@ class MetersController extends ChangeNotifier {
     } on ApiException catch (e) {
       if (e.isUnauthorized) _session.markTokenRejected();
       if (e.statusCode == 409) return S.meterDuplicate;
+      if (e.code == 'bad_number') return S.meterNumberInvalid;
       return e.message;
     } on NetworkException {
       return S.onlineRequired;

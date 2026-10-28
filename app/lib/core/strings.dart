@@ -102,8 +102,8 @@ class S {
   );
   static String get exportOrder => _t('ترتيب التصدير', 'Export order');
   static String get exportOrderHint => _t(
-    'الترتيب الافتراضي لقائمة القراءات والتصدير (الأصغر أولًا)',
-    'Default order of the readings list and exports (lowest first)',
+    'الترتيب الافتراضي لقائمة القراءات والتصدير داخل كل نوع عداد (الأصغر أولًا)',
+    'Default order of the readings list and exports within each meter type (lowest first)',
   );
   static String get orderInvalid =>
       _t('أدخل رقمًا صحيحًا موجبًا', 'Enter a whole number, 0 or more');
@@ -114,7 +114,7 @@ class S {
   static String get gainLabel =>
       _t('الزيادة عن القراءة السابقة', 'Increase since previous reading');
   static String get meterNumberHint =>
-      _t('اختياري: الرقم التسلسلي', 'Optional: serial number');
+      _t('اختياري: رقم صحيح', 'Optional: a whole number');
   static String get colMeterArea => _t('المنطقة', 'Area');
   static String get colMeterNumber => _t('رقم العداد', 'Meter number');
   static String get colMeterName => _t('اسم العداد', 'Meter name');
@@ -225,7 +225,6 @@ class S {
       _t('بانتظار المزامنة على هذا الجهاز', 'Waiting to sync on this device');
   static String get sort => _t('ترتيب', 'Sort');
   static String get sortBy => _t('ترتيب حسب', 'Sort by');
-  static String get sortDate => _t('التاريخ', 'Date');
   static String get sortValue => _t('القراءة', 'Reading');
   static String get sortMeterName => _t('اسم العداد', 'Meter name');
   static String get sortUser => _t('اسم المستخدم', 'User');
@@ -800,6 +799,52 @@ class S {
     'Do you want to save your changes before leaving?',
   );
   static String get discardChanges => _t('تجاهل', 'Discard');
+
+  // Meter groups, whole-number meter numbers, multi-level sort, transposed
+  // export
+  static String get meterGroup => _t('المجموعة', 'Group');
+  static String get meterGroupHint => _t(
+    'اختياري: العدادات التي تحمل نفس المجموعة تظهر تحت عنوان واحد في ملف Excel المقلوب',
+    'Optional: meters with the same group share one header in the transposed Excel file',
+  );
+  static String get meterNumberInvalid => _t(
+    'رقم العداد يجب أن يكون رقمًا صحيحًا (حتى 9 أرقام)',
+    'The meter number must be a whole number (up to 9 digits)',
+  );
+  static String sortLevel(int level) => switch (level) {
+    1 => _t('رتّب حسب', 'Sort by'),
+    _ => _t('ثم حسب', 'Then by'),
+  };
+  static String get sortNone => _t('بدون', 'None');
+  static String get sortDefaultHint => _t(
+    'بدون اختيار: الأحدث يومًا أولًا، ثم نوع العداد، ثم ترتيب التصدير',
+    'Nothing chosen: newest day first, then meter type, then export order',
+  );
+  static String get sortDay => _t('اليوم', 'Day');
+  static String get sortDateTime => _t('التاريخ والوقت', 'Date and time');
+  static String get sortGain => _t('الاستهلاك', 'Consumption');
+  static String get sortArea => _t('المنطقة', 'Area');
+  static String get exportLayout => _t('شكل الملف', 'File layout');
+  static String get exportTranspose =>
+      _t('قلب الجدول (العدادات أعمدة)', 'Transpose (meters as columns)');
+  static String get exportTransposeHint => _t(
+    'التواريخ في الصفوف والعدادات في الأعمدة، مرتبة حسب نوع العداد ثم ترتيب التصدير. لكل عداد عمود للقراءة وعمود للاستهلاك حسب الأعمدة المختارة (القراءة / الزيادة)، ويُضاف رقم العداد ومنطقته لعنوانه إذا اخترتهما. إذا سُجلت أكثر من قراءة لعداد في يوم واحد تظهر آخرها مع مجموع استهلاك ذلك اليوم.',
+    'Dates down the side and meters across the top, ordered by meter type and then export order. Each meter gets a reading and a consumption column, following the chosen columns (Reading / Increase), and its number and area join its header when those columns are chosen. A meter read more than once in a day shows that day\'s last reading and the day\'s total consumption.',
+  );
+  static String get exportGroupHeaders =>
+      _t('عناوين المجموعات', 'Group headers');
+  static String get exportGroupHeadersHint => _t(
+    'العدادات التي لها نفس المجموعة تظهر تحت عنوان مشترك. يتطلب قلب الجدول.',
+    'Meters in the same group sit under a shared header. Needs Transpose.',
+  );
+  static String get exportTotals => _t('صف الإجمالي', 'Total row');
+  static String get exportTotalsHint => _t(
+    'صف في الأسفل بمعادلة جمع لكل عمود استهلاك. يتطلب قلب الجدول.',
+    'A row at the bottom with a SUM formula under each consumption column. Needs Transpose.',
+  );
+  static String get colDate => _t('التاريخ', 'Date');
+  static String get colConsumption => _t('الاستهلاك', 'Consumption');
+  static String get exportTotalRow => _t('الإجمالي', 'Total');
 
   // Generic
   static String get retry => _t('إعادة المحاولة', 'Retry');

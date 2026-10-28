@@ -132,7 +132,11 @@ void main() {
       isActive: true,
       isMain: false,
       updatedAt: '2026-09-24T00:00:00Z',
+      groupName: 'Pools',
     );
+    // The meter form offers the groups other meters use.
+    final db = AppDatabase(NativeDatabase.memory());
+    await tester.runAsync(() => db.replaceMeters([meter]));
 
     for (final screen in <Widget>[
       const UserFormScreen(existing: user),
@@ -144,13 +148,20 @@ void main() {
         MultiProvider(
           providers: [
             Provider<ApiClient>.value(value: api),
+            Provider<AppDatabase>.value(value: db),
             ChangeNotifierProvider<SessionController>.value(value: session),
           ],
           child: MaterialApp(home: screen),
         ),
       );
+      // Let the form's query for the known groups finish.
+      await tester.runAsync(() => Future<void>.delayed(Duration.zero));
       await tester.pump();
       expect(tester.takeException(), isNull, reason: '$screen');
+      if (screen is MeterFormScreen) {
+        expect(find.widgetWithText(ChoiceChip, 'Pools'), findsOneWidget);
+      }
     }
+    await tester.runAsync(db.close);
   });
 }

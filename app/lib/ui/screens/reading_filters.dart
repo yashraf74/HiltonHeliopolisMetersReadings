@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart' hide TextDirection;
 
 import '../../core/config.dart';
@@ -6,26 +7,60 @@ import '../../core/strings.dart';
 import '../../data/models.dart';
 import '../widgets/status_widgets.dart';
 
-enum ReadingSort {
-  byDefault('default'),
+/// What a sort level orders the readings by.
+enum ReadingSortField {
+  day('day'),
   loggedAt('logged_at'),
   value('value'),
+  gain('gain'),
   meterName('meter_name'),
+  meterNumber('meter_number'),
+  meterArea('meter_area'),
   meterType('meter_type'),
   user('technician');
 
-  const ReadingSort(this.apiName);
+  const ReadingSortField(this.apiName);
 
   final String apiName;
 
   String get label => switch (this) {
-    byDefault => S.sortDefault,
-    loggedAt => S.sortDate,
+    day => S.sortDay,
+    loggedAt => S.sortDateTime,
     value => S.sortValue,
+    gain => S.sortGain,
     meterName => S.sortMeterName,
+    meterNumber => S.meterNumber,
+    meterArea => S.sortArea,
     meterType => S.sortType,
     user => S.sortUser,
   };
+
+  /// The direction a field starts in when picked: dates and amounts newest
+  /// / highest first, names, numbers and types from the start.
+  bool get startsDescending => switch (this) {
+    day || loggedAt || value || gain => true,
+    meterName || meterNumber || meterArea || meterType || user => false,
+  };
+}
+
+/// One level of a multi-level sort.
+@immutable
+class SortLevel {
+  const SortLevel(this.field, {this.descending = false});
+
+  final ReadingSortField field;
+  final bool descending;
+
+  String get arrow => descending ? '↓' : '↑';
+
+  @override
+  bool operator ==(Object other) =>
+      other is SortLevel &&
+      other.field == field &&
+      other.descending == descending;
+
+  @override
+  int get hashCode => Object.hash(field, descending);
 }
 
 class ReadingFilters {
@@ -36,7 +71,7 @@ class ReadingFilters {
     this.from,
     this.to,
     this.search = '',
-    this.sort = ReadingSort.byDefault,
+    this.sort = const [],
     this.descending = false,
   });
 
@@ -46,12 +81,16 @@ class ReadingFilters {
   final DateTime? from;
   final DateTime? to;
   final String search;
-  final ReadingSort sort;
 
-  /// The default sort is newest day first, then export order: this flag
-  /// flips only the export order (ascending unless chosen otherwise). The
-  /// others default to newest / highest first.
+  /// Up to [maxSortLevels] levels, each a different field; empty is the
+  /// default sort.
+  final List<SortLevel> sort;
+
+  /// The default sort only (newest day first, then meter type, then export
+  /// order): flips the export order, ascending unless chosen otherwise.
   final bool descending;
+
+  static const maxSortLevels = 3;
 
   bool get isEmpty => !hasActiveFilters && search.isEmpty;
   bool get hasActiveFilters =>
@@ -60,7 +99,14 @@ class ReadingFilters {
       userId != null ||
       from != null ||
       to != null;
-  bool get isDefaultSort => sort == ReadingSort.byDefault && !descending;
+  bool get isDefaultSort => sort.isEmpty && !descending;
+
+  /// "Meter type ↑, Reading ↓", or "Default ↓" for the default sort.
+  String get sortLabel => sort.isEmpty
+      ? '${S.sortDefault} ${descending ? '↓' : '↑'}'
+      : sort
+            .map((l) => '${l.field.label} ${l.arrow}')
+            .join(S.isEnglish ? ', ' : '، ');
 
   ReadingFilters copyWith({
     Set<MeterType>? types,
@@ -71,7 +117,7 @@ class ReadingFilters {
     DateTime? to,
     bool clearDates = false,
     String? search,
-    ReadingSort? sort,
+    List<SortLevel>? sort,
     bool? descending,
   }) => ReadingFilters(
     types: types ?? this.types,
@@ -99,10 +145,17 @@ class ReadingFilters {
   };
 
   /// The same filters plus the sort, for the readings list and the export.
+  /// Levels go as matching comma lists ("meter_type,value" + "asc,desc");
+  /// a single level is exactly what older servers took.
   Map<String, String> toReadingsQuery() => {
     ...toQuery(),
-    'sort': sort.apiName,
-    'dir': descending ? 'desc' : 'asc',
+    if (sort.isEmpty) ...{
+      'sort': 'default',
+      'dir': descending ? 'desc' : 'asc',
+    } else ...{
+      'sort': sort.map((l) => l.field.apiName).join(','),
+      'dir': sort.map((l) => l.descending ? 'desc' : 'asc').join(','),
+    },
   };
 
   static DateTime _startOfDay(DateTime d) => DateTime(d.year, d.month, d.day);
@@ -128,14 +181,116 @@ class ReadingSortSheet extends StatefulWidget {
 }
 
 class _ReadingSortSheetState extends State<ReadingSortSheet> {
-  late ReadingSort _sort = widget.initial.sort;
-  late bool _desc = widget.initial.descending;
+  // One slot per level; null = not used (level 1: the default sort). A
+  // level can only use a field no earlier level uses, and only once the
+  // level before it is set, so whatever is picked here is always valid.
+  late final List<ReadingSortField?> _fields = [
+    for (var i = 0; i < ReadingFilters.maxSortLevels; i++)
+      i < widget.initial.sort.length ? widget.initial.sort[i].field : null,
+  ];
+  late final List<bool> _desc = [
+    for (var i = 0; i < ReadingFilters.maxSortLevels; i++)
+      i < widget.initial.sort.length
+          ? widget.initial.sort[i].descending
+          : (i == 0 && widget.initial.descending),
+  ];
+
+  List<ReadingSortField> get _offered => ReadingSortField.values
+      .where((f) => widget.showUser || f != ReadingSortField.user)
+      .toList();
+
+  /// Fields level [i] may use: those no earlier level has taken.
+  List<ReadingSortField> _optionsFor(int i) =>
+      _offered.where((f) => !_fields.take(i).contains(f)).toList();
+
+  void _pick(int i, ReadingSortField? field) => setState(() {
+    _fields[i] = field;
+    // A field starts in its natural direction; the default sort ascending.
+    _desc[i] = field?.startsDescending ?? false;
+    // Later levels give way: nothing after an empty level, and no field
+    // twice (picking here what a later level had clears that level).
+    for (var j = i + 1; j < _fields.length; j++) {
+      if (_fields[j - 1] == null || _fields.take(j).contains(_fields[j])) {
+        _fields[j] = null;
+      }
+    }
+  });
+
+  ReadingFilters get _result {
+    final levels = [
+      for (final (i, f) in _fields.indexed)
+        if (f != null) SortLevel(f, descending: _desc[i]),
+    ];
+    return widget.initial.copyWith(
+      sort: levels,
+      descending: levels.isEmpty && _desc[0],
+    );
+  }
+
+  Widget _level(BuildContext context, int i) {
+    final enabled = i == 0 || _fields[i - 1] != null;
+    final field = _fields[i];
+    return Row(
+      children: [
+        Expanded(
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: S.sortLevel(i + 1),
+              isDense: true,
+              enabled: enabled,
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<ReadingSortField?>(
+                value: field,
+                isDense: true,
+                isExpanded: true,
+                onChanged: enabled ? (v) => _pick(i, v) : null,
+                items: [
+                  DropdownMenuItem<ReadingSortField?>(
+                    value: null,
+                    child: Text(i == 0 ? S.sortDefault : S.sortNone),
+                  ),
+                  for (final f in _optionsFor(i))
+                    DropdownMenuItem<ReadingSortField?>(
+                      value: f,
+                      child: Text(f.label),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        // The default sort has a direction too (its export order); an
+        // unused later level has none.
+        SegmentedButton<bool>(
+          showSelectedIcon: false,
+          style: const ButtonStyle(
+            visualDensity: VisualDensity(horizontal: -3, vertical: -2),
+          ),
+          segments: [
+            ButtonSegment(
+              value: false,
+              tooltip: S.sortAsc,
+              icon: const Icon(Icons.arrow_upward_rounded, size: 18),
+            ),
+            ButtonSegment(
+              value: true,
+              tooltip: S.sortDesc,
+              icon: const Icon(Icons.arrow_downward_rounded, size: 18),
+            ),
+          ],
+          selected: {_desc[i]},
+          onSelectionChanged: enabled && (i == 0 || field != null)
+              ? (s) => setState(() => _desc[i] = s.first)
+              : null,
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final options = ReadingSort.values.where(
-      (s) => widget.showUser || s != ReadingSort.user,
-    );
     return SingleChildScrollView(
       padding: EdgeInsets.fromLTRB(
         20,
@@ -152,53 +307,24 @@ class _ReadingSortSheetState extends State<ReadingSortSheet> {
             style: Theme.of(context).textTheme.titleLarge
                 ?.copyWith(fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 8),
-          RadioGroup<ReadingSort>(
-            groupValue: _sort,
-            onChanged: (v) => setState(() {
-              _sort = v!;
-              // Sensible direction per field: default = ascending export
-              // order within each day; everything else newest / highest first.
-              _desc = _sort != ReadingSort.byDefault;
-            }),
-            child: Column(
-              children: [
-                for (final s in options)
-                  RadioListTile<ReadingSort>(
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    title: Text(s.label),
-                    value: s,
-                  ),
-              ],
+          const SizedBox(height: 12),
+          for (var i = 0; i < ReadingFilters.maxSortLevels; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            _level(context, i),
+          ],
+          if (_fields[0] == null) ...[
+            const SizedBox(height: 8),
+            Text(
+              S.sortDefaultHint,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 12.5,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            child: SegmentedButton<bool>(
-              segments: [
-                ButtonSegment(
-                  value: false,
-                  label: Text(S.sortAsc),
-                  icon: Icon(Icons.arrow_upward_rounded, size: 16),
-                ),
-                ButtonSegment(
-                  value: true,
-                  label: Text(S.sortDesc),
-                  icon: Icon(Icons.arrow_downward_rounded, size: 16),
-                ),
-              ],
-              selected: {_desc},
-              onSelectionChanged: (s) => setState(() => _desc = s.first),
-            ),
-          ),
+          ],
           const SizedBox(height: 20),
           FilledButton(
-            onPressed: () => Navigator.pop(
-              context,
-              widget.initial.copyWith(sort: _sort, descending: _desc),
-            ),
+            onPressed: () => Navigator.pop(context, _result),
             child: Text(S.applyFilters),
           ),
         ],
@@ -308,11 +434,15 @@ class _ReadingFilterSheetState extends State<ReadingFilterSheet> {
             const SizedBox(height: 16),
             TextField(
               controller: _number,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              maxLength: maxMeterNumberDigits,
               textDirection: TextDirection.ltr,
               contextMenuBuilder: appContextMenuBuilder,
               decoration: InputDecoration(
                 labelText: S.filterNumber,
                 isDense: true,
+                counterText: '',
                 prefixIcon: Icon(Icons.tag_rounded),
               ),
             ),

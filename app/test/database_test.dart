@@ -11,7 +11,8 @@ void main() {
       name: 'Pool',
       type: 'water',
       area: 'Pool',
-      number: '7',
+      number: 7,
+      groupName: 'Pools',
       photoKey: 'meters/p.jpg',
       todoOrder: 3,
       exportOrder: 4,
@@ -34,6 +35,7 @@ void main() {
     final m = (await db.watchActiveMeters().first).single;
     expect(m.photoKey, isNull);
     expect(m.number, isNull);
+    expect(m.groupName, isNull);
     expect(m.todoOrder, isNull);
     expect(m.exportOrder, isNull);
   });

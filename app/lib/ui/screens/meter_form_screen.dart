@@ -34,10 +34,16 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
   late final TextEditingController _name;
   late final TextEditingController _area;
   late final TextEditingController _number;
+  late final TextEditingController _group;
   late final TextEditingController _todoOrder;
   late final TextEditingController _exportOrder;
   late bool _isMain;
   bool _busy = false;
+
+  /// Groups other meters already use, offered as one-tap choices so a
+  /// group is spelled the same way on every meter (that is what puts them
+  /// under one header in the export).
+  List<String> _knownGroups = const [];
 
   // Photo state: an existing server key, a newly picked file, or a request
   // to clear. `_newPhoto` wins over `_photoKey`; `_removePhoto` clears both.
@@ -50,6 +56,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
   /// Everything the form holds, to spot edits when leaving.
   String get _current =>
       '${_type.name}|${_name.text}|${_area.text}|${_number.text}|'
+      '${_group.text}|'
       '${_todoOrder.text}|${_exportOrder.text}|$_isMain|$_photoKey|'
       '${_newPhoto?.path}|$_removePhoto';
   String _saved = '';
@@ -61,17 +68,24 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     _type = m != null ? MeterType.fromApi(m.type) : MeterType.electricity;
     _name = TextEditingController(text: m?.name ?? '');
     _area = TextEditingController(text: m?.area ?? '');
-    _number = TextEditingController(text: m?.number ?? '');
+    _number = TextEditingController(text: m?.number?.toString() ?? '');
+    _group = TextEditingController(text: m?.groupName ?? '');
     _todoOrder = TextEditingController(text: m?.todoOrder?.toString() ?? '');
     _exportOrder = TextEditingController(
       text: m?.exportOrder?.toString() ?? '',
     );
     _isMain = m?.isMain ?? false;
     _photoKey = m?.photoKey;
-    for (final c in [_name, _area, _number, _todoOrder, _exportOrder]) {
+    for (final c in [_name, _area, _number, _group, _todoOrder, _exportOrder]) {
       c.addListener(() => setState(() {}));
     }
     _saved = _current;
+    _loadKnownGroups();
+  }
+
+  Future<void> _loadKnownGroups() async {
+    final groups = await context.read<AppDatabase>().meterGroups();
+    if (mounted) setState(() => _knownGroups = groups);
   }
 
   @override
@@ -79,6 +93,7 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     _name.dispose();
     _area.dispose();
     _number.dispose();
+    _group.dispose();
     _todoOrder.dispose();
     _exportOrder.dispose();
     super.dispose();
@@ -94,7 +109,8 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
     final messenger = ScaffoldMessenger.of(context);
     final name = _name.text.trim();
     final area = _area.text.trim();
-    final number = _number.text.trim();
+    final number = int.tryParse(_number.text.trim());
+    final group = _group.text.trim();
     final todoOrder = _orderValue(_todoOrder);
     final exportOrder = _orderValue(_exportOrder);
 
@@ -120,7 +136,8 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
             type: _type,
             name: name,
             area: area,
-            number: number.isEmpty ? null : number,
+            number: number,
+            group: group,
             photoKey: uploadedKey,
             clearPhoto: _removePhoto && uploadedKey == null,
             todoOrder: todoOrder,
@@ -131,7 +148,8 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
             type: _type,
             name: name,
             area: area,
-            number: number.isEmpty ? null : number,
+            number: number,
+            group: group.isEmpty ? null : group,
             photoKey: uploadedKey,
             todoOrder: todoOrder,
             exportOrder: exportOrder,
@@ -320,7 +338,9 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
               TextFormField(
                 controller: _number,
                 textInputAction: TextInputAction.next,
-                maxLength: 80,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                maxLength: maxMeterNumberDigits,
                 textDirection: TextDirection.ltr,
                 contextMenuBuilder: appContextMenuBuilder,
                 decoration: InputDecoration(
@@ -329,6 +349,38 @@ class _MeterFormScreenState extends State<MeterFormScreen> {
                   counterText: '',
                 ),
               ),
+              const SizedBox(height: 14),
+              TextFormField(
+                controller: _group,
+                textInputAction: TextInputAction.next,
+                maxLength: 80,
+                contextMenuBuilder: appContextMenuBuilder,
+                decoration: InputDecoration(
+                  labelText: S.meterGroup,
+                  helperText: S.meterGroupHint,
+                  helperMaxLines: 3,
+                  counterText: '',
+                ),
+              ),
+              if (_knownGroups.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    for (final g in _knownGroups)
+                      ChoiceChip(
+                        label: Text(g),
+                        visualDensity: VisualDensity.compact,
+                        selected:
+                            _group.text.trim().toLowerCase() == g.toLowerCase(),
+                        onSelected: _busy
+                            ? null
+                            : (on) => _group.text = on ? g : '',
+                      ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 20),
               Text(
                 S.moderatorOnlyFields,

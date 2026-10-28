@@ -460,7 +460,8 @@ class _SettingsSection extends StatelessWidget {
 }
 
 /// Excel export options: which columns, in what order, the sheet direction,
-/// date and number formats, and one sheet per meter type.
+/// date and number formats, one sheet per meter type, and the transposed
+/// layout with its group headers and total row.
 class _ExportSection extends StatelessWidget {
   const _ExportSection({
     required this.settings,
@@ -626,6 +627,40 @@ class _ExportSection extends StatelessWidget {
           value: settings.sheetPerType,
           onChanged: enabled
               ? (v) => onChanged(settings.copyWith(sheetPerType: v))
+              : null,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          S.exportLayout,
+          style: const TextStyle(fontWeight: FontWeight.w700),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(S.exportTranspose),
+          subtitle: Text(S.exportTransposeHint, style: muted),
+          value: settings.transpose,
+          onChanged: enabled
+              ? (v) => onChanged(settings.copyWith(transpose: v))
+              : null,
+        ),
+        // Both only shape the transposed layout, so they wait for it (and
+        // keep their own setting while it is off).
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(S.exportGroupHeaders),
+          subtitle: Text(S.exportGroupHeadersHint, style: muted),
+          value: settings.groupHeaders,
+          onChanged: enabled && settings.transpose
+              ? (v) => onChanged(settings.copyWith(groupHeaders: v))
+              : null,
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(S.exportTotals),
+          subtitle: Text(S.exportTotalsHint, style: muted),
+          value: settings.totals,
+          onChanged: enabled && settings.transpose
+              ? (v) => onChanged(settings.copyWith(totals: v))
               : null,
         ),
       ],

@@ -13,7 +13,12 @@ class Meters extends Table {
   TextColumn get name => text().withDefault(const Constant(''))();
   TextColumn get type => text()();
   TextColumn get area => text().withDefault(const Constant(''))();
-  TextColumn get number => text().nullable()();
+
+  /// A whole number (text before schema 10).
+  IntColumn get number => integer().nullable()();
+
+  /// The header a meter sits under in the transposed export; null = none.
+  TextColumn get groupName => text().nullable()();
   TextColumn get photoKey => text().nullable()();
   TextColumn get lastLoggedAt => text().nullable()();
   RealColumn get lastValue => real().nullable()();
@@ -57,7 +62,7 @@ class AppDatabase extends _$AppDatabase {
     : super(executor ?? driftDatabase(name: 'meters_app'));
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -102,6 +107,27 @@ class AppDatabase extends _$AppDatabase {
       if (from < 9) {
         await m.addColumn(meters, meters.isMain);
       }
+      if (from < 10) {
+        // The number turns into an integer and the group arrives. This is
+        // only a cache (the next refresh rewrites it from the server), but
+        // numbers that are plain digits carry over so the meter list reads
+        // right while offline; anything else is left empty until then.
+        // Queued readings are a separate table and aren't touched.
+        await m.alterTable(
+          TableMigration(
+            meters,
+            columnTransformer: {
+              meters.number: const CustomExpression<int>(
+                "CASE WHEN TRIM(number) GLOB '[0-9]*' "
+                "AND TRIM(number) NOT GLOB '*[^0-9]*' "
+                "AND LENGTH(TRIM(number)) <= 9 "
+                'THEN CAST(TRIM(number) AS INTEGER) END',
+              ),
+            },
+            newColumns: [meters.groupName],
+          ),
+        );
+      }
     },
   );
 
@@ -138,6 +164,19 @@ class AppDatabase extends _$AppDatabase {
       ..orderBy([(m) => OrderingTerm.asc(m.name)]);
     if (type != null) q.where((m) => m.type.equals(type));
     return q.watch();
+  }
+
+  /// The groups active meters use, each once (whatever its case), A–Z.
+  Future<List<String>> meterGroups() async {
+    final rows = await (select(
+      meters,
+    )..where((m) => m.isActive.equals(true) & m.groupName.isNotNull())).get();
+    final seen = <String>{};
+    return [
+      for (final m in rows)
+        if (m.groupName!.trim() case final g when g.isNotEmpty)
+          if (seen.add(g.toLowerCase())) g,
+    ]..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
   }
 
   Future<Meter?> meterById(String id) =>
