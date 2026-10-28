@@ -116,7 +116,9 @@ settingsRoutes.put("/settings", requireAuth, requireRole("moderator"), async (c)
     if (typeof body.export !== "object" || body.export === null) {
       return c.json({ error: "export must be an object" }, 400);
     }
-    const parsed = parseExportSettings(JSON.stringify(body.export));
+    // Over the current settings, so an app that doesn't know a newer option
+    // (and so doesn't send it) leaves it as it was instead of resetting it.
+    const parsed = parseExportSettings(JSON.stringify({ ...current.export, ...body.export }));
     // Anything unusable falls back, so only an empty column list is an error.
     if (Array.isArray(body.export.columns) && body.export.columns.length === 0) {
       return c.json({ error: "export.columns must list at least one column" }, 400);

@@ -108,6 +108,15 @@ export interface ExportSettings {
   thousandsSeparator: boolean;
   /** One sheet per meter type (tab named after the type) instead of one. */
   sheetPerType: boolean;
+  /**
+   * Dates down the side and meters across the top (by meter type, then
+   * export order) instead of one row per reading.
+   */
+  transpose: boolean;
+  /** Transposed only: meters that share a group sit under its header. */
+  groupHeaders: boolean;
+  /** Transposed only: a total row summing each consumption column. */
+  totals: boolean;
 }
 
 export interface Prices {

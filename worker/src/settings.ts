@@ -33,6 +33,9 @@ export const DEFAULT_SETTINGS: Settings = {
     decimals: 2,
     thousandsSeparator: true,
     sheetPerType: false,
+    transpose: false,
+    groupHeaders: false,
+    totals: false,
   },
   prices: { electricity: 0, water: 0, gas: 0 },
 };
@@ -69,6 +72,9 @@ export function parseExportSettings(raw: string | null): ExportSettings {
     decimals: Number.isInteger(decimals) && decimals >= 0 && decimals <= 3 ? decimals : fallback.decimals,
     thousandsSeparator: typeof value.thousandsSeparator === "boolean" ? value.thousandsSeparator : fallback.thousandsSeparator,
     sheetPerType: typeof value.sheetPerType === "boolean" ? value.sheetPerType : fallback.sheetPerType,
+    transpose: typeof value.transpose === "boolean" ? value.transpose : fallback.transpose,
+    groupHeaders: typeof value.groupHeaders === "boolean" ? value.groupHeaders : fallback.groupHeaders,
+    totals: typeof value.totals === "boolean" ? value.totals : fallback.totals,
   };
 }
 

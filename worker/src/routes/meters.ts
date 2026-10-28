@@ -12,8 +12,10 @@ function isUniqueViolation(err: unknown): boolean {
 const DUPLICATE_METER = "A meter with the same name, number and area already exists";
 
 // `location` mirrors area for 2.0.0 apps, which still require the field.
+// The number is stored as an integer but sent as text: apps from before the
+// change read it as a string and would fail on a JSON number.
 const METER_COLUMNS =
-  "m.id, m.name, m.type, m.area, m.area AS location, m.number, m.is_active, m.is_main, m.photo_key, m.todo_order, m.export_order, m.created_by, m.created_at, m.updated_at";
+  "m.id, m.name, m.type, m.area, m.area AS location, CAST(m.number AS TEXT) AS number, m.group_name, m.is_active, m.is_main, m.photo_key, m.todo_order, m.export_order, m.created_by, m.created_at, m.updated_at";
 
 export const meterRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
@@ -44,6 +46,25 @@ function text(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
+/** Largest meter number (9 digits). */
+const MAX_METER_NUMBER = 999_999_999;
+const BAD_NUMBER = "number must be a whole number between 0 and 999999999";
+
+/**
+ * A meter number from the body: a whole number, or its digits as a string
+ * (what every app version sends). null = none; NaN signals an invalid value.
+ */
+function meterNumber(v: unknown): number | null {
+  if (v === undefined || v === null) return null;
+  if (typeof v === "string") {
+    const digits = v.trim();
+    if (!digits) return null;
+    if (!/^\d{1,9}$/.test(digits)) return NaN;
+    v = Number(digits);
+  }
+  return Number.isInteger(v) && (v as number) >= 0 && (v as number) <= MAX_METER_NUMBER ? (v as number) : NaN;
+}
+
 /** null = absent, or a non-negative integer; NaN signals an invalid value. */
 function order(v: unknown): number | null {
   if (v === undefined || v === null || v === "") return null;
@@ -55,7 +76,8 @@ meterRoutes.post("/", requireRole("moderator"), async (c) => {
   const type = body?.type;
   const name = text(body?.name);
   const area = text(body?.area);
-  const number = text(body?.number) || null;
+  const number = meterNumber(body?.number);
+  const group = text(body?.group) || null;
   const photoKey = typeof body?.photoKey === "string" && body.photoKey.startsWith("meters/") ? body.photoKey : null;
   const todoOrder = order(body?.todoOrder);
   const exportOrder = order(body?.exportOrder);
@@ -66,7 +88,8 @@ meterRoutes.post("/", requireRole("moderator"), async (c) => {
   }
   if (!name || name.length > MAX_TEXT_LENGTH) return c.json({ error: "name is required (max 80 chars)" }, 400);
   if (!area || area.length > MAX_TEXT_LENGTH) return c.json({ error: "area is required (max 80 chars)" }, 400);
-  if (number && number.length > MAX_TEXT_LENGTH) return c.json({ error: "number is too long (max 80 chars)" }, 400);
+  if (Number.isNaN(number)) return c.json({ error: BAD_NUMBER, code: "bad_number" }, 400);
+  if (group && group.length > MAX_TEXT_LENGTH) return c.json({ error: "group is too long (max 80 chars)" }, 400);
   if (Number.isNaN(todoOrder) || Number.isNaN(exportOrder)) {
     return c.json({ error: "todoOrder and exportOrder must be non-negative integers" }, 400);
   }
@@ -76,10 +99,10 @@ meterRoutes.post("/", requireRole("moderator"), async (c) => {
 
   try {
     await c.env.DB.prepare(
-      `INSERT INTO meters (id, name, type, area, number, photo_key, todo_order, export_order, is_main, is_active, created_by, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
+      `INSERT INTO meters (id, name, type, area, number, group_name, photo_key, todo_order, export_order, is_main, is_active, created_by, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`
     )
-      .bind(id, name, type, area, number, photoKey, todoOrder, exportOrder, isMain, c.get("user").id, now, now)
+      .bind(id, name, type, area, number, group, photoKey, todoOrder, exportOrder, isMain, c.get("user").id, now, now)
       .run();
   } catch (err) {
     if (isUniqueViolation(err)) return c.json({ error: DUPLICATE_METER }, 409);
@@ -108,11 +131,13 @@ meterRoutes.put("/:id", requireRole("moderator"), async (c) => {
   if (area !== null && (!area || area.length > MAX_TEXT_LENGTH)) {
     return c.json({ error: "area is required (max 80 chars)" }, 400);
   }
-  // number / todoOrder / exportOrder: present (possibly empty/null) sets or
-  // clears, absent leaves unchanged.
+  // number / group / todoOrder / exportOrder: present (possibly empty/null)
+  // sets or clears, absent leaves unchanged.
   const has = (k: string) => body !== null && Object.prototype.hasOwnProperty.call(body, k);
-  const number = has("number") ? text(body.number) || null : null;
-  if (number && number.length > MAX_TEXT_LENGTH) return c.json({ error: "number is too long (max 80 chars)" }, 400);
+  const number = has("number") ? meterNumber(body.number) : null;
+  if (Number.isNaN(number)) return c.json({ error: BAD_NUMBER, code: "bad_number" }, 400);
+  const group = has("group") ? text(body.group) || null : null;
+  if (group && group.length > MAX_TEXT_LENGTH) return c.json({ error: "group is too long (max 80 chars)" }, 400);
   const todoOrder = has("todoOrder") ? order(body.todoOrder) : null;
   const exportOrder = has("exportOrder") ? order(body.exportOrder) : null;
   if (Number.isNaN(todoOrder) || Number.isNaN(exportOrder)) {
@@ -129,6 +154,7 @@ meterRoutes.put("/:id", requireRole("moderator"), async (c) => {
          name = COALESCE(?, name),
          area = COALESCE(?, area),
          number = CASE WHEN ? THEN ? ELSE number END,
+         group_name = CASE WHEN ? THEN ? ELSE group_name END,
          photo_key = CASE WHEN ? THEN ? ELSE photo_key END,
          todo_order = CASE WHEN ? THEN ? ELSE todo_order END,
          export_order = CASE WHEN ? THEN ? ELSE export_order END,
@@ -139,6 +165,7 @@ meterRoutes.put("/:id", requireRole("moderator"), async (c) => {
       .bind(
         type, name, area,
         has("number") ? 1 : 0, number,
+        has("group") ? 1 : 0, group,
         has("photoKey") ? 1 : 0, photoKey,
         has("todoOrder") ? 1 : 0, todoOrder,
         has("exportOrder") ? 1 : 0, exportOrder,

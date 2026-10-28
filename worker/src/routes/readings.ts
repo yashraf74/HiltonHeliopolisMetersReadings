@@ -5,7 +5,7 @@ import { ALL_DATES_FROM, DATA_START, READINGS_ADMIN_ROLES } from "../types";
 import type { AuthedVars } from "../middleware";
 import { requireAuth, requireRole } from "../middleware";
 import { recomputeGains } from "../gain";
-import { filterUnusual, findUnusual, loadRowsForUnusual, unusualWindow } from "../unusual";
+import { filterUnusual, findUnusual, loadRowsForUnusual, meterNumberFilter, unusualWindow } from "../unusual";
 
 export const readingRoutes = new Hono<{ Bindings: Env; Variables: AuthedVars }>();
 
@@ -70,30 +70,70 @@ const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
 
 // A sort is a list of keys; the cursor carries one value per key and the
-// keyset condition is the lexicographic tuple comparison. `dir` flips only
-// the keys marked `follows` (the primary sort); fixed-direction keys keep
-// their own order, e.g. "default" = newest local day first, then export
-// order (follows `dir`, ascending by default), then newest first.
-interface SortKey {
+// keyset condition is the lexicographic tuple comparison.
+//
+// `sort` is either "default" — newest local day first, then meter type,
+// then export order (the only part `dir` flips, ascending by default), then
+// newest first — or up to three comma-separated fields, each with its own
+// direction in the same position of `dir` ("meter_type,value" +
+// "asc,desc"; a missing direction is descending). A single field is what
+// apps before multi-level sorting send. Ties after the chosen fields go to
+// the newest reading, then to the id.
+interface SortField {
   expr: string;
   nocase?: boolean;
-  desc?: boolean; // fixed direction (ignores `dir`)
-  follows?: boolean; // direction follows `dir`
+}
+interface SortKey extends SortField {
+  desc: boolean;
 }
 const ORDER_LAST = 2147483647;
-/** `tz` is the caller's offset in minutes east of UTC (an integer). */
-const sortsFor = (tz: number): Record<string, SortKey[]> => ({
-  default: [
-    { expr: `date(r.logged_at, '${tz} minutes')`, desc: true },
-    { expr: `COALESCE(m.export_order, ${ORDER_LAST})`, follows: true },
-    { expr: "r.logged_at", desc: true },
-  ],
-  logged_at: [{ expr: "r.logged_at", follows: true }],
-  value: [{ expr: "r.value", follows: true }],
-  meter_name: [{ expr: "m.name", nocase: true, follows: true }],
-  meter_type: [{ expr: "m.type", follows: true }, { expr: "r.logged_at", desc: true }],
-  technician: [{ expr: "u.full_name", nocase: true, follows: true }, { expr: "r.logged_at", desc: true }],
+/** Stands in for a missing gain (a meter's first reading): below any real one. */
+const NO_GAIN = -1e15;
+const MAX_SORT_LEVELS = 3;
+/** Meter types in the app's order (electricity, water, gas), not alphabetical. */
+const TYPE_ORDER = "CASE m.type WHEN 'electricity' THEN 0 WHEN 'water' THEN 1 ELSE 2 END";
+/**
+ * The fields a sort level can use. Nullable columns are coalesced, because
+ * the keyset comparison can't step past a NULL. `tz` is the caller's offset
+ * in minutes east of UTC (an integer).
+ */
+const sortFieldsFor = (tz: number): Record<string, SortField> => ({
+  day: { expr: `date(r.logged_at, '${tz} minutes')` },
+  logged_at: { expr: "r.logged_at" },
+  value: { expr: "r.value" },
+  gain: { expr: `COALESCE(r.gain, ${NO_GAIN})` },
+  meter_name: { expr: "m.name", nocase: true },
+  meter_number: { expr: `COALESCE(m.number, ${ORDER_LAST})` },
+  meter_area: { expr: "m.area", nocase: true },
+  meter_type: { expr: TYPE_ORDER },
+  technician: { expr: "u.full_name", nocase: true },
 });
+
+/** The keys for `sort` + `dir`, or an error message. */
+function sortKeys(sortParam: string, dirParam: string | undefined, tz: number): SortKey[] | string {
+  const fields = sortFieldsFor(tz);
+  const dayExpr = fields.day.expr;
+  if (sortParam === "default") {
+    return [
+      { expr: dayExpr, desc: true },
+      { expr: TYPE_ORDER, desc: false },
+      { expr: `COALESCE(m.export_order, ${ORDER_LAST})`, desc: (dirParam ?? "asc") !== "asc" },
+      { expr: "r.logged_at", desc: true },
+    ];
+  }
+  const names = sortParam.split(",").map((n) => n.trim());
+  const dirs = (dirParam ?? "").split(",").map((d) => d.trim());
+  if (
+    names.length > MAX_SORT_LEVELS ||
+    new Set(names).size !== names.length ||
+    !names.every((n) => Object.prototype.hasOwnProperty.call(fields, n))
+  ) {
+    return `sort must be "default" or up to ${MAX_SORT_LEVELS} different fields of: ${Object.keys(fields).join(", ")}`;
+  }
+  const keys: SortKey[] = names.map((n, i) => ({ ...fields[n], desc: (dirs[i] || "desc") !== "asc" }));
+  if (!names.includes("logged_at")) keys.push({ expr: "r.logged_at", desc: true });
+  return keys;
+}
 
 type CursorValue = string | number;
 
@@ -132,18 +172,19 @@ readingRoutes.get("/", async (c) => {
   const forExport = c.req.query("export") === "1";
   const limitParam = Number(c.req.query("limit") ?? DEFAULT_PAGE_SIZE);
   const limit = Number.isInteger(limitParam) ? Math.min(Math.max(limitParam, 1), MAX_PAGE_SIZE) : DEFAULT_PAGE_SIZE;
-  const sortKey = c.req.query("sort") ?? "default";
   const tzRaw = Number(c.req.query("tz") ?? "0");
-  const sorts = sortsFor(Number.isInteger(tzRaw) && Math.abs(tzRaw) <= 24 * 60 ? tzRaw : 0);
-  const sort = sorts[sortKey];
-  if (!sort) return c.json({ error: `sort must be one of: ${Object.keys(sorts).join(", ")}` }, 400);
-  const dirDesc = (c.req.query("dir") ?? (sortKey === "default" ? "asc" : "desc")) !== "asc";
+  const sort = sortKeys(
+    c.req.query("sort") || "default",
+    c.req.query("dir"),
+    Number.isInteger(tzRaw) && Math.abs(tzRaw) <= 24 * 60 ? tzRaw : 0
+  );
+  if (typeof sort === "string") return c.json({ error: sort }, 400);
   if (forExport && !settings.exportEnabled) return c.json({ error: "Export is disabled", code: "export_disabled" }, 403);
 
   const keys = sort.map((k) => ({
     expr: k.expr,
     collate: k.nocase ? " COLLATE NOCASE" : "",
-    desc: k.follows ? dirDesc : !!k.desc,
+    desc: k.desc,
   }));
   // Tie-break on id in the direction of the last key.
   const idDesc = keys[keys.length - 1].desc;
@@ -162,9 +203,16 @@ readingRoutes.get("/", async (c) => {
       params.push(...types);
     }
   }
-  if (number) {
-    conditions.push("m.number LIKE ?");
-    params.push(`%${number}%`);
+  // A whole meter number, matched exactly (12 doesn't find 112). Anything
+  // else can't be a meter number, so it matches nothing.
+  if (number?.trim()) {
+    const n = meterNumberFilter(number);
+    if (n === null) {
+      conditions.push("0");
+    } else {
+      conditions.push("m.number = ?");
+      params.push(n);
+    }
   }
   if (userId) {
     conditions.push("r.logged_by = ?");
@@ -179,7 +227,7 @@ readingRoutes.get("/", async (c) => {
     params.push(dateTo);
   }
   if (search) {
-    conditions.push("(m.name LIKE ? OR m.area LIKE ? OR m.number LIKE ? OR u.full_name LIKE ?)");
+    conditions.push("(m.name LIKE ? OR m.area LIKE ? OR CAST(m.number AS TEXT) LIKE ? OR u.full_name LIKE ?)");
     params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
   }
   if (cursor) {
@@ -216,8 +264,9 @@ readingRoutes.get("/", async (c) => {
     `SELECT r.id, r.value, r.gain, r.photo_key, r.logged_by, r.logged_at, r.synced_at,
             u.full_name as logged_by_name, u.username as logged_by_username,
             m.id as meter_id, m.name as meter_name, m.type as meter_type, m.area as meter_location, -- meter_location: for 2.0.0 apps
-            m.area as meter_area, m.number as meter_number,
-            m.export_order as meter_export_order,
+            m.area as meter_area,
+            CAST(m.number AS TEXT) as meter_number, -- text for apps from before integer numbers
+            m.export_order as meter_export_order, m.group_name as meter_group,
             ${sortSelects}
      FROM readings r
      JOIN meters m ON m.id = r.meter_id

@@ -108,7 +108,7 @@ export function loadRowsForUnusual(db: D1Database, innerFrom: string, to: string
   return db
     .prepare(
       `SELECT * FROM (
-         SELECT r.id, r.meter_id, m.type, m.name, m.area, m.number, m.is_main, m.photo_key, r.value, r.gain, r.logged_at,
+         SELECT r.id, r.meter_id, m.type, m.name, m.area, CAST(m.number AS TEXT) AS number, m.is_main, m.photo_key, r.value, r.gain, r.logged_at,
                 r.photo_key AS reading_photo_key, r.logged_by, r.normal_at, u.full_name AS logged_by_name,
                 LAG(r.logged_at) OVER (PARTITION BY r.meter_id ORDER BY r.logged_at, r.id) AS prev_at
          FROM readings r JOIN meters m ON m.id = r.meter_id JOIN users u ON u.id = r.logged_by
@@ -149,6 +149,16 @@ export interface UnusualFilters {
 
 type Flagged = ReturnType<typeof findUnusual>[number];
 
+/**
+ * The meter number a filter asks for, or null when the text can't be one
+ * (a meter number is a whole number). Shared with `GET /readings` so the
+ * list and its unusual readings match on the same meters.
+ */
+export function meterNumberFilter(text: string): number | null {
+  const digits = text.trim();
+  return /^\d{1,9}$/.test(digits) ? Number(digits) : null;
+}
+
 const has = (value: string | null, needle: string) =>
   (value ?? "").toLowerCase().includes(needle);
 
@@ -161,11 +171,12 @@ const has = (value: string | null, needle: string) =>
  */
 export function filterUnusual(rows: Flagged[], f: UnusualFilters): Flagged[] {
   const types = f.types?.length ? f.types : null;
-  const number = f.number?.trim().toLowerCase();
+  const number = f.number?.trim() ? meterNumberFilter(f.number) : undefined;
   const search = f.search?.trim().toLowerCase();
   return rows.filter((r) => {
     if (types && !types.includes(r.type)) return false;
-    if (number && !has(r.number, number)) return false;
+    // Exact, like the list: 12 doesn't find 112, and non-digits find nothing.
+    if (number !== undefined && (number === null || r.number === null || Number(r.number) !== number)) return false;
     if (f.userId && r.logged_by !== f.userId) return false;
     if (
       search &&
